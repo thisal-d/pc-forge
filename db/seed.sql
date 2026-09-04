@@ -1,0 +1,1 @@
+-- PostgreSQL Initial Seed Data: Hardware Catalog, Roles, Demo Accounts

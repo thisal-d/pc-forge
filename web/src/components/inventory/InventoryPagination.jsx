@@ -1,0 +1,1 @@
+// Component: Inventory Table Pagination

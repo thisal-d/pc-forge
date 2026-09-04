@@ -1,0 +1,1 @@
+// Component: Categories Administration Table

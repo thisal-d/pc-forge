@@ -1,0 +1,1 @@
+-- PostgreSQL 16 Normalized Schema (16 Tables, Views, Indexes, Constraints)

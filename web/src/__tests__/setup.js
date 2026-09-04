@@ -1,0 +1,1 @@
+// Vitest Environment Setup (jsdom)
