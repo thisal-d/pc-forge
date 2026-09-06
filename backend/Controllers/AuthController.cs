@@ -95,4 +95,73 @@ public class AuthController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieve currently authenticated user's claims.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me")]
+    public IActionResult GetCurrentUser()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("userId");
+        var email = User.FindFirstValue(ClaimTypes.Email);
+        var role = User.FindFirstValue(ClaimTypes.Role) ?? User.FindFirstValue("role");
+        var firstName = User.FindFirstValue(ClaimTypes.GivenName) ?? User.FindFirstValue("firstName");
+        var lastName = User.FindFirstValue(ClaimTypes.Surname) ?? User.FindFirstValue("lastName");
+
+        return Ok(new
+        {
+            UserId = userId,
+            Email = email,
+            Role = role,
+            FirstName = firstName,
+            LastName = lastName
+        });
+    }
+
+    /// <summary>
+    /// Update authenticated user's profile details (Member 01).
+    /// </summary>
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new AuthResponseDto
+            {
+                Success = false,
+                Message = "Invalid profile data provided."
+            });
+        }
+
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("userId");
+        if (!int.TryParse(userIdStr, out int userId))
+        {
+            return Unauthorized(new AuthResponseDto
+            {
+                Success = false,
+                Message = "Invalid or missing user authentication claims."
+            });
+        }
+
+        try
+        {
+            var result = await _authService.UpdateProfileAsync(userId, dto);
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error occurred during profile update.");
+            return StatusCode(StatusCodes.Status500InternalServerError, new AuthResponseDto
+            {
+                Success = false,
+                Message = $"Server error during profile update: {ex.Message}"
+            });
+        }
+    }
 }
