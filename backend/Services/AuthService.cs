@@ -125,6 +125,91 @@ public class AuthService : IAuthService
         };
     }
 
+    public async Task<AuthResponseDto> UpdateProfileAsync(int userId, UpdateProfileDto dto)
+    {
+        var user = await _context.Users
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.UserId == userId);
+
+        if (user == null)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "User not found."
+            };
+        }
+
+        // 1. Optional Email change
+        if (!string.IsNullOrWhiteSpace(dto.Email) && !dto.Email.Trim().Equals(user.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+            if (await _context.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail && u.UserId != userId))
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Another account is already using this email address."
+                };
+            }
+            user.Email = normalizedEmail;
+        }
+
+        // 2. Optional Name changes
+        if (dto.FirstName != null)
+        {
+            user.FirstName = dto.FirstName.Trim();
+        }
+
+        if (dto.LastName != null)
+        {
+            user.LastName = dto.LastName.Trim();
+        }
+
+        // 3. Optional Password change
+        if (!string.IsNullOrWhiteSpace(dto.NewPassword))
+        {
+            if (string.IsNullOrWhiteSpace(dto.CurrentPassword))
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Current password is required to set a new password."
+                };
+            }
+
+            bool isCurrentValid = BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash);
+            if (!isCurrentValid)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Current password is incorrect."
+                };
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        }
+
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        var roleName = user.Role?.RoleName ?? "Customer";
+        var token = GenerateJwtToken(user, roleName);
+
+        return new AuthResponseDto
+        {
+            Success = true,
+            Message = "Profile updated successfully.",
+            Token = token,
+            UserId = user.UserId,
+            Email = user.Email,
+            Role = roleName,
+            FirstName = user.FirstName,
+            LastName = user.LastName
+        };
+    }
+
     private string GenerateJwtToken(User user, string roleName)
     {
         var jwtSettings = _configuration.GetSection("Jwt");
@@ -169,5 +254,4 @@ public class AuthService : IAuthService
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
     }
-}
 }
