@@ -44,4 +44,5 @@ public class User
     [Column("updatedat")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    public Staff? StaffProfile { get; set; }
 }
