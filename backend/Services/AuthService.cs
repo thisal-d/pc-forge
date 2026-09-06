@@ -78,4 +78,96 @@ public class AuthService : IAuthService
             LastName = user.LastName
         };
     }
+
+    public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
+    {
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+
+        // 1. Find user including Role navigation
+        var user = await _context.Users
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+
+        if (user == null || !user.IsActive)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Invalid email or password."
+            };
+        }
+
+        // 2. Verify password with BCrypt
+        bool isPasswordValid = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+        if (!isPasswordValid)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Invalid email or password."
+            };
+        }
+
+        // 3. Generate JWT token
+        var roleName = user.Role?.RoleName ?? "Customer";
+        var token = GenerateJwtToken(user, roleName);
+
+        return new AuthResponseDto
+        {
+            Success = true,
+            Message = "Login successful.",
+            Token = token,
+            UserId = user.UserId,
+            Email = user.Email,
+            Role = roleName,
+            FirstName = user.FirstName,
+            LastName = user.LastName
+        };
+    }
+
+    private string GenerateJwtToken(User user, string roleName)
+    {
+        var jwtSettings = _configuration.GetSection("Jwt");
+        var secretKey = jwtSettings["Key"] ?? "PCForgeSuperSecretKeyForJwtAuthentication2026!";
+        var issuer = jwtSettings["Issuer"] ?? "PCForgeApi";
+        var audience = jwtSettings["Audience"] ?? "PCForgeClients";
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+            new(ClaimTypes.Email, user.Email),
+            new(ClaimTypes.Role, roleName),
+            new("userId", user.UserId.ToString()),
+            new("role", roleName)
+        };
+
+        if (!string.IsNullOrWhiteSpace(user.FirstName))
+        {
+            claims.Add(new Claim(ClaimTypes.GivenName, user.FirstName));
+            claims.Add(new Claim("firstName", user.FirstName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(user.LastName))
+        {
+            claims.Add(new Claim(ClaimTypes.Surname, user.LastName));
+            claims.Add(new Claim("lastName", user.LastName));
+        }
+
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Expires = DateTime.UtcNow.AddDays(7),
+            Issuer = issuer,
+            Audience = audience,
+            SigningCredentials = credentials
+        };
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
+    }
+}
 }
