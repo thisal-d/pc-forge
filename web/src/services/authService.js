@@ -48,4 +48,24 @@ export const authService = {
     localStorage.removeItem(USER_KEY);
   },
 
+  // Retrieve cached token
+  getToken() {
+    return localStorage.getItem(TOKEN_KEY);
+  },
+
+  // Retrieve cached user profile
+  getCurrentUser() {
+    const user = localStorage.getItem(USER_KEY);
+    try {
+      return user ? JSON.parse(user) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  // Fetch verified profile from /auth/me
+  async fetchMe() {
+    const response = await api.get('/auth/me');
+    return response.data;
+  },
 };
