@@ -366,6 +366,71 @@ public class CustomBuildsController : ControllerBase
         return Ok(await GetBuildDetailInternal(id));
     }
 
+    /// <summary>
+    /// Staff/Admin technical review action (Approve, Request Changes, Assign Staff).
+    /// </summary>
+    [HttpPatch("{id:int}/review")]
+    [Authorize(Policy = "StaffOnly")]
+    public async Task<ActionResult<CustomBuildDetailDto>> ReviewBuild(
+        int id,
+        [FromBody] UpdateBuildReviewStatusDto dto)
+    {
+        var build = await _context.CustomBuilds
+            .Include(cb => cb.Items)
+            .FirstOrDefaultAsync(cb => cb.BuildId == id);
+
+        if (build == null)
+        {
+            return NotFound(new { message = $"Custom Build #{id} not found." });
+        }
+
+        // Validate allowed statuses
+        var allowedStatuses = new[]
+        {
+            "Pending Staff Review",
+            "In Review by Staff",
+            "Approved by Staff",
+            "Changes Requested",
+            "Ordered"
+        };
+
+        if (!allowedStatuses.Contains(dto.Status, StringComparer.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = $"Invalid status '{dto.Status}'. Allowed: {string.Join(", ", allowedStatuses)}" });
+        }
+
+        build.Status = dto.Status;
+        if (dto.StaffNotes != null)
+        {
+            build.StaffNotes = dto.StaffNotes;
+        }
+
+        if (dto.AssignedStaffId.HasValue)
+        {
+            if (dto.AssignedStaffId.Value > 0)
+            {
+                var staff = await _context.Staff
+                    .FirstOrDefaultAsync(s => s.StaffId == dto.AssignedStaffId.Value || s.UserId == dto.AssignedStaffId.Value);
+                if (staff != null)
+                {
+                    build.AssignedStaffId = staff.StaffId;
+                }
+            }
+            else
+            {
+                build.AssignedStaffId = null;
+            }
+        }
+
+        build.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Custom Build #{BuildId} review status updated to '{Status}' by staff #{StaffId}",
+            build.BuildId, build.Status, build.AssignedStaffId);
+
+        return Ok(await GetBuildDetailInternal(id));
+    }
+
     private async Task<CustomBuildDetailDto?> GetBuildDetailInternal(int id)
     {
         var actionResult = await GetBuildById(id);
