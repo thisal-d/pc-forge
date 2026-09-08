@@ -220,6 +220,152 @@ public class CustomBuildsController : ControllerBase
         return Ok(detail);
     }
 
+    /// <summary>
+    /// Submit a new custom build configuration from the customer app.
+    /// </summary>
+    [HttpPost]
+    public async Task<ActionResult<CustomBuildDetailDto>> CreateBuild([FromBody] CreateCustomBuildDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+        {
+            return Unauthorized(new { message = "Authentication required to create a custom build." });
+        }
+        int userId = currentUserId.Value;
+
+        var productIds = dto.Components.Select(c => c.ProductId).Distinct().ToList();
+        var products = await _context.Products
+            .Where(p => productIds.Contains(p.ProductId))
+            .ToDictionaryAsync(p => p.ProductId);
+
+        decimal totalPrice = 0;
+        int estimatedWattage = 80; // Baseline motherboard/fans/storage overhead
+
+        var items = new List<CustomBuildItem>();
+        foreach (var c in dto.Components)
+        {
+            if (products.TryGetValue(c.ProductId, out var product))
+            {
+                totalPrice += product.Price;
+                if (product.PowerWattage.HasValue && (c.SlotType == "cpu" || c.SlotType == "gpu"))
+                {
+                    estimatedWattage += product.PowerWattage.Value;
+                }
+
+                items.Add(new CustomBuildItem
+                {
+                    ProductId = c.ProductId,
+                    SlotType = c.SlotType.ToLower(),
+                    UnitPrice = product.Price
+                });
+            }
+        }
+
+        var build = new CustomBuild
+        {
+            UserId = userId,
+            BuildName = dto.BuildName,
+            TotalPrice = totalPrice,
+            EstimatedWattage = estimatedWattage,
+            Status = "Pending Staff Review",
+            CustomerNotes = dto.CustomerNotes,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Items = items
+        };
+
+        _context.CustomBuilds.Add(build);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("New custom build #{BuildId} '{BuildName}' submitted by user #{UserId}",
+            build.BuildId, build.BuildName, userId);
+
+        return CreatedAtAction(nameof(GetBuildById), new { id = build.BuildId }, await GetBuildDetailInternal(build.BuildId));
+    }
+
+    /// <summary>
+    /// Customer resubmits a custom build after modifying components based on staff review.
+    /// </summary>
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<CustomBuildDetailDto>> ResubmitBuild(
+        int id,
+        [FromBody] CreateCustomBuildDto dto)
+    {
+        var build = await _context.CustomBuilds
+            .Include(cb => cb.Items)
+            .FirstOrDefaultAsync(cb => cb.BuildId == id);
+
+        if (build == null)
+        {
+            return NotFound(new { message = $"Custom Build #{id} not found." });
+        }
+
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+        {
+            return Unauthorized(new { message = "Authentication required to update a custom build." });
+        }
+
+        var isStaffOrAdmin = IsStaffOrAdmin();
+        if (!isStaffOrAdmin && build.UserId != currentUserId.Value)
+        {
+            return Forbid();
+        }
+
+        var productIds = dto.Components.Select(c => c.ProductId).Distinct().ToList();
+        var products = await _context.Products
+            .Where(p => productIds.Contains(p.ProductId))
+            .ToDictionaryAsync(p => p.ProductId);
+
+        decimal totalPrice = 0;
+        int estimatedWattage = 80;
+
+        _context.CustomBuildItems.RemoveRange(build.Items);
+        build.Items.Clear();
+
+        foreach (var c in dto.Components)
+        {
+            if (products.TryGetValue(c.ProductId, out var product))
+            {
+                totalPrice += product.Price;
+                if (product.PowerWattage.HasValue && (c.SlotType == "cpu" || c.SlotType == "gpu"))
+                {
+                    estimatedWattage += product.PowerWattage.Value;
+                }
+
+                build.Items.Add(new CustomBuildItem
+                {
+                    BuildId = id,
+                    ProductId = c.ProductId,
+                    SlotType = c.SlotType.ToLower(),
+                    UnitPrice = product.Price
+                });
+            }
+        }
+
+        build.BuildName = dto.BuildName;
+        build.TotalPrice = totalPrice;
+        build.EstimatedWattage = estimatedWattage;
+        build.Status = "In Review by Staff"; // Reset status for technician review as requested
+        if (!string.IsNullOrWhiteSpace(dto.CustomerNotes))
+        {
+            build.CustomerNotes = dto.CustomerNotes;
+        }
+        build.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Custom build #{BuildId} modified and resubmitted by user #{UserId}",
+            build.BuildId, currentUserId);
+
+        return Ok(await GetBuildDetailInternal(id));
+    }
+
     private async Task<CustomBuildDetailDto?> GetBuildDetailInternal(int id)
     {
         var actionResult = await GetBuildById(id);
