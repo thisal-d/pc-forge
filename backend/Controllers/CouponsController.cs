@@ -116,4 +116,89 @@ public class CouponsController : ControllerBase
 
         return CreatedAtAction(nameof(GetCouponById), new { id = coupon.CouponId }, MapToDto(coupon));
     }
+
+    /// <summary>
+    /// Updates an existing coupon (Staff/Admin only).
+    /// </summary>
+    [Authorize(Policy = "StaffOnly")]
+    [HttpPut("{id}")]
+    public async Task<ActionResult<CouponDto>> UpdateCoupon(int id, [FromBody] UpdateCouponDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var coupon = await _context.Coupons.FirstOrDefaultAsync(c => c.CouponId == id);
+        if (coupon == null)
+        {
+            return NotFound(new { message = $"Coupon #{id} not found." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Description))
+            coupon.Description = dto.Description.Trim();
+
+        if (!string.IsNullOrWhiteSpace(dto.DiscountType))
+            coupon.DiscountType = dto.DiscountType.Trim().ToUpper();
+
+        if (dto.DiscountValue.HasValue)
+            coupon.DiscountValue = dto.DiscountValue.Value;
+
+        if (dto.MinSubtotal.HasValue)
+            coupon.MinSubtotal = dto.MinSubtotal.Value;
+
+        if (dto.MaxDiscount.HasValue)
+            coupon.MaxDiscount = dto.MaxDiscount.Value;
+
+        if (dto.IsActive.HasValue)
+            coupon.IsActive = dto.IsActive.Value;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Coupon #{Id} ({Code}) updated.", coupon.CouponId, coupon.Code);
+
+        return Ok(MapToDto(coupon));
+    }
+
+    /// <summary>
+    /// Quick toggles active/inactive status for a coupon (Staff/Admin only).
+    /// </summary>
+    [Authorize(Policy = "StaffOnly")]
+    [HttpPatch("{id}/toggle-status")]
+    public async Task<ActionResult<CouponDto>> ToggleStatus(int id)
+    {
+        var coupon = await _context.Coupons.FirstOrDefaultAsync(c => c.CouponId == id);
+        if (coupon == null)
+        {
+            return NotFound(new { message = $"Coupon #{id} not found." });
+        }
+
+        coupon.IsActive = !coupon.IsActive;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Coupon #{Id} ({Code}) status changed to {Status}", coupon.CouponId, coupon.Code, coupon.IsActive ? "Active" : "Inactive");
+
+        return Ok(MapToDto(coupon));
+    }
+
+    /// <summary>
+    /// Deletes a coupon from the catalog (Staff/Admin only).
+    /// </summary>
+    [Authorize(Policy = "StaffOnly")]
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteCoupon(int id)
+    {
+        var coupon = await _context.Coupons.FirstOrDefaultAsync(c => c.CouponId == id);
+        if (coupon == null)
+        {
+            return NotFound(new { message = $"Coupon #{id} not found." });
+        }
+
+        _context.Coupons.Remove(coupon);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Coupon #{Id} ({Code}) deleted.", id, coupon.Code);
+
+        return Ok(new { message = $"Coupon '{coupon.Code}' deleted successfully." });
+    }
 }
