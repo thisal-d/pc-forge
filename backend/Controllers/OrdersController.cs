@@ -218,7 +218,7 @@ public class OrdersController : ControllerBase
             .AsNoTracking()
             .Include(o => o.User)
             .Include(o => o.Items)
-                .ThenInclude(oi => oi.Product)
+            .ThenInclude(i => i.Product)
             .FirstOrDefaultAsync(o => o.OrderId == id);
 
         if (order == null)
@@ -227,8 +227,8 @@ public class OrdersController : ControllerBase
         }
 
         var currentUserId = GetCurrentUserId();
-        var isStaff = IsStaffOrAdmin();
-        if (!isStaff && order.UserId != currentUserId)
+        var isStaffOrAdmin = IsStaffOrAdmin();
+        if (!isStaffOrAdmin && order.UserId != currentUserId)
         {
             return Forbid();
         }
@@ -236,14 +236,107 @@ public class OrdersController : ControllerBase
         return Ok(MapToDetailDto(order));
     }
 
+    /// <summary>
+    /// Update order fulfillment status (Admin / Staff only).
+    /// Handles automatic inventory restocking when an order is cancelled.
+    /// </summary>
+    [HttpPatch("{id:int}/status")]
+    [Authorize(Policy = "StaffOnly")]
+    public async Task<ActionResult<OrderDetailDto>> UpdateOrderStatus(int id, [FromBody] UpdateOrderStatusDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var allowedStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Pending", "Paid", "Processing", "Shipped", "Delivered", "Cancelled"
+        };
+
+        var normalizedStatus = dto.Status.Trim();
+        var canonicalStatus = allowedStatuses.FirstOrDefault(s => s.Equals(normalizedStatus, StringComparison.OrdinalIgnoreCase));
+        if (canonicalStatus == null)
+        {
+            return BadRequest(new { message = $"Invalid status '{dto.Status}'. Allowed: {string.Join(", ", allowedStatuses)}" });
+        }
+
+        var order = await _context.Orders
+            .Include(o => o.User)
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .FirstOrDefaultAsync(o => o.OrderId == id);
+
+        if (order == null)
+        {
+            return NotFound(new { message = $"Order #{id} not found." });
+        }
+
+        var previousStatus = order.Status;
+
+        // If status isn't changing, return current
+        if (previousStatus.Equals(canonicalStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(MapToDetailDto(order));
+        }
+
+        // 1. If transitioning TO "Cancelled" from another status -> Restock inventory
+        if (canonicalStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) &&
+            !previousStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var item in order.Items)
+            {
+                if (item.Product != null)
+                {
+                    item.Product.StockQuantity += item.Quantity;
+                    item.Product.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+            _logger.LogInformation("Order #{OrderId} cancelled. Restocked {Count} items.", order.OrderId, order.Items.Count);
+        }
+        // 2. If transitioning FROM "Cancelled" to active -> Deduct inventory (with validation)
+        else if (previousStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) &&
+                 !canonicalStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
+        {
+            // Validate stock for all items
+            foreach (var item in order.Items)
+            {
+                if (item.Product != null && item.Product.StockQuantity < item.Quantity)
+                {
+                    return BadRequest(new
+                    {
+                        message = $"Cannot re-open order #{order.OrderId}. Insufficient stock for '{item.Product.Name}'. Available: {item.Product.StockQuantity}, Required: {item.Quantity}"
+                    });
+                }
+            }
+
+            // Deduct stock
+            foreach (var item in order.Items)
+            {
+                if (item.Product != null)
+                {
+                    item.Product.StockQuantity -= item.Quantity;
+                    item.Product.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+            _logger.LogInformation("Order #{OrderId} uncancelled. Deducted stock for {Count} items.", order.OrderId, order.Items.Count);
+        }
+
+        order.Status = canonicalStatus;
+        order.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Order #{OrderId} status changed from '{PreviousStatus}' to '{NewStatus}' by {User}",
+            order.OrderId, previousStatus, canonicalStatus, User.Identity?.Name ?? "Staff");
+
+        return Ok(MapToDetailDto(order));
+    }
+
     private static OrderDetailDto MapToDetailDto(Order order)
     {
-        var customerName = string.Empty;
-        if (order.User != null)
-        {
-            customerName = $"{order.User.FirstName} {order.User.LastName}".Trim();
-        }
-        if (string.IsNullOrWhiteSpace(customerName) && order.User != null)
+        var customerName = order.User != null ? $"{order.User.FirstName} {order.User.LastName}".Trim() : string.Empty;
+        if (string.IsNullOrEmpty(customerName) && order.User != null)
         {
             customerName = order.User.Email;
         }
@@ -292,3 +385,4 @@ public class OrdersController : ControllerBase
         return null;
     }
 }
+
