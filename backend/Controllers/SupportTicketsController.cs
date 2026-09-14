@@ -26,6 +26,25 @@ public class SupportTicketsController : ControllerBase
     }
 
     /// <summary>
+    /// Executes Member 05 After-Sales Agent to answer warranty/order inquiries and open RMA tickets (UI 8).
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("ai-chat")]
+    public async Task<ActionResult<AfterSalesChatResponseDto>> AfterSalesChat([FromBody] AfterSalesChatRequestDto request)
+    {
+        var currentUserId = GetCurrentUserId() ?? 1;
+        request.UserId = currentUserId;
+
+        var result = await _aiAgentService.SendAfterSalesChatMessageAsync(request);
+        if (!result.Success)
+        {
+            return StatusCode(500, result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Open a new manual Support / RMA Ticket (Scenario 3 in the project story).
     /// </summary>
     [HttpPost]
@@ -81,7 +100,7 @@ public class SupportTicketsController : ControllerBase
             Description = dto.Description.Trim(),
             AttachmentUrl = dto.AttachmentUrl,
             Status = "Open",
-            Priority = "Normal",
+            Priority = dto.IssueType.Contains("Overheating") || dto.IssueType.Contains("Failure") ? "High" : "Normal",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -89,17 +108,13 @@ public class SupportTicketsController : ControllerBase
         _context.SupportTickets.Add(ticket);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Support ticket #{TicketId} created by user {UserId}: '{Subject}'",
+        _logger.LogInformation("Support Ticket #{TicketId} opened for User {UserId}: '{Subject}'",
             ticket.TicketId, userId, ticket.Subject);
 
-        // 4. Return detailed DTO
-        var user = await _context.Users.FindAsync(userId);
-        return CreatedAtAction(nameof(GetTicketById), new { id = ticket.TicketId }, new SupportTicketDetailDto
+        var response = new SupportTicketDetailDto
         {
             TicketId = ticket.TicketId,
             UserId = ticket.UserId,
-            CustomerName = user != null ? $"{user.FirstName} {user.LastName}".Trim() : null,
-            CustomerEmail = user?.Email,
             OrderId = ticket.OrderId,
             ProductId = ticket.ProductId,
             ProductName = linkedProduct?.Name,
@@ -112,17 +127,16 @@ public class SupportTicketsController : ControllerBase
             ResolutionNotes = ticket.ResolutionNotes,
             CreatedAt = ticket.CreatedAt,
             UpdatedAt = ticket.UpdatedAt
-        });
+        };
+
+        return CreatedAtAction(nameof(GetTicketById), new { id = ticket.TicketId }, response);
     }
 
     /// <summary>
-    /// Retrieve ticket list: filtered to current user if customer, full list if staff.
+    /// Retrieve customer's support tickets.
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<List<SupportTicketSummaryDto>>> GetTickets(
-        [FromQuery] string? status = null,
-        [FromQuery] string? search = null,
-        [FromQuery] string? priority = null)
+    public async Task<ActionResult<List<SupportTicketSummaryDto>>> GetTickets()
     {
         var currentUserId = GetCurrentUserId();
         if (!currentUserId.HasValue)
@@ -170,7 +184,7 @@ public class SupportTicketsController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieve single ticket details by ID.
+    /// Retrieve specific ticket details.
     /// </summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<SupportTicketDetailDto>> GetTicketById(int id)
@@ -189,11 +203,66 @@ public class SupportTicketsController : ControllerBase
         }
 
         var currentUserId = GetCurrentUserId();
-        var isStaff = User.IsInRole("Admin") || User.IsInRole("Staff");
-        if (!isStaff && ticket.UserId != currentUserId)
+        var isStaffOrAdmin = User.IsInRole("Admin") || User.IsInRole("Staff");
+        if (!isStaffOrAdmin && ticket.UserId != currentUserId)
         {
             return Forbid();
         }
+
+        return Ok(new SupportTicketDetailDto
+        {
+            TicketId = ticket.TicketId,
+            UserId = ticket.UserId,
+            CustomerName = ticket.User != null ? $"{ticket.User.FirstName} {ticket.User.LastName}".Trim() : null,
+            CustomerEmail = ticket.User != null ? ticket.User.Email : null,
+            OrderId = ticket.OrderId,
+            ProductId = ticket.ProductId,
+            ProductName = ticket.Product?.Name,
+            IssueType = ticket.IssueType,
+            Subject = ticket.Subject,
+            Description = ticket.Description,
+            AttachmentUrl = ticket.AttachmentUrl,
+            Status = ticket.Status,
+            Priority = ticket.Priority,
+            ResolutionNotes = ticket.ResolutionNotes,
+            AssignedStaffId = ticket.AssignedStaffId,
+            AssignedStaffName = ticket.AssignedStaff != null && ticket.AssignedStaff.User != null
+                ? $"{ticket.AssignedStaff.User.FirstName} {ticket.AssignedStaff.User.LastName}".Trim()
+                : null,
+            CreatedAt = ticket.CreatedAt,
+            UpdatedAt = ticket.UpdatedAt
+        });
+    }
+
+    /// <summary>
+    /// Update support ticket status, priority, resolution notes, or assigned staff.
+    /// </summary>
+    [Authorize(Policy = "StaffOnly")]
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<SupportTicketDetailDto>> UpdateTicket(int id, [FromBody] UpdateSupportTicketDto dto)
+    {
+        var ticket = await _context.SupportTickets
+            .Include(t => t.Product)
+            .Include(t => t.User)
+            .Include(t => t.AssignedStaff)
+            .ThenInclude(s => s!.User)
+            .FirstOrDefaultAsync(t => t.TicketId == id);
+
+        if (ticket == null)
+        {
+            return NotFound(new { message = $"Support Ticket #{id} not found." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Status)) ticket.Status = dto.Status.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.Priority)) ticket.Priority = dto.Priority.Trim();
+        if (dto.ResolutionNotes != null) ticket.ResolutionNotes = dto.ResolutionNotes.Trim();
+        if (dto.AssignedStaffId.HasValue) ticket.AssignedStaffId = dto.AssignedStaffId.Value;
+        ticket.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Support ticket #{TicketId} updated by staff: Status={Status}, Priority={Priority}",
+            ticket.TicketId, ticket.Status, ticket.Priority);
 
         return Ok(new SupportTicketDetailDto
         {
