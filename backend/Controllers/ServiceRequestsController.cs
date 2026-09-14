@@ -108,19 +108,19 @@ public class ServiceRequestsController : ControllerBase
                 ProductName = sr.Product != null ? sr.Product.Name : null,
                 ProblemDescription = sr.ProblemDescription,
                 ProblemCategory = sr.ProblemCategory,
+                TroubleshootingSummary = sr.TroubleshootingSummary,
+                AttemptCount = sr.AttemptCount,
                 WarrantyStatus = sr.WarrantyStatus,
                 WarrantyExpiryDate = sr.WarrantyExpiryDate,
                 PreferredDate = sr.PreferredDate,
                 PreferredTime = sr.PreferredTime,
                 Status = sr.Status,
                 Priority = sr.Priority,
-                TroubleshootingSummary = sr.TroubleshootingSummary,
-                AttemptCount = sr.AttemptCount,
-                AttachmentUrl = sr.AttachmentUrl,
                 AssignedStaffId = sr.AssignedStaffId,
                 AssignedStaffName = sr.AssignedStaff != null && sr.AssignedStaff.User != null
                     ? $"{sr.AssignedStaff.User.FirstName} {sr.AssignedStaff.User.LastName}".Trim()
                     : null,
+                AttachmentUrl = sr.AttachmentUrl,
                 CreatedAt = sr.CreatedAt
             })
             .ToListAsync();
@@ -129,12 +129,15 @@ public class ServiceRequestsController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieve single service request by ID or SR Number.
+    /// Retrieve single Service Request by ID or SR-Number.
     /// </summary>
     [AllowAnonymous]
     [HttpGet("{id}")]
     public async Task<ActionResult<ServiceRequestDetailDto>> GetServiceRequestById(string id)
     {
+        var currentUserId = GetCurrentUserId() ?? 1;
+        var isStaffOrAdmin = User.Identity?.IsAuthenticated == true && (User.IsInRole("Admin") || User.IsInRole("Staff"));
+
         ServiceRequest? request = null;
         if (int.TryParse(id, out int numericId))
         {
@@ -149,7 +152,7 @@ public class ServiceRequestsController : ControllerBase
         }
         else
         {
-            var clean = id.Trim().ToUpper();
+            var cleanSrNumber = id.Trim().ToUpper();
             request = await _context.ServiceRequests
                 .AsNoTracking()
                 .Include(sr => sr.Product)
@@ -157,12 +160,17 @@ public class ServiceRequestsController : ControllerBase
                 .Include(sr => sr.Order)
                 .Include(sr => sr.AssignedStaff)
                     .ThenInclude(s => s!.User)
-                .FirstOrDefaultAsync(sr => sr.ServiceRequestNumber.ToUpper() == clean);
+                .FirstOrDefaultAsync(sr => sr.ServiceRequestNumber.ToUpper() == cleanSrNumber);
         }
 
         if (request == null)
         {
             return NotFound(new { message = $"Service Request '{id}' not found." });
+        }
+
+        if (!isStaffOrAdmin && request.UserId != currentUserId)
+        {
+            return Forbid();
         }
 
         return Ok(new ServiceRequestDetailDto
@@ -171,8 +179,9 @@ public class ServiceRequestsController : ControllerBase
             ServiceRequestNumber = request.ServiceRequestNumber,
             UserId = request.UserId,
             CustomerName = request.User != null ? $"{request.User.FirstName} {request.User.LastName}".Trim() : null,
-            CustomerEmail = request.User?.Email,
+            CustomerEmail = request.User != null ? request.User.Email : null,
             OrderId = request.OrderId,
+            OrderDate = request.Order?.CreatedAt,
             ProductId = request.ProductId,
             ProductName = request.Product?.Name,
             ProblemDescription = request.ProblemDescription,
@@ -305,7 +314,166 @@ public class ServiceRequestsController : ControllerBase
         });
     }
 
-    private static int GetWarrantyMonths(string? categoryName, string? specificationsJson)
+    /// <summary>
+    /// Update service request status, diagnosis, notes, or assigned technician (Technician/Staff only).
+    /// </summary>
+    [Authorize(Policy = "StaffOnly")]
+    [HttpPut("{id}")]
+    public async Task<ActionResult<ServiceRequestDetailDto>> UpdateServiceRequest(string id, [FromBody] UpdateServiceRequestDto dto)
+    {
+        ServiceRequest? request = null;
+        if (int.TryParse(id, out int numericId))
+        {
+            request = await _context.ServiceRequests
+                .Include(sr => sr.Product)
+                .Include(sr => sr.User)
+                .Include(sr => sr.Order)
+                .Include(sr => sr.AssignedStaff)
+                    .ThenInclude(s => s!.User)
+                .FirstOrDefaultAsync(sr => sr.ServiceRequestId == numericId);
+        }
+        else
+        {
+            var clean = id.Trim().ToUpper();
+            request = await _context.ServiceRequests
+                .Include(sr => sr.Product)
+                .Include(sr => sr.User)
+                .Include(sr => sr.Order)
+                .Include(sr => sr.AssignedStaff)
+                    .ThenInclude(s => s!.User)
+                .FirstOrDefaultAsync(sr => sr.ServiceRequestNumber.ToUpper() == clean);
+        }
+
+        if (request == null)
+        {
+            return NotFound(new { message = $"Service Request '{id}' not found." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Status))
+        {
+            var validStatuses = new[] { "PENDING", "UNDER_REVIEW", "WAITING_FOR_CUSTOMER", "SCHEDULED", "IN_SERVICE", "RESOLVED", "CANCELLED" };
+            var upper = dto.Status.Trim().ToUpper();
+            if (validStatuses.Contains(upper))
+            {
+                request.Status = upper;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Priority))
+        {
+            request.Priority = dto.Priority.Trim();
+        }
+
+        if (dto.AssignedStaffId.HasValue)
+        {
+            request.AssignedStaffId = dto.AssignedStaffId.Value > 0 ? dto.AssignedStaffId.Value : null;
+        }
+
+        if (dto.TechnicianNotes != null)
+        {
+            request.TechnicianNotes = dto.TechnicianNotes.Trim();
+        }
+
+        if (dto.Resolution != null)
+        {
+            request.Resolution = dto.Resolution.Trim();
+        }
+
+        request.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Service Request {SrNumber} updated by staff: Status={Status}, Priority={Priority}",
+            request.ServiceRequestNumber, request.Status, request.Priority);
+
+        return Ok(new ServiceRequestDetailDto
+        {
+            ServiceRequestId = request.ServiceRequestId,
+            ServiceRequestNumber = request.ServiceRequestNumber,
+            UserId = request.UserId,
+            CustomerName = request.User != null ? $"{request.User.FirstName} {request.User.LastName}".Trim() : null,
+            CustomerEmail = request.User != null ? request.User.Email : null,
+            OrderId = request.OrderId,
+            OrderDate = request.Order?.CreatedAt,
+            ProductId = request.ProductId,
+            ProductName = request.Product?.Name,
+            ProblemDescription = request.ProblemDescription,
+            ProblemCategory = request.ProblemCategory,
+            TroubleshootingSummary = request.TroubleshootingSummary,
+            AttemptCount = request.AttemptCount,
+            WarrantyStatus = request.WarrantyStatus,
+            WarrantyExpiryDate = request.WarrantyExpiryDate,
+            PreferredDate = request.PreferredDate,
+            PreferredTime = request.PreferredTime,
+            Status = request.Status,
+            Priority = request.Priority,
+            AssignedStaffId = request.AssignedStaffId,
+            AssignedStaffName = request.AssignedStaff != null && request.AssignedStaff.User != null
+                ? $"{request.AssignedStaff.User.FirstName} {request.AssignedStaff.User.LastName}".Trim()
+                : null,
+            TechnicianNotes = request.TechnicianNotes,
+            Resolution = request.Resolution,
+            AttachmentUrl = request.AttachmentUrl,
+            CreatedAt = request.CreatedAt,
+            UpdatedAt = request.UpdatedAt
+        });
+    }
+
+    /// <summary>
+    /// Retrieve verified order purchase and warranty data from live database for an order ID.
+    /// </summary>
+    [HttpGet("orders/{orderId:int}/warranty")]
+    public async Task<ActionResult<OrderWarrantyInfoDto>> GetOrderWarrantyInfo(int orderId)
+    {
+        var order = await _context.Orders
+            .AsNoTracking()
+            .Include(o => o.Items)
+                .ThenInclude(i => i.Product)
+                    .ThenInclude(p => p.Category)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+        if (order == null)
+        {
+            return NotFound(new { message = $"Order #{orderId} not found." });
+        }
+
+        var currentUserId = GetCurrentUserId();
+        var isStaffOrAdmin = User.IsInRole("Admin") || User.IsInRole("Staff");
+        if (!isStaffOrAdmin && order.UserId != currentUserId)
+        {
+            return Forbid();
+        }
+
+        var result = new OrderWarrantyInfoDto
+        {
+            OrderId = order.OrderId,
+            OrderNumber = $"PCF-10{order.OrderId:03d}",
+            OrderDate = order.CreatedAt,
+            Status = order.Status,
+            Items = order.Items.Select(item =>
+            {
+                var catName = item.Product.Category?.Name ?? "Hardware";
+                var months = item.Product.WarrantyMonths > 0 
+                    ? item.Product.WarrantyMonths 
+                    : GetWarrantyMonths(catName, item.Product.Specifications);
+                var expiry = order.CreatedAt.AddMonths(months);
+                return new OrderWarrantyItemDto
+                {
+                    ProductId = item.ProductId,
+                    ProductName = item.Product.Name,
+                    CategoryName = catName,
+                    UnitPrice = item.UnitPrice,
+                    Quantity = item.Quantity,
+                    WarrantyPeriod = FormatWarrantyPeriod(months),
+                    WarrantyExpiryDate = expiry,
+                    IsActive = expiry >= DateTime.UtcNow
+                };
+            }).ToList()
+        };
+
+        return Ok(result);
+    }
+
+    private static int GetWarrantyMonths(string? categoryName, string? specificationsJson = null)
     {
         if (!string.IsNullOrWhiteSpace(specificationsJson))
         {
@@ -317,6 +485,20 @@ public class ServiceRequestsController : ControllerBase
                     return wm;
                 if (root.TryGetProperty("warrantyMonths", out var wmProp2) && wmProp2.TryGetInt32(out int wm2) && wm2 > 0)
                     return wm2;
+                if (root.TryGetProperty("warranty", out var wProp) && wProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var text = wProp.GetString()?.ToLower() ?? "";
+                    double years = 0;
+                    int months = 0;
+                    var yMatch = System.Text.RegularExpressions.Regex.Match(text, @"(\d+(?:\.\d+)?)\s*(?:year|yr)");
+                    if (yMatch.Success && double.TryParse(yMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out double y))
+                        years = y;
+                    var mMatch = System.Text.RegularExpressions.Regex.Match(text, @"(\d+)\s*(?:month|mo)");
+                    if (mMatch.Success && int.TryParse(mMatch.Groups[1].Value, out int m))
+                        months = m;
+                    var total = (int)(years * 12 + months);
+                    if (total > 0) return total;
+                }
             }
             catch { }
         }
@@ -325,7 +507,7 @@ public class ServiceRequestsController : ControllerBase
         if (cat.Contains("gpu") || cat.Contains("graphics") || cat.Contains("video")) return 36;
         if (cat.Contains("cpu") || cat.Contains("processor")) return 36;
         if (cat.Contains("motherboard")) return 36;
-        if (cat.Contains("ram") || cat.Contains("memory")) return 120;
+        if (cat.Contains("ram") || cat.Contains("memory")) return 120; // 10 years / lifetime
         if (cat.Contains("storage") || cat.Contains("ssd") || cat.Contains("nvme")) return 60;
         if (cat.Contains("power") || cat.Contains("psu")) return 60;
         if (cat.Contains("case") || cat.Contains("cooler")) return 24;
