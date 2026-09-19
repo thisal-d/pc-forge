@@ -1,1 +1,11 @@
-// Categories Components Export Index
+export { CategoryStats } from './CategoryStats.jsx';
+export { CategoryToolbar } from './CategoryToolbar.jsx';
+export { CategoryTableRow } from './CategoryTableRow.jsx';
+export { CategoryTable } from './CategoryTable.jsx';
+export { AddCategoryModal } from './AddCategoryModal.jsx';
+export { EditCategoryModal } from './EditCategoryModal.jsx';
+export { ViewCategoryModal } from './ViewCategoryModal.jsx';
+export { AssignedFiltersList } from './AssignedFiltersList.jsx';
+export { AddFilterForm } from './AddFilterForm.jsx';
+export { ManageFiltersModal } from './ManageFiltersModal.jsx';
+export { DeleteCategoryModal } from './DeleteCategoryModal.jsx';
