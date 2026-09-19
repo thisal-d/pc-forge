@@ -1,1 +1,190 @@
-/* Inventory Workbench Styles */
+/* ==========================================================================
+   PCForge Page Module - Inventory Management
+   ========================================================================== */
+
+/* Table Column Widths */
+.th-checkbox { width: 44px; text-align: center; }
+.th-id { width: 75px; }
+.th-product { min-width: 260px; }
+.th-category { width: 130px; }
+.th-msrp { width: 110px; }
+.th-stock { width: 160px; }
+.th-status { width: 140px; }
+.th-actions { width: 210px; }
+
+.td-checkbox {
+  text-align: center;
+}
+
+.saas-checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* MSRP display */
+.msrp-value {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 0.875rem;
+}
+
+/* Stock Cell with Progress Meter */
+.stock-cell-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.stock-units-bold {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 0.85rem;
+}
+
+.stock-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stock-progress-track {
+  flex: 1;
+  height: 6px;
+  background-color: #e2e8f0;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.stock-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+.fill-green { background-color: var(--success); }
+.fill-amber { background-color: var(--warning); }
+.fill-red { background-color: var(--danger); }
+
+.stock-percent-text {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  min-width: 28px;
+}
+
+/* Actions Cell: Inline Stepper + Adjust Button */
+.actions-cell-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stepper-control-group {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: #ffffff;
+  overflow: hidden;
+}
+
+.stepper-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 600;
+  width: 26px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.stepper-btn:hover:not(:disabled) {
+  background-color: #f1f5f9;
+}
+
+.stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stepper-qty-input {
+  width: 32px;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+  padding: 2px 0;
+  background: transparent;
+  -moz-appearance: textfield;
+}
+
+.stepper-qty-input::-webkit-outer-spin-button,
+.stepper-qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.btn-adjust-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--primary);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-adjust-action:hover {
+  background-color: var(--primary-hover);
+}
+
+/* Modal Mode Toggle Group (Restock vs Exact) */
+.mode-toggle-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.mode-toggle-btn {
+  padding: 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.mode-toggle-btn.mode-active {
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.saas-modal-alert-error {
+  padding: 0.65rem 0.85rem;
+  background-color: var(--danger-light);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+}
