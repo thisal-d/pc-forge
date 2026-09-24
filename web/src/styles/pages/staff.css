@@ -1,1 +1,92 @@
-/* Staff Management Workbench Styles */
+/* ==========================================================================
+   PCForge Page Module - Staff Management
+   ========================================================================== */
+
+/* User Cell in Table */
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.avatar-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: var(--primary-light);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--primary-border);
+  flex-shrink: 0;
+}
+
+.user-name-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-full-name {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 0.875rem;
+}
+
+.user-email-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Department Chip */
+.dept-chip {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  background-color: #f1f5f9;
+  color: var(--text-body);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+/* Action Button Group */
+.action-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+/* Staff Details Inspector Grid */
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  background-color: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.detail-item-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.detail-item-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-main);
+}
