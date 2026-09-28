@@ -1,1 +1,214 @@
-/* Support Workbench Styles */
+/* ==========================================================================
+   PCForge Page Module - Support Tickets & RMA Desk
+   ========================================================================== */
+
+/* Priority Badges */
+.badge-priority-urgent {
+  background-color: var(--danger-light);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
+  font-weight: 700;
+}
+
+.badge-priority-high {
+  background-color: #fff1f2;
+  color: #e11d48;
+  border: 1px solid #fecdd3;
+  font-weight: 600;
+}
+
+.badge-priority-normal {
+  background-color: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid var(--primary-border);
+}
+
+.badge-priority-low {
+  background-color: #f1f5f9;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* Ticket Status Badges */
+.badge-status-open {
+  background-color: var(--warning-light);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+}
+
+.badge-status-in-review {
+  background-color: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid var(--primary-border);
+}
+
+.badge-status-rma-approved {
+  background-color: var(--accent-purple-light);
+  color: var(--accent-purple);
+  border: 1px solid var(--accent-purple-border);
+  font-weight: 700;
+}
+
+.badge-status-resolved {
+  background-color: var(--success-light);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
+}
+
+.badge-status-closed {
+  background-color: #f1f5f9;
+  color: var(--text-subtle);
+  border: 1px solid var(--border);
+}
+
+/* Warranty & RMA Tags */
+.warranty-card {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.warranty-card-expired {
+  background: var(--danger-light);
+  border-color: var(--danger-border);
+}
+
+.rma-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background-color: var(--accent-purple-light);
+  color: var(--accent-purple);
+  border: 1px solid var(--accent-purple-border);
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Attachment Preview Box */
+.attachment-preview-box {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  cursor: pointer;
+  background-color: #ffffff;
+}
+
+.attachment-preview-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-zoom-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.attachment-preview-box:hover .attachment-zoom-overlay {
+  opacity: 1;
+}
+
+/* Support Desk Ticket Actions Bar */
+.ticket-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Conversation & Timeline Track */
+.timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.timeline-entry {
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background-color: #ffffff;
+}
+
+.timeline-entry-customer {
+  background-color: #ffffff;
+  border-color: var(--border);
+  border-left: 4px solid var(--primary);
+}
+
+.timeline-entry-technician {
+  background-color: #f0f7ff;
+  border-color: var(--primary-border);
+  border-left: 4px solid var(--info);
+}
+
+.timeline-entry-internal {
+  background-color: #fffbeb;
+  border-color: var(--warning-border);
+  border-left: 4px solid var(--warning);
+}
+
+.timeline-entry-system {
+  background-color: #f8fafc;
+  border-color: var(--border);
+  font-style: italic;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  gap: 0.5rem;
+}
+
+.timeline-author {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.internal-note-tag {
+  background-color: var(--warning);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.timeline-time {
+  font-size: 0.75rem;
+  color: var(--text-subtle);
+}
+
+.timeline-body {
+  font-size: 0.875rem;
+  color: var(--text-body);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
