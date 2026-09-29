@@ -28,10 +28,10 @@ __pycache__/
 *$py.class
 
 # IDE / OS
-.vscode/
 .idea/
 *.swp
 *.swo
 .DS_Store
 Thumbs.db
 
+config.bat
