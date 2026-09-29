@@ -1,1 +1,25 @@
-/* Global CSS Reset, Theme Variables, and Dark Neon Styles */
+/* ==========================================================================
+   PCForge Modern SaaS Light Theme - Master CSS Entry Point (Option 2A)
+   ========================================================================== */
+
+/* 1. Global Tokens & Design Variables */
+@import './styles/variables.css';
+
+/* 2. Global Shell & Layout Structure */
+@import './styles/layout.css';
+
+/* 3. Universal Shared Component Library */
+@import './styles/components.css';
+
+/* 4. Modular Page Styles */
+@import './styles/pages/dashboard.css';
+@import './styles/pages/inventory.css';
+@import './styles/pages/categories.css';
+@import './styles/pages/products.css';
+@import './styles/pages/staff.css';
+@import './styles/pages/support.css';
+@import './styles/pages/build-reviews.css';
+@import './styles/pages/auth.css';
+
+/* 5. Universal Responsiveness & Mobile Adaptations */
+@import './styles/responsive.css';
