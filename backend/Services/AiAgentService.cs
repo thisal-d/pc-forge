@@ -327,7 +327,7 @@ public class AiAgentService : IAiAgentService
                     .AsNoTracking()
                     .Include(o => o.Items)
                         .ThenInclude(i => i.Product)
-                            .ThenInclude(p => p.Category)
+                            .ThenInclude(p => p!.Category)
                     .Where(o => o.UserId == request.UserId)
                     .OrderByDescending(o => o.CreatedAt)
                     .ToListAsync();
@@ -483,7 +483,7 @@ public class AiAgentService : IAiAgentService
                             .AsNoTracking()
                             .Include(o => o.Items)
                                 .ThenInclude(i => i.Product)
-                                    .ThenInclude(p => p.Category)
+                                    .ThenInclude(p => p!.Category)
                             .FirstOrDefaultAsync(o => o.OrderId == srDto.OrderId.Value);
 
                         if (order != null)

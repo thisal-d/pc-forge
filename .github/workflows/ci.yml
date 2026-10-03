@@ -53,19 +53,18 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+          global-json-file: global.json
 
       - name: Restore dependencies
-        run: dotnet restore backend/pc_forge_api.csproj
-
-      - name: Restore test dependencies
         run: dotnet restore backend.Tests/backend.Tests.csproj
 
-      - name: Build backend
-        run: dotnet build backend/pc_forge_api.csproj --no-restore --configuration Release
+      - name: Build backend & test projects
+        run: dotnet build backend.Tests/backend.Tests.csproj --no-restore --configuration Release
 
       - name: Run unit & integration tests
-        run: dotnet test backend.Tests/backend.Tests.csproj --no-restore --verbosity normal
+        run: dotnet test backend.Tests/backend.Tests.csproj --no-build --configuration Release --verbosity normal
         env:
+          ASPNETCORE_ENVIRONMENT: "Testing"
           ConnectionStrings__DefaultConnection: "Host=localhost;Database=test;Username=test;Password=test"
           Jwt__Key: "TestSecretKeyForCIOnlyDoNotUseInProduction2026!"
           Jwt__Issuer: "PCForgeApi"
