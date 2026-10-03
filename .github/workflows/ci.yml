@@ -66,7 +66,7 @@ jobs:
         env:
           ASPNETCORE_ENVIRONMENT: "Testing"
           ConnectionStrings__DefaultConnection: "Host=localhost;Database=test;Username=test;Password=test"
-          Jwt__Key: "TestSecretKeyForCIOnlyDoNotUseInProduction2026!"
+          Jwt__Key: "PCForgeSuperSecretKeyForJwtAuthentication2026!"
           Jwt__Issuer: "PCForgeApi"
           Jwt__Audience: "PCForgeClients"
           EMAILJS_SIMULATE: "true"
