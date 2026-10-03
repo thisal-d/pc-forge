@@ -113,7 +113,7 @@ jobs:
           CHAT_MODEL: "gemini-3.8-flash"
 
   # ============================================================================
-  # 3. React Web Admin Portal (Node 20) (Quality -> Test -> Security -> Build)
+  # 3. React Web Admin Portal (Node 22) (Quality -> Test -> Security -> Build)
   # ============================================================================
   react:
     name: React Web - Lint, Test, Security & Build
@@ -124,10 +124,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      # Node 22+ required: jsdom 30 -> undici 7 uses markAsUncloneable (absent in Node 20)
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
@@ -154,7 +155,7 @@ jobs:
           VITE_API_BASE_URL: "https://pc-forge.onrender.com/api"
 
   # ============================================================================
-  # 4. Flutter Mobile App (Flutter 3.22.x) (Static Analysis & Widget Tests)
+  # 4. Flutter Mobile App (Flutter 3.38.5 / Dart 3.10.4) (Static Analysis & Widget Tests)
   # ============================================================================
   flutter:
     name: Flutter - Analyze & Widget Tests
@@ -168,7 +169,8 @@ jobs:
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
+          # Must ship Dart >= 3.10.4 to satisfy pubspec `sdk: ^3.10.4`
+          flutter-version: '3.38.5'
           channel: 'stable'
           cache: true
 
