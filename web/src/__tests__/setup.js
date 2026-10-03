@@ -1,1 +1,2 @@
-// Vitest Environment Setup (jsdom)
+// Vitest global test setup
+import '@testing-library/jest-dom';

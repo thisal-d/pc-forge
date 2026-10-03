@@ -1,1 +1,219 @@
-/* Mobile & Tablet Media Queries */
+/* ==========================================================================
+   PCForge Design System - Global Responsiveness & Mobile Adaptations
+   ========================================================================== */
+
+/* ==========================================================================
+   Desktop / Tablet Landscape Breakpoint (<= 1200px)
+   ========================================================================== */
+@media (max-width: 1200px) {
+  .stats-grid,
+  .metric-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .app-body.has-sidebar .main-content {
+    padding: 1.5rem 1.5rem 2.5rem 1.5rem;
+  }
+}
+
+/* ==========================================================================
+   Tablet Portrait & Medium Screen Breakpoint (<= 1024px)
+   ========================================================================== */
+@media (max-width: 1024px) {
+  /* Multi-column grid containers collapse to single column */
+  .grid-2,
+  .support-desk-layout,
+  .workbench-layout {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+  }
+
+  /* Top Navbar adjustments */
+  .top-navbar-tabs {
+    display: none; /* Secondary horizontal tabs hide in favor of sidebar */
+  }
+
+  .top-navbar-container {
+    padding: 0 1rem;
+  }
+
+  /* Modals */
+  .modal-content,
+  .modal-dialog,
+  .saas-modal-card {
+    max-width: 90vw;
+  }
+}
+
+/* ==========================================================================
+   Mobile Devices Breakpoint (<= 768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* Layout Padding */
+  .app-body.has-sidebar .main-content {
+    padding: 1rem 1rem 2rem 1rem;
+  }
+
+  /* Header wraps cleanly */
+  .dashboard-header,
+  .inventory-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+
+  .header-right,
+  .dashboard-header .header-actions {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .header-title,
+  .dashboard-header h1 {
+    font-size: 1.35rem;
+  }
+
+  /* 1-Column KPI summary cards */
+  .stats-grid,
+  .metric-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  /* Toolbars stack vertically */
+  .toolbar-card,
+  .inventory-toolbar-card,
+  .filter-controls,
+  .search-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.85rem;
+  }
+
+  .toolbar-search-wrapper,
+  .search-box,
+  .search-input-wrapper {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .toolbar-filters-group,
+  .filter-group,
+  .filter-dropdowns {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .toolbar-select-item,
+  .filter-item {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .select-with-chevron,
+  .toolbar-select,
+  .filter-item select,
+  .filter-controls select {
+    width: 100%;
+  }
+
+  .toolbar-count-badge {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 0.5rem;
+  }
+
+  /* Table responsive touch handling */
+  .table-responsive {
+    border-radius: var(--radius-lg);
+    box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.03);
+  }
+
+  .data-table th,
+  .data-table td,
+  .saas-inventory-table th,
+  .saas-inventory-table td {
+    padding: 0.75rem 0.85rem;
+  }
+
+  /* Pagination stacking */
+  .table-pagination-footer {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  /* Modals on Mobile */
+  .modal-overlay,
+  .modal-backdrop,
+  .saas-modal-backdrop {
+    padding: 0.75rem;
+  }
+
+  .modal-content,
+  .modal-dialog,
+  .saas-modal-card {
+    max-width: 96vw;
+    border-radius: var(--radius-lg) !important;
+  }
+
+  .modal-header,
+  .saas-modal-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .modal-body,
+  .saas-modal-body {
+    padding: 1.25rem;
+  }
+
+  .modal-footer,
+  .saas-modal-footer {
+    padding: 0.85rem 1.25rem;
+    flex-direction: column-reverse;
+  }
+
+  .modal-footer .btn,
+  .saas-modal-footer .btn {
+    width: 100%;
+  }
+
+  /* Ensure touch targets are at least 40px */
+  .btn,
+  .toolbar-select,
+  .form-input-saas,
+  .form-select-saas,
+  .search-box input {
+    min-height: 42px;
+  }
+}
+
+/* ==========================================================================
+   Small Mobile Devices (<= 480px)
+   ========================================================================== */
+@media (max-width: 480px) {
+  .user-profile-name {
+    display: none; /* Show only avatar circle */
+  }
+
+  .brand-title {
+    font-size: 1.1rem;
+  }
+
+  .auth-card {
+    padding: 1.75rem 1.25rem;
+  }
+
+  .stat-value,
+  .metric-value {
+    font-size: 1.6rem;
+  }
+}

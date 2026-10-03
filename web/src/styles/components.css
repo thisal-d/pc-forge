@@ -1,1 +1,1111 @@
-/* Shared UI Component Styles */
+/* ==========================================================================
+   PCForge Design System - Shared Component Library
+   Universal Components for Consistency across All Pages
+   ========================================================================== */
+
+/* ==========================================================================
+   1. Cards & Containers
+   ========================================================================== */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  color: var(--text-main);
+  transition: var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--border-hover);
+}
+
+.card h3 {
+  color: var(--text-main);
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: -0.3px;
+}
+
+/* ==========================================================================
+   2. Buttons
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Primary Button */
+.btn-primary,
+.btn-primary-saas {
+  background-color: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-primary-saas:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Secondary Button */
+.btn-secondary {
+  background-color: #f1f5f9;
+  color: var(--text-main);
+  border-color: var(--border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #e2e8f0;
+  color: var(--text-main);
+}
+
+/* Outline Button */
+.btn-outline,
+.btn-outline-saas {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-body);
+}
+
+.btn-outline:hover:not(:disabled),
+.btn-outline-saas:hover:not(:disabled) {
+  background-color: #f1f5f9;
+  border-color: var(--border-hover);
+  color: var(--text-main);
+}
+
+/* Small Variants */
+.btn-outline-sm {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-body);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-md);
+}
+
+.btn-outline-sm:hover:not(:disabled) {
+  background-color: #f1f5f9;
+  color: var(--text-main);
+}
+
+.btn-primary-sm {
+  background-color: var(--primary);
+  color: #ffffff;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-md);
+}
+
+.btn-primary-sm:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+}
+
+/* Danger / Warning / Success Actions */
+.btn-danger {
+  background-color: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: var(--danger-text);
+  border-color: var(--danger-text);
+}
+
+.btn-danger-sm {
+  background: transparent;
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-danger-sm:hover:not(:disabled) {
+  background-color: var(--danger-light);
+  border-color: var(--danger);
+}
+
+.btn-warning-sm {
+  background: transparent;
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-warning-sm:hover:not(:disabled) {
+  background-color: var(--warning-light);
+}
+
+.btn-success-sm {
+  background: transparent;
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-success-sm:hover:not(:disabled) {
+  background-color: var(--success-light);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-catalog-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: var(--primary);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.6rem 1.15rem;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-catalog-action:hover {
+  background-color: var(--primary-hover);
+}
+
+/* ==========================================================================
+   3. Universal KPI Summary Stat Cards
+   ========================================================================== */
+.stats-grid,
+.metric-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+
+.stat-card,
+.metric-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card:hover,
+.metric-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.metric-card.card-active-ring {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-focus);
+}
+
+/* Indicator Border Styles for Stat Cards */
+.stat-card-total { border-left: 4px solid var(--primary); }
+.stat-card-active { border-left: 4px solid var(--success); }
+.stat-card-inactive { border-left: 4px solid var(--warning); }
+.stat-card-tech { border-left: 4px solid var(--accent-purple); }
+.stat-card-danger { border-left: 4px solid var(--danger); }
+
+.metric-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.metric-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.metric-icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-circle-blue { background-color: var(--primary-light); color: var(--primary); }
+.icon-circle-green { background-color: var(--success-light); color: var(--success); }
+.icon-circle-amber { background-color: var(--warning-light); color: var(--warning); }
+.icon-circle-red { background-color: var(--danger-light); color: var(--danger); }
+.icon-circle-purple { background-color: var(--accent-purple-light); color: var(--accent-purple); }
+
+.stat-label,
+.metric-label {
+  display: block;
+  font-size: 0.775rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-value,
+.metric-value {
+  display: block;
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.2;
+  margin: 0.2rem 0;
+  letter-spacing: -0.5px;
+}
+
+.stat-subtext,
+.metric-subtext {
+  display: block;
+  font-size: 0.775rem;
+  color: var(--text-subtle);
+  font-weight: 400;
+}
+
+.metric-trend {
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.trend-positive { color: var(--success-text); }
+.trend-amber { color: var(--warning-text); }
+.trend-neutral { color: var(--text-muted); }
+
+/* ==========================================================================
+   4. Universal Search & Filter Toolbars
+   ========================================================================== */
+.toolbar-card,
+.inventory-toolbar-card,
+.filter-controls {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Universal Search & Filter Row container used in BuildReviews, Staff, Support, Categories, Products */
+.search-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  width: 100%;
+}
+
+.toolbar-search-wrapper,
+.search-box,
+.search-input-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 280px;
+}
+
+.toolbar-search-icon,
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-subtle);
+  display: flex;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.toolbar-search-input,
+.search-box input,
+.search-input-wrapper input {
+  width: 100%;
+  background-color: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.55rem 2rem 0.55rem 2.45rem;
+  font-size: 0.875rem;
+  color: var(--text-main);
+  transition: var(--transition-fast);
+}
+
+.toolbar-search-input:focus,
+.search-box input:focus,
+.search-input-wrapper input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-focus);
+}
+
+.toolbar-clear-btn,
+.clear-search-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-subtle);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px;
+  border-radius: var(--radius-xs);
+  transition: color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbar-clear-btn:hover,
+.clear-search-btn:hover {
+  color: var(--text-main);
+}
+
+.toolbar-filters-group,
+.filter-group,
+.filter-dropdowns {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.toolbar-select-item,
+.filter-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.toolbar-select-label,
+.filter-item label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.select-with-chevron {
+  position: relative;
+  display: inline-block;
+}
+
+.filter-select,
+.toolbar-select,
+.filter-item select,
+.filter-controls select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.55rem 2.25rem 0.55rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.filter-select:focus,
+.toolbar-select:focus,
+.filter-item select:focus,
+.filter-controls select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-focus);
+}
+
+.select-chevron-icon {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-muted);
+}
+
+.toolbar-count-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--border);
+}
+
+/* ==========================================================================
+   5. Universal SaaS Data Tables
+   ========================================================================== */
+.saas-table-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   Universal Dashboard Tables Design System
+   ========================================================================== */
+
+.data-table-card,
+.orders-table-wrapper,
+.coupons-table-card,
+.saas-table-card {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+}
+
+.table-header-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.15rem 1.25rem 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  background: var(--card-bg, #ffffff);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.table-header-banner h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main, #0f172a);
+  letter-spacing: -0.01em;
+}
+
+.table-header-banner .table-header-subtitle {
+  font-size: 0.825rem;
+  color: var(--text-muted, #64748b);
+  font-weight: 500;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table,
+.saas-inventory-table,
+.orders-table,
+.coupons-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.data-table thead,
+.saas-inventory-table thead,
+.orders-table thead,
+.coupons-table thead {
+  background-color: #f8fafc;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.data-table th,
+.saas-inventory-table th,
+.orders-table th,
+.coupons-table th {
+  padding: 0.85rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #64748b);
+  white-space: nowrap;
+}
+
+.data-table tbody tr,
+.saas-inventory-table tbody tr,
+.orders-table tbody tr,
+.coupons-table tbody tr {
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  transition: background-color 0.15s ease;
+}
+
+.data-table tbody tr:hover,
+.saas-inventory-table tbody tr:hover,
+.orders-table tbody tr:hover,
+.coupons-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.data-table tbody tr:last-child,
+.saas-inventory-table tbody tr:last-child,
+.orders-table tbody tr:last-child,
+.coupons-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.saas-inventory-table tbody tr.row-selected {
+  background-color: #eff6ff;
+}
+
+.data-table td,
+.saas-inventory-table td,
+.orders-table td,
+.coupons-table td {
+  padding: 0.85rem 1rem;
+  font-size: 0.875rem;
+  vertical-align: middle;
+  color: var(--text-main, #0f172a);
+}
+
+/* Pagination Footer */
+.table-pagination-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  background-color: #ffffff;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.pagination-info {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pagination-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background-color: #ffffff;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  background-color: #f8fafc;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-active {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+}
+
+/* Empty States */
+.table-empty-cell,
+.empty-state {
+  text-align: center;
+  padding: 3.5rem 1rem !important;
+}
+
+.empty-state-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.empty-state-icon {
+  font-size: 2.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.empty-state-title,
+.empty-state h4 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.empty-state-desc,
+.empty-state p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  max-width: 400px;
+  margin: 0 auto 0.75rem auto;
+}
+
+/* ==========================================================================
+   6. Universal Modal Dialogs
+   ========================================================================== */
+.modal-overlay,
+.modal-backdrop,
+.saas-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: fadeIn 0.15s ease;
+}
+
+.modal-content,
+.modal-dialog,
+.saas-modal-card {
+  background: #ffffff !important;
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-modal) !important;
+  width: 100%;
+  max-width: 540px;
+  border: 1px solid var(--border) !important;
+  animation: scaleUp 0.15s ease;
+  overflow: hidden;
+  color: var(--text-main) !important;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Modal Form Container Handling - ensures form passes height constraints so modal-body scrolls */
+.modal-content form,
+.modal-dialog form,
+.saas-modal-card form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.modal-header,
+.saas-modal-header {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal-title,
+.saas-modal-title,
+.modal-header h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.3px;
+}
+
+.modal-subtitle,
+.saas-modal-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.modal-close-btn,
+.saas-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--text-subtle);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease;
+  line-height: 1;
+}
+
+.modal-close-btn:hover,
+.saas-modal-close:hover {
+  color: var(--text-main);
+}
+
+.modal-body,
+.saas-modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Custom sleek scrollbar for modal bodies */
+.modal-body::-webkit-scrollbar,
+.saas-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track,
+.saas-modal-body::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.modal-body::-webkit-scrollbar-thumb,
+.saas-modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: var(--radius-full);
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover,
+.saas-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.modal-footer,
+.saas-modal-footer {
+  padding: 1rem 1.5rem;
+  background-color: #f8fafc;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+/* Universal Form Controls inside all Modals (Ensures Light Theme) */
+.modal-content input,
+.modal-dialog input,
+.saas-modal-card input,
+.modal-content select,
+.modal-dialog select,
+.saas-modal-card select,
+.modal-content textarea,
+.modal-dialog textarea,
+.saas-modal-card textarea {
+  background-color: #ffffff !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 0.55rem 0.85rem !important;
+  font-size: 0.875rem !important;
+}
+
+.modal-content input:focus,
+.modal-dialog input:focus,
+.saas-modal-card input:focus,
+.modal-content select:focus,
+.modal-dialog select:focus,
+.saas-modal-card select:focus,
+.modal-content textarea:focus,
+.modal-dialog textarea:focus,
+.saas-modal-card textarea:focus {
+  outline: none !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-focus) !important;
+}
+
+/* ==========================================================================
+   7. Form Inputs & Groups
+   ========================================================================== */
+.form-group,
+.form-group-saas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.form-group label,
+.form-label-saas {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea,
+.form-input-saas,
+.form-select-saas,
+.form-textarea-saas {
+  width: 100%;
+  background-color: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.85rem;
+  font-size: 0.875rem;
+  color: var(--text-main);
+  transition: var(--transition-fast);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus,
+.form-input-saas:focus,
+.form-select-saas:focus,
+.form-textarea-saas:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-focus);
+}
+
+.form-help-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+.input-error {
+  border-color: var(--danger) !important;
+}
+
+.field-error-text {
+  font-size: 0.75rem;
+  color: var(--danger-text);
+  margin-top: 0.2rem;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   8. Badges & Pastel Status Pills
+   ========================================================================== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-lg {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+}
+
+/* Roles */
+.badge-admin { background-color: var(--accent-purple-light); color: var(--accent-purple); border: 1px solid var(--accent-purple-border); }
+.badge-staff { background-color: var(--warning-light); color: var(--warning-text); border: 1px solid var(--warning-border); }
+.badge-customer { background-color: var(--success-light); color: var(--success-text); border: 1px solid var(--success-border); }
+
+/* Semantic Statuses */
+.badge-success { background-color: var(--success-light); color: var(--success-text); }
+.badge-warning { background-color: var(--warning-light); color: var(--warning-text); }
+.badge-error, .badge-danger { background-color: var(--danger-light); color: var(--danger-text); }
+.badge-info { background-color: var(--info-light); color: var(--info-text); }
+
+/* Status Pills with Live Indicator Dot */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-pill-in { background-color: var(--success-light); color: var(--success-text); }
+.status-pill-in .status-dot { background-color: var(--success); }
+
+.status-pill-low { background-color: var(--warning-light); color: var(--warning-text); }
+.status-pill-low .status-dot { background-color: var(--warning); }
+
+.status-pill-out { background-color: var(--danger-light); color: var(--danger-text); }
+.status-pill-out .status-dot { background-color: var(--danger); }
+
+/* ID Pills */
+.id-pill-badge,
+.id-badge {
+  display: inline-block;
+  background-color: var(--primary-light);
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+}
+
+/* Category Pills */
+.cat-pill {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cat-badge-gpu { background-color: #e0f2fe; color: #0369a1; }
+.cat-badge-cpu { background-color: #f3e8ff; color: #7e22ce; }
+.cat-badge-motherboard { background-color: #ccfbf1; color: #0f766e; }
+.cat-badge-psu { background-color: #ede9fe; color: #6d28d9; }
+.cat-badge-ram { background-color: #ffe4e6; color: #be123c; }
+.cat-badge-storage { background-color: #e0e7ff; color: #4338ca; }
+.cat-badge-default { background-color: #f1f5f9; color: #475569; }
+
+/* ==========================================================================
+   9. Notification Banners & Toasts
+   ========================================================================== */
+.notification-banner,
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.alert-success,
+.card-success {
+  background-color: var(--success-light);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+}
+
+.alert-error,
+.card-danger {
+  background-color: var(--danger-light);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+}
+
+.alert-warning {
+  background-color: var(--warning-light);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+}
+
+.saas-toast {
+  position: fixed;
+  top: 80px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.875rem;
+  font-weight: 500;
+  animation: slideInRight 0.2s ease;
+}
+
+.saas-toast-success {
+  background: #ffffff;
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+}
+
+.saas-toast-error {
+  background: #ffffff;
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+}
+
+/* Skeleton Loading Animation */
+@keyframes skeleton-pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.table-skeleton-body .skeleton-row:nth-child(even) td div {
+  animation-delay: 0.2s;
+}
+

@@ -1,1 +1,127 @@
-# GitHub Actions 4-Tier Automated CI/CD Pipeline
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  # 1. ASP.NET Core Backend
+  backend:
+    name: Backend - Build & Test (.NET 8)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore backend/pc_forge_api.csproj
+
+      - name: Restore test dependencies
+        run: dotnet restore backend.Tests/backend.Tests.csproj
+
+      - name: Build backend
+        run: dotnet build backend/pc_forge_api.csproj --no-restore --configuration Release
+
+      - name: Run backend tests
+        run: dotnet test backend.Tests/backend.Tests.csproj --no-restore --verbosity normal
+        env:
+          ConnectionStrings__DefaultConnection: "Host=localhost;Database=test;Username=test;Password=test"
+          Jwt__Key: "TestSecretKeyForCIOnlyDoNotUseInProduction2026!"
+          Jwt__Issuer: "PCForgeApi"
+          Jwt__Audience: "PCForgeClients"
+
+  # 2. Python AI Service - Syntax & Import Check
+  ai-service:
+    name: AI Service - Syntax & Tests (Python 3.11)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: ai_service
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Syntax check (py_compile)
+        run: |
+          find ai_service -name "*.py" | xargs python -m py_compile
+          echo "All Python files passed syntax check"
+
+      - name: Run agent unit tests
+        working-directory: ai_service
+        run: python -m pytest tests/ -v --tb=short
+        env:
+          GEMINI_API_KEY: "ci-placeholder-key"
+
+  # 3. React Web App - Build Check
+  react:
+    name: React - Install & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Build React app
+        working-directory: web
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: "http://localhost:5000/api"
+
+      - name: Run React tests
+        working-directory: web
+        run: npm test
+
+  # 4. Flutter - Static Analysis & Tests
+  flutter:
+    name: Flutter - Analyze & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+
+      - name: Get Flutter packages
+        working-directory: app
+        run: flutter pub get
+
+      - name: Flutter analyze
+        working-directory: app
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run Flutter tests
+        working-directory: app
+        run: flutter test --no-pub
