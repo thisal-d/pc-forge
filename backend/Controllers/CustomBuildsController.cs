@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using PCForge.Api.Data;
 using PCForge.Api.DTOs;
 using PCForge.Api.Models;
+using PCForge.Api.Services;
 
 namespace PCForge.Api.Controllers;
 
@@ -15,11 +16,16 @@ namespace PCForge.Api.Controllers;
 public class CustomBuildsController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IEmailService _emailService;
     private readonly ILogger<CustomBuildsController> _logger;
 
-    public CustomBuildsController(AppDbContext context, ILogger<CustomBuildsController> logger)
+    public CustomBuildsController(
+        AppDbContext context,
+        IEmailService emailService,
+        ILogger<CustomBuildsController> logger)
     {
         _context = context;
+        _emailService = emailService;
         _logger = logger;
     }
 
@@ -376,6 +382,7 @@ public class CustomBuildsController : ControllerBase
         [FromBody] UpdateBuildReviewStatusDto dto)
     {
         var build = await _context.CustomBuilds
+            .Include(cb => cb.User)
             .Include(cb => cb.Items)
             .FirstOrDefaultAsync(cb => cb.BuildId == id);
 
@@ -427,6 +434,38 @@ public class CustomBuildsController : ControllerBase
 
         _logger.LogInformation("Custom Build #{BuildId} review status updated to '{Status}' by staff #{StaffId}",
             build.BuildId, build.Status, build.AssignedStaffId);
+
+        // Automatically dispatch email notification when review status changes to Approved or Changes Requested
+        if (string.Equals(dto.Status, "Approved by Staff", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(dto.Status, "Changes Requested", StringComparison.OrdinalIgnoreCase))
+        {
+            var customerEmail = build.User?.Email;
+            var customerName = string.Join(" ", new[] { build.User?.FirstName, build.User?.LastName }
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+            if (string.IsNullOrWhiteSpace(customerName))
+            {
+                customerName = "Valued Customer";
+            }
+
+            if (!string.IsNullOrWhiteSpace(customerEmail))
+            {
+                try
+                {
+                    await _emailService.SendBuildReviewNotificationAsync(
+                        customerEmail,
+                        customerName,
+                        build.BuildId,
+                        build.BuildName,
+                        dto.Status,
+                        dto.StaffNotes,
+                        build.TotalPrice);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send build review notification email for Build #{BuildId}", build.BuildId);
+                }
+            }
+        }
 
         return Ok(await GetBuildDetailInternal(id));
     }

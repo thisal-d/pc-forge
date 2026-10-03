@@ -374,8 +374,9 @@ class RunnerOrchestrator:
                 name="AI Agent Service (FastAPI)",
                 tag="AGENT_AI",
                 color=BLUE,
-                cwd=self.root_dir,
-                cmd=[python_bin, "-m", "uvicorn", "ai_service.main:app", "--port", "5050", "--reload"],
+                cwd=self.root_dir / "ai_service",
+                cmd=[python_bin, "-m", "uvicorn", "main:app", "--port", "5050", "--reload"],
+                env={"PYTHONPATH": f"{self.root_dir / 'ai_service'}{os.pathsep}{self.root_dir}"},
                 supports_stdin=False
             )
 

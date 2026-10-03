@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="PCForge Logo" width="160" />
+</p>
+
 # PCForge — Computer Shop & Custom PC Builder Platform
 
 [![CI](https://github.com/thisal-d/pc-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/thisal-d/pc-forge/actions/workflows/ci.yml)

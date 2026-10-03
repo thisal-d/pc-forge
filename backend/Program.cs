@@ -35,6 +35,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IImageUploadService, CloudinaryImageUploadService>();
 builder.Services.AddHttpClient<IAiAgentService, AiAgentService>();
+builder.Services.AddHttpClient<IEmailService, EmailService>();
 
 // 3. Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -231,10 +232,14 @@ static void LoadDotEnvFiles()
 {
     string[] candidatePaths =
     [
+        Path.Combine(Directory.GetCurrentDirectory(), "backend", ".env"),
         Path.Combine(Directory.GetCurrentDirectory(), ".env"),
-        Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"),
         Path.Combine(AppContext.BaseDirectory, ".env"),
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".env")
+        Path.Combine(AppContext.BaseDirectory, "backend", ".env"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "backend", ".env"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".env"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "backend", ".env"),
+        Path.Combine(Directory.GetCurrentDirectory(), "..", ".env")
     ];
 
     foreach (var path in candidatePaths)
