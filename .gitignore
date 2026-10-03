@@ -21,6 +21,13 @@ yarn-error.log*
 **/.flutter-plugins-dependencies
 **/.pub-cache/
 **/.pub/
+app/android/
+app/ios/
+app/linux/
+app/macos/
+app/windows/
+app/pubspec.lock
+*.iml
 
 # Python
 __pycache__/
@@ -35,3 +42,4 @@ __pycache__/
 Thumbs.db
 
 config.bat
+contributed-history.md
