@@ -26,6 +26,8 @@ app/ios/
 app/linux/
 app/macos/
 app/windows/
+app/web/
+app/.metadata
 app/pubspec.lock
 *.iml
 
@@ -43,3 +45,12 @@ Thumbs.db
 
 config.bat
 contributed-history.md
+pubspec.lock
+
+# Local Environment Secrets (never commit!)
+**/.env
+**/.env.local
+**/.env.*.local
+**/deploy.env
+**/*.deploy.env
+!**/.env.example

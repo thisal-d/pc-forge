@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { buildReviewService } from '../services/buildReviewService.js';
 import { staffService } from '../services/staffService.js';
-import { emailService } from '../services/emailService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   BuildReviewStats,
@@ -226,34 +225,11 @@ export const BuildReviews = () => {
 
       setSelectedBuild(updated);
       await loadData();
-      showNotification(`Build #${selectedBuild.buildId} marked as "${newStatus}".`);
-
-      // Send EmailJS notification to customer when build is approved or changes requested
-      if (newStatus === 'Approved by Staff' || newStatus === 'Changes Requested') {
-        const customerEmail = selectedBuild.customerEmail || updated?.customerEmail;
-        if (customerEmail) {
-          try {
-            const emailRes = await emailService.sendBuildReviewNotification({
-              customerName: selectedBuild.customerName || updated?.customerName || 'Valued Customer',
-              customerEmail: customerEmail,
-              buildId: selectedBuild.buildId,
-              buildName: selectedBuild.buildName || updated?.buildName || 'Custom PC Build',
-              newStatus: newStatus,
-              technicianNotes: notesToSave,
-              totalPrice: selectedBuild.totalPrice || updated?.totalPrice,
-            });
-
-            if (emailRes.success && !emailRes.simulated) {
-              showNotification(`Notification email successfully sent to ${customerEmail}.`);
-            } else if (emailRes.simulated) {
-              console.info(`[EmailJS] Customer notification simulated for ${customerEmail}. Set EmailJS keys in web/.env for live dispatch.`);
-            }
-          } catch (emailErr) {
-            console.warn('[EmailJS] Notification sending encountered error:', emailErr);
-          }
-        }
-        handleCloseModal();
-      }
+      const notificationMsg = (newStatus === 'Approved by Staff' || newStatus === 'Changes Requested')
+        ? `Build #${selectedBuild.buildId} marked as "${newStatus}". Customer notification dispatched by server.`
+        : `Build #${selectedBuild.buildId} marked as "${newStatus}".`;
+      showNotification(notificationMsg);
+      handleCloseModal();
     } catch (err) {
       showNotification(`Failed to update review status: ${err?.message}`, 'error');
     } finally {

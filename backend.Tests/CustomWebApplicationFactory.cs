@@ -44,6 +44,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             }
             services.AddSingleton<PCForge.Api.Services.IAiAgentService, MockAiAgentService>();
 
+            // Replace IEmailService with MockEmailService for unit testing
+            var emailDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(PCForge.Api.Services.IEmailService));
+            if (emailDescriptor != null)
+            {
+                services.Remove(emailDescriptor);
+            }
+            services.AddSingleton<PCForge.Api.Services.IEmailService, MockEmailService>();
+
             // Build service provider and seed required test data
             var sp = services.BuildServiceProvider();
             using var scope = sp.CreateScope();
@@ -257,6 +265,24 @@ public class MockAiAgentService : PCForge.Api.Services.IAiAgentService
             Success = true,
             Reply = "How can I help with your order?"
         });
+    }
+}
+
+public class MockEmailService : IEmailService
+{
+    public List<(string Email, string Name, int BuildId, string Status)> SentEmails { get; } = new();
+
+    public Task<bool> SendBuildReviewNotificationAsync(
+        string customerEmail,
+        string customerName,
+        int buildId,
+        string buildName,
+        string newStatus,
+        string? technicianNotes,
+        decimal totalPrice)
+    {
+        SentEmails.Add((customerEmail, customerName, buildId, newStatus));
+        return Task.FromResult(true);
     }
 }
 

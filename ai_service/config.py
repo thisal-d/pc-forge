@@ -2,10 +2,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Try loading from local .env or parent directory .env
+# Load service-local .env
 _current_dir = Path(__file__).resolve().parent
 load_dotenv(_current_dir / ".env")
-load_dotenv(_current_dir.parent / ".env")
 
 
 def get_api_keys() -> list[str]:
