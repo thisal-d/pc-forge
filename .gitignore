@@ -35,6 +35,7 @@ app/pubspec.lock
 __pycache__/
 *.py[cod]
 *$py.class
+ci-log
 
 # IDE / OS
 .idea/
