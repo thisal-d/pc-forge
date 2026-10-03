@@ -8,23 +8,23 @@ load_dotenv(_current_dir / ".env")
 
 
 def get_api_keys() -> list[str]:
-    """Collects configured Gemini API keys (GOOGLE_API_KEY_1 to GOOGLE_API_KEY_5, with fallback to GOOGLE_API_KEY)."""
+    """Collects configured Gemini API keys (GOOGLE_API_KEY_1 to GOOGLE_API_KEY_5, with fallback to GOOGLE_API_KEY / GEMINI_API_KEY)."""
     keys = []
     for i in range(1, 6):
         k = (os.getenv(f"GOOGLE_API_KEY_{i}") or "").strip()
-        if k and not k.lower().startswith("your_"):
+        if k and not (k.lower().startswith("your_") or k.lower().startswith("ci-") or "placeholder" in k.lower()):
             keys.append(k)
 
     if not keys:
-        single = (os.getenv("GOOGLE_API_KEY") or "").strip()
-        if single and not single.lower().startswith("your_"):
+        single = (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY") or "").strip()
+        if single and not (single.lower().startswith("your_") or single.lower().startswith("ci-") or "placeholder" in single.lower()):
             keys.append(single)
     return keys
 
 
 GOOGLE_API_KEYS = get_api_keys()
 GOOGLE_API_KEY = GOOGLE_API_KEYS[0] if GOOGLE_API_KEYS else os.getenv("GOOGLE_API_KEY", "")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-2.5-flash-lite")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-3.8-flash")
 AI_SERVICE_PORT = int(os.getenv("AI_SERVICE_PORT", "5050"))
 AI_SERVICE_HOST = os.getenv("AI_SERVICE_HOST", "0.0.0.0")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
