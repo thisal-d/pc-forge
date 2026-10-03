@@ -35,6 +35,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IImageUploadService, CloudinaryImageUploadService>();
 builder.Services.AddHttpClient<IAiAgentService, AiAgentService>();
+builder.Services.AddHttpClient<IEmailService, EmailService>();
 
 // 3. Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -125,75 +126,78 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Ensure requirement_sessions table exists in PostgreSQL
-using (var scope = app.Services.CreateScope())
+if (!app.Environment.IsEnvironment("Testing"))
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    try
+    // Ensure requirement_sessions table exists in PostgreSQL
+    using (var scope = app.Services.CreateScope())
     {
-        db.Database.ExecuteSqlRaw(@"
-            CREATE TABLE IF NOT EXISTS requirement_sessions (
-                sessionid VARCHAR(100) PRIMARY KEY,
-                userid INT NULL REFERENCES users(userid) ON DELETE SET NULL,
-                purpose VARCHAR(100),
-                budgetamount DECIMAL(12,2),
-                budgetraw VARCHAR(100),
-                currency VARCHAR(10) DEFAULT 'LKR',
-                targetresolution VARCHAR(50),
-                monitorneeded BOOLEAN,
-                preferencesjson TEXT,
-                iscomplete BOOLEAN DEFAULT FALSE,
-                status VARCHAR(50) DEFAULT 'Gathering',
-                rawanswersjson TEXT,
-                createdat TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                updatedat TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+                CREATE TABLE IF NOT EXISTS requirement_sessions (
+                    sessionid VARCHAR(100) PRIMARY KEY,
+                    userid INT NULL REFERENCES users(userid) ON DELETE SET NULL,
+                    purpose VARCHAR(100),
+                    budgetamount DECIMAL(12,2),
+                    budgetraw VARCHAR(100),
+                    currency VARCHAR(10) DEFAULT 'LKR',
+                    targetresolution VARCHAR(50),
+                    monitorneeded BOOLEAN,
+                    preferencesjson TEXT,
+                    iscomplete BOOLEAN DEFAULT FALSE,
+                    status VARCHAR(50) DEFAULT 'Gathering',
+                    rawanswersjson TEXT,
+                    createdat TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updatedat TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
 
-            ALTER TABLE products ADD COLUMN IF NOT EXISTS warrantymonths INT NOT NULL DEFAULT 36;
-            UPDATE products SET warrantymonths = 120 WHERE warrantymonths = 36 AND (LOWER(name) LIKE '%ram%' OR LOWER(name) LIKE '%trident%' OR LOWER(name) LIKE '%vengeance%');
-            UPDATE products SET warrantymonths = 60 WHERE warrantymonths = 36 AND (LOWER(name) LIKE '%psu%' OR LOWER(name) LIKE '%rm850%' OR LOWER(name) LIKE '%ssd%' OR LOWER(name) LIKE '%nvme%');
-            UPDATE products SET warrantymonths = 24 WHERE warrantymonths = 36 AND (LOWER(name) LIKE '%case%' OR LOWER(name) LIKE '%cooler%');
+                ALTER TABLE products ADD COLUMN IF NOT EXISTS warrantymonths INT NOT NULL DEFAULT 36;
+                UPDATE products SET warrantymonths = 120 WHERE warrantymonths = 36 AND (LOWER(name) LIKE '%ram%' OR LOWER(name) LIKE '%trident%' OR LOWER(name) LIKE '%vengeance%');
+                UPDATE products SET warrantymonths = 60 WHERE warrantymonths = 36 AND (LOWER(name) LIKE '%psu%' OR LOWER(name) LIKE '%rm850%' OR LOWER(name) LIKE '%ssd%' OR LOWER(name) LIKE '%nvme%');
+                UPDATE products SET warrantymonths = 24 WHERE warrantymonths = 36 AND (LOWER(name) LIKE '%case%' OR LOWER(name) LIKE '%cooler%');
 
-            -- Ensure any staff users previously saved with Customer role are elevated to Staff role
-            UPDATE users 
-            SET roleid = (SELECT roleid FROM roles WHERE rolename = 'Staff' LIMIT 1)
-            WHERE userid IN (SELECT userid FROM staff) 
-              AND roleid != (SELECT roleid FROM roles WHERE rolename = 'Admin' LIMIT 1);
+                -- Ensure any staff users previously saved with Customer role are elevated to Staff role
+                UPDATE users 
+                SET roleid = (SELECT roleid FROM roles WHERE rolename = 'Staff' LIMIT 1)
+                WHERE userid IN (SELECT userid FROM staff) 
+                  AND roleid != (SELECT roleid FROM roles WHERE rolename = 'Admin' LIMIT 1);
 
-            -- Synchronize primary key sequences with MAX(id) to prevent duplicate key constraint violations
-            DO $$
-            BEGIN
-                IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'categories_categoryid_seq') THEN
-                    PERFORM setval('categories_categoryid_seq', (SELECT GREATEST(COALESCE(MAX(categoryid), 1), 1) FROM categories));
-                END IF;
-                IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'products_productid_seq') THEN
-                    PERFORM setval('products_productid_seq', (SELECT GREATEST(COALESCE(MAX(productid), 1), 1) FROM products));
-                END IF;
-                IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'categoryfilters_filterid_seq') THEN
-                    PERFORM setval('categoryfilters_filterid_seq', (SELECT GREATEST(COALESCE(MAX(filterid), 1), 1) FROM categoryfilters));
-                END IF;
-                IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'filteroptions_optionid_seq') THEN
-                    PERFORM setval('filteroptions_optionid_seq', (SELECT GREATEST(COALESCE(MAX(optionid), 1), 1) FROM filteroptions));
-                END IF;
-            END $$;
-        ");
+                -- Synchronize primary key sequences with MAX(id) to prevent duplicate key constraint violations
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'categories_categoryid_seq') THEN
+                        PERFORM setval('categories_categoryid_seq', (SELECT GREATEST(COALESCE(MAX(categoryid), 1), 1) FROM categories));
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'products_productid_seq') THEN
+                        PERFORM setval('products_productid_seq', (SELECT GREATEST(COALESCE(MAX(productid), 1), 1) FROM products));
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'categoryfilters_filterid_seq') THEN
+                        PERFORM setval('categoryfilters_filterid_seq', (SELECT GREATEST(COALESCE(MAX(filterid), 1), 1) FROM categoryfilters));
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'filteroptions_optionid_seq') THEN
+                        PERFORM setval('filteroptions_optionid_seq', (SELECT GREATEST(COALESCE(MAX(optionid), 1), 1) FROM filteroptions));
+                    END IF;
+                END $$;
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Startup] Database migration note: {ex.Message}");
+        }
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[Startup] Database migration note: {ex.Message}");
-    }
-}
 
-// 6. Seed Database on startup (Roles + 3 Default Users)
-using (var scope = app.Services.CreateScope())
-{
-    try
+    // 6. Seed Database on startup (Roles + 3 Default Users)
+    using (var scope = app.Services.CreateScope())
     {
-        await DbInitializer.SeedAsync(scope.ServiceProvider);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogWarning(ex, "Database seeding skipped or database not reachable during startup.");
+        try
+        {
+            await DbInitializer.SeedAsync(scope.ServiceProvider);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "Database seeding skipped or database not reachable during startup.");
+        }
     }
 }
 
@@ -231,10 +235,14 @@ static void LoadDotEnvFiles()
 {
     string[] candidatePaths =
     [
+        Path.Combine(Directory.GetCurrentDirectory(), "backend", ".env"),
         Path.Combine(Directory.GetCurrentDirectory(), ".env"),
-        Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"),
         Path.Combine(AppContext.BaseDirectory, ".env"),
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".env")
+        Path.Combine(AppContext.BaseDirectory, "backend", ".env"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "backend", ".env"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".env"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "backend", ".env"),
+        Path.Combine(Directory.GetCurrentDirectory(), "..", ".env")
     ];
 
     foreach (var path in candidatePaths)

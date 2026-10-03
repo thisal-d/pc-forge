@@ -58,8 +58,9 @@ DEFAULT_COUPONS: Dict[str, Dict[str, Any]] = {
 
 
 def _format_currency(amount: float, currency: str = "LKR") -> str:
-    """Helper to format currency strings cleanly in LKR (e.g. 'LKR 385,000')."""
-    return f"LKR {int(round(amount)):,}"
+    """Helper to format currency strings cleanly."""
+    curr = currency if currency else "LKR"
+    return f"{curr} {int(round(amount)):,}"
 
 
 @tool

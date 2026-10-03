@@ -91,7 +91,7 @@ public class ServiceRequestsController : ControllerBase
                 sr.ServiceRequestNumber.ToLower().Contains(term) ||
                 sr.ProblemDescription.ToLower().Contains(term) ||
                 (sr.Product != null && sr.Product.Name.ToLower().Contains(term)) ||
-                (sr.User != null && (sr.User.FirstName.ToLower().Contains(term) || sr.User.LastName.ToLower().Contains(term) || sr.User.Email.ToLower().Contains(term))));
+                (sr.User != null && ((sr.User.FirstName != null && sr.User.FirstName.ToLower().Contains(term)) || (sr.User.LastName != null && sr.User.LastName.ToLower().Contains(term)) || sr.User.Email.ToLower().Contains(term))));
         }
 
         var list = await query
@@ -231,7 +231,7 @@ public class ServiceRequestsController : ControllerBase
             var order = await _context.Orders
                 .Include(o => o.Items)
                 .ThenInclude(i => i.Product)
-                    .ThenInclude(p => p.Category)
+                    .ThenInclude(p => p!.Category)
                 .FirstOrDefaultAsync(o => o.OrderId == dto.OrderId.Value);
 
             if (order != null)
@@ -428,7 +428,7 @@ public class ServiceRequestsController : ControllerBase
             .AsNoTracking()
             .Include(o => o.Items)
                 .ThenInclude(i => i.Product)
-                    .ThenInclude(p => p.Category)
+                    .ThenInclude(p => p!.Category)
             .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
         if (order == null)
@@ -451,15 +451,15 @@ public class ServiceRequestsController : ControllerBase
             Status = order.Status,
             Items = order.Items.Select(item =>
             {
-                var catName = item.Product.Category?.Name ?? "Hardware";
-                var months = item.Product.WarrantyMonths > 0 
+                var catName = item.Product?.Category?.Name ?? "Hardware";
+                var months = (item.Product != null && item.Product.WarrantyMonths > 0)
                     ? item.Product.WarrantyMonths 
-                    : GetWarrantyMonths(catName, item.Product.Specifications);
+                    : GetWarrantyMonths(catName, item.Product?.Specifications);
                 var expiry = order.CreatedAt.AddMonths(months);
                 return new OrderWarrantyItemDto
                 {
                     ProductId = item.ProductId,
-                    ProductName = item.Product.Name,
+                    ProductName = item.Product?.Name ?? $"Product #{item.ProductId}",
                     CategoryName = catName,
                     UnitPrice = item.UnitPrice,
                     Quantity = item.Quantity,

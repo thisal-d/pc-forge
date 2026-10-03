@@ -15,15 +15,8 @@ vi.mock("../api/axiosInstance", () => ({
   },
 }));
 
-vi.mock("@emailjs/browser", () => ({
-  default: {
-    send: vi.fn(),
-  },
-}));
-
 import api from "../api/axiosInstance";
-import emailjs from "@emailjs/browser";
-import { emailService } from "../services/emailService.js";
+import { buildReviewService } from "../services/buildReviewService.js";
 
 // ── Auth Service ──────────────────────────────────────────────────────────────
 describe("Auth – login()", () => {
@@ -163,85 +156,44 @@ describe("Categories – getCategories()", () => {
   });
 });
 
-// ── EmailJS Notification Service ──────────────────────────────────────────────
-describe("EmailJS – sendBuildReviewNotification()", () => {
+// ── Build Review Service Methods ──────────────────────────────────────────────
+describe("buildReviewService – updateBuildReview()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("handles missing customer email gracefully without throwing", async () => {
-    const result = await emailService.sendBuildReviewNotification({
-      customerEmail: "",
-      buildId: 10,
-      newStatus: "Approved by Staff",
-    });
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Customer email is required");
-    expect(emailjs.send).not.toHaveBeenCalled();
-  });
-
-  it("runs in simulated mode when env keys are unconfigured or placeholder", async () => {
-    const originalServiceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-    const originalTemplateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-    const originalPublicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
-
-    import.meta.env.VITE_EMAILJS_SERVICE_ID = "your_emailjs_service_id";
-    import.meta.env.VITE_EMAILJS_TEMPLATE_ID = "your_emailjs_template_id";
-    import.meta.env.VITE_EMAILJS_PUBLIC_KEY = "your_emailjs_public_key";
-
-    try {
-      const result = await emailService.sendBuildReviewNotification({
-        customerEmail: "customer@example.com",
-        customerName: "Alex Mercer",
+  it("updates review status and delegates customer notification to backend", async () => {
+    api.patch.mockResolvedValueOnce({
+      data: {
         buildId: 7,
-        buildName: "Creator Studio Beast",
-        newStatus: "Approved by Staff",
-        technicianNotes: "Verified all clearances and PSU headroom.",
-        totalPrice: 2499.0,
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.simulated).toBe(true);
-    } finally {
-      import.meta.env.VITE_EMAILJS_SERVICE_ID = originalServiceId;
-      import.meta.env.VITE_EMAILJS_TEMPLATE_ID = originalTemplateId;
-      import.meta.env.VITE_EMAILJS_PUBLIC_KEY = originalPublicKey;
-    }
-  });
-
-  it("calls emailjs.send with formatted params when valid keys are configured", async () => {
-    // Temporarily mock environment variables
-    const originalEnv = { ...import.meta.env };
-    import.meta.env.VITE_EMAILJS_SERVICE_ID = "service_pcforge";
-    import.meta.env.VITE_EMAILJS_TEMPLATE_ID = "template_build_approved";
-    import.meta.env.VITE_EMAILJS_PUBLIC_KEY = "pk_live_pcforge123";
-
-    emailjs.send.mockResolvedValueOnce({ status: 200, text: "OK" });
-
-    const result = await emailService.sendBuildReviewNotification({
-      customerEmail: "gamer@pcforge.com",
-      customerName: "Gamer User",
-      buildId: 42,
-      buildName: "RTX 4090 Ultra",
-      newStatus: "Changes Requested",
-      technicianNotes: "Power supply wattage (650W) is insufficient for RTX 4090. Upgrade to at least 850W.",
-      totalPrice: 3200.0,
+        status: "Approved by Staff",
+        staffNotes: "Verified all clearances and PSU headroom.",
+        assignedStaffId: 2,
+      },
     });
 
-    expect(result.success).toBe(true);
-    expect(result.simulated).toBe(false);
-    expect(emailjs.send).toHaveBeenCalledTimes(1);
+    const result = await buildReviewService.updateBuildReview(7, {
+      status: "Approved by Staff",
+      staffNotes: "Verified all clearances and PSU headroom.",
+      assignedStaffId: 2,
+    });
 
-    const [serviceId, templateId, templateParams, publicKey] = emailjs.send.mock.calls[0];
-    expect(serviceId).toBe("service_pcforge");
-    expect(templateId).toBe("template_build_approved");
-    expect(publicKey).toBe("pk_live_pcforge123");
-    expect(templateParams.to_email).toBe("gamer@pcforge.com");
-    expect(templateParams.review_status).toBe("CHANGES REQUESTED");
-    expect(templateParams.technician_notes).toContain("Power supply wattage");
+    expect(api.patch).toHaveBeenCalledWith("/custombuilds/7/review", {
+      status: "Approved by Staff",
+      staffNotes: "Verified all clearances and PSU headroom.",
+      assignedStaffId: 2,
+    });
+    expect(result.status).toBe("Approved by Staff");
+  });
 
-    // Restore environment
-    Object.assign(import.meta.env, originalEnv);
+  it("handles backend error when updating build review", async () => {
+    api.patch.mockRejectedValueOnce({
+      response: { data: { message: "Build not found" } },
+    });
+
+    await expect(
+      buildReviewService.updateBuildReview(999, { status: "Approved by Staff" })
+    ).rejects.toThrow("Build not found");
   });
 });
 

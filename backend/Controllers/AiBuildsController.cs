@@ -119,7 +119,7 @@ public class AiBuildsController : ControllerBase
         agentResponse.Profile.Purpose = session.Purpose;
         agentResponse.Profile.BudgetAmount = session.BudgetAmount;
         agentResponse.Profile.BudgetRaw = session.BudgetRaw;
-        agentResponse.Profile.Currency = session.Currency ?? agentResponse.Profile.Currency;
+        agentResponse.Profile.Currency = session.Currency ?? agentResponse.Profile.Currency ?? "LKR";
         agentResponse.Profile.TargetResolution = session.TargetResolution;
         agentResponse.Profile.MonitorNeeded = session.MonitorNeeded;
         agentResponse.IsComplete = session.IsComplete;

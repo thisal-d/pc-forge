@@ -32,6 +32,10 @@ class ApiService {
   /// The runner.py automatically sets up the adb reverse tunnel on startup
   /// whenever an Android device is detected.
   static String get defaultBaseUrl {
+    const envUrl = String.fromEnvironment('API_BASE_URL');
+    if (envUrl.isNotEmpty) {
+      return envUrl;
+    }
     return 'http://localhost:5000/api';
   }
 

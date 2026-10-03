@@ -1,16 +1,49 @@
-name: CI
+name: CI / CD Pipeline
 
+# Triggers based on SE3090 Lecture 08 Branching Strategy (GitHub Flow)
+# Runs on push to shared branches (main, master, dev) and on pull requests targeting them
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, dev ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, dev ]
+  workflow_dispatch:
+
+# Cancel in-progress redundant runs when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # 1. ASP.NET Core Backend
-  backend:
-    name: Backend - Build & Test (.NET 8)
+  # ============================================================================
+  # 0. Repository Security & Secret Leak Prevention Gate (Lecture 08 §6 & §7)
+  # ============================================================================
+  security-secrets-audit:
+    name: Security - Secret Leak & Git Integrity Check
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify no environment secrets are committed in git index
+        run: |
+          echo "Scanning git index for forbidden secret files (.env, deploy.env)..."
+          LEAKED_FILES=$(git ls-files | grep -E '(^|/)\.env$|(^|/)deploy\.env$' || true)
+          if [ -n "$LEAKED_FILES" ]; then
+            echo "❌ CRITICAL SECURITY ALERT: Secret files detected in git tracking:"
+            echo "$LEAKED_FILES"
+            echo "Secrets must never be committed. Add them to .gitignore and rotate immediately."
+            exit 1
+          fi
+          echo "✅ Secret file check passed: No .env or deploy.env files tracked in git."
+
+  # ============================================================================
+  # 1. ASP.NET Core Backend (.NET 8) (Build -> Test -> Security Scan)
+  # ============================================================================
+  backend:
+    name: Backend - Build, Test & Security (.NET 8)
+    runs-on: ubuntu-latest
+    needs: [security-secrets-audit]
 
     steps:
       - name: Checkout repository
@@ -20,28 +53,34 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+          global-json-file: global.json
 
       - name: Restore dependencies
-        run: dotnet restore backend/pc_forge_api.csproj
-
-      - name: Restore test dependencies
         run: dotnet restore backend.Tests/backend.Tests.csproj
 
-      - name: Build backend
-        run: dotnet build backend/pc_forge_api.csproj --no-restore --configuration Release
+      - name: Build backend & test projects
+        run: dotnet build backend.Tests/backend.Tests.csproj --no-restore --configuration Release
 
-      - name: Run backend tests
-        run: dotnet test backend.Tests/backend.Tests.csproj --no-restore --verbosity normal
+      - name: Run unit & integration tests
+        run: dotnet test backend.Tests/backend.Tests.csproj --no-build --configuration Release --verbosity normal
         env:
+          ASPNETCORE_ENVIRONMENT: "Testing"
           ConnectionStrings__DefaultConnection: "Host=localhost;Database=test;Username=test;Password=test"
-          Jwt__Key: "TestSecretKeyForCIOnlyDoNotUseInProduction2026!"
+          Jwt__Key: "PCForgeSuperSecretKeyForJwtAuthentication2026!"
           Jwt__Issuer: "PCForgeApi"
           Jwt__Audience: "PCForgeClients"
+          EMAILJS_SIMULATE: "true"
 
-  # 2. Python AI Service - Syntax & Import Check
+      - name: Dependency security vulnerability scan
+        run: dotnet list backend/pc_forge_api.csproj package --vulnerable
+
+  # ============================================================================
+  # 2. Python AI Microservice (Python 3.11) (Syntax -> Quality -> Unit Tests)
+  # ============================================================================
   ai-service:
-    name: AI Service - Syntax & Tests (Python 3.11)
+    name: AI Service - Syntax, Tools & Unit Tests (Python 3.11)
     runs-on: ubuntu-latest
+    needs: [security-secrets-audit]
 
     steps:
       - name: Checkout repository
@@ -51,77 +90,98 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: ai_service/requirements.txt
 
       - name: Install dependencies
         working-directory: ai_service
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Syntax check (py_compile)
+      - name: Syntax & bytecode compilation check (py_compile)
         run: |
           find ai_service -name "*.py" | xargs python -m py_compile
-          echo "All Python files passed syntax check"
+          echo "All Python source files passed syntax and compilation check"
 
-      - name: Run agent unit tests
+      - name: Run multi-agent tool & unit test suite
         working-directory: ai_service
         run: python -m pytest tests/ -v --tb=short
         env:
+          CI: "true"
           GEMINI_API_KEY: "ci-placeholder-key"
+          CHAT_MODEL: "gemini-3.8-flash"
 
-  # 3. React Web App - Build Check
+  # ============================================================================
+  # 3. React Web Admin Portal (Node 22) (Quality -> Test -> Security -> Build)
+  # ============================================================================
   react:
-    name: React - Install & Build
+    name: React Web - Lint, Test, Security & Build
     runs-on: ubuntu-latest
+    needs: [security-secrets-audit]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      # Node 22+ required: jsdom 30 -> undici 7 uses markAsUncloneable (absent in Node 20)
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
-      - name: Install dependencies
+      - name: Install dependencies (clean install)
         working-directory: web
         run: npm ci
 
-      - name: Build React app
+      - name: Code quality & static analysis (oxlint)
         working-directory: web
-        run: npm run build
-        env:
-          VITE_API_BASE_URL: "http://localhost:5000/api"
+        run: npm run lint
 
-      - name: Run React tests
+      - name: Run Vitest unit & component tests
         working-directory: web
         run: npm test
 
-  # 4. Flutter - Static Analysis & Tests
+      - name: Dependency vulnerability audit (Lecture 08 §7)
+        working-directory: web
+        run: npm audit --audit-level=high
+
+      - name: Build production bundle
+        working-directory: web
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: "https://pc-forge.onrender.com/api"
+
+  # ============================================================================
+  # 4. Flutter Mobile App (Flutter 3.38.5 / Dart 3.10.4) (Static Analysis & Widget Tests)
+  # ============================================================================
   flutter:
-    name: Flutter - Analyze & Test
+    name: Flutter - Analyze & Widget Tests
     runs-on: ubuntu-latest
+    needs: [security-secrets-audit]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Flutter
+      - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
+          # Must ship Dart >= 3.10.4 to satisfy pubspec `sdk: ^3.10.4`
+          flutter-version: '3.38.5'
           channel: 'stable'
+          cache: true
 
-      - name: Get Flutter packages
+      - name: Get packages
         working-directory: app
         run: flutter pub get
 
-      - name: Flutter analyze
+      - name: Static code analysis (flutter analyze)
         working-directory: app
         run: flutter analyze --no-fatal-infos
 
-      - name: Run Flutter tests
+      - name: Run widget & unit tests
         working-directory: app
         run: flutter test --no-pub
