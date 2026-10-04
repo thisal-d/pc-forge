@@ -71,10 +71,6 @@ public class OrdersController : ControllerBase
                 });
             }
 
-            // Reserve & deduct inventory
-            product.StockQuantity -= itemDto.Quantity;
-            product.UpdatedAt = DateTime.UtcNow;
-
             totalAmount += product.Price * itemDto.Quantity;
 
             orderItems.Add(new OrderItem
@@ -85,14 +81,48 @@ public class OrdersController : ControllerBase
             });
         }
 
-        // 4. Create and Save Order
+        // 4. Payment Method & Total Threshold Validation (Server-side from DB prices)
+        var isCod = OrderStatusConstants.IsCod(dto.PaymentMethod);
+        var isStorePickup = OrderStatusConstants.IsStorePickup(dto.PaymentMethod);
+
+        if (totalAmount > OrderStatusConstants.CodMaxLimit)
+        {
+            if (isCod)
+            {
+                return BadRequest(new
+                {
+                    message = $"Cash on delivery (COD) is only allowed for orders up to LKR {OrderStatusConstants.CodMaxLimit:N0}. Your calculated order total is LKR {totalAmount:N2}. For orders over LKR {OrderStatusConstants.CodMaxLimit:N0}, Store pickup is the only option."
+                });
+            }
+            else if (!isStorePickup)
+            {
+                return BadRequest(new
+                {
+                    message = $"For orders exceeding LKR {OrderStatusConstants.CodMaxLimit:N0}, Store pickup (pay at counter) is the only allowed option. Your calculated order total is LKR {totalAmount:N2}."
+                });
+            }
+        }
+
+        var normalizedPaymentMethod = isCod ? OrderStatusConstants.CashOnDelivery : OrderStatusConstants.StorePickup;
+
+        // 5. Reserve & Deduct Inventory in Transaction
+        var isInMemory = _context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+        using var transaction = isInMemory ? null : await _context.Database.BeginTransactionAsync();
+
+        foreach (var itemDto in dto.Items)
+        {
+            var product = products[itemDto.ProductId];
+            product.StockQuantity -= itemDto.Quantity;
+            product.UpdatedAt = DateTime.UtcNow;
+        }
+
         var order = new Order
         {
             UserId = userId,
             TotalAmount = totalAmount,
-            Status = "Paid", // Simulated successful checkout
+            Status = OrderStatusConstants.OrderPlaced, // Starts strictly at 'Order placed'
             ShippingAddress = dto.ShippingAddress.Trim(),
-            PaymentMethod = dto.PaymentMethod,
+            PaymentMethod = normalizedPaymentMethod,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
             Items = orderItems
@@ -101,8 +131,13 @@ public class OrdersController : ControllerBase
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Order #{OrderId} placed successfully for User {UserId}, Total: {TotalAmount:C}",
-            order.OrderId, userId, totalAmount);
+        if (transaction != null)
+        {
+            await transaction.CommitAsync();
+        }
+
+        _logger.LogInformation("Order #{OrderId} placed successfully for User {UserId}, Method: {PaymentMethod}, Total: {TotalAmount:C}",
+            order.OrderId, userId, normalizedPaymentMethod, totalAmount);
 
         // 5. Load User info for response
         var user = await _context.Users.FindAsync(userId);
@@ -238,7 +273,10 @@ public class OrdersController : ControllerBase
 
     /// <summary>
     /// Update order fulfillment status (Admin / Staff only).
-    /// Handles automatic inventory restocking when an order is cancelled.
+    /// Enforces strict forward-only progression rules:
+    /// - COD: Order placed -> Processing -> Ready for delivery -> Out for delivery -> Paid & Completed
+    /// - Store pickup: Order placed -> Processing -> Ready for pickup -> Paid & Completed
+    /// - Cancelled: only permitted from 'Order placed' or 'Processing'
     /// </summary>
     [HttpPatch("{id:int}/status")]
     [Authorize(Policy = "StaffOnly")]
@@ -249,40 +287,55 @@ public class OrdersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var allowedStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "Pending", "Paid", "Processing", "Shipped", "Delivered", "Cancelled"
-        };
+        var isInMemory = _context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+        using var transaction = isInMemory ? null : await _context.Database.BeginTransactionAsync();
 
-        var normalizedStatus = dto.Status.Trim();
-        var canonicalStatus = allowedStatuses.FirstOrDefault(s => s.Equals(normalizedStatus, StringComparison.OrdinalIgnoreCase));
-        if (canonicalStatus == null)
+        Order? order;
+        if (!isInMemory)
         {
-            return BadRequest(new { message = $"Invalid status '{dto.Status}'. Allowed: {string.Join(", ", allowedStatuses)}" });
+            order = await _context.Orders
+                .FromSqlRaw("SELECT * FROM orders WHERE orderid = {0} FOR UPDATE", id)
+                .Include(o => o.User)
+                .Include(o => o.Items)
+                .ThenInclude(i => i.Product)
+                .FirstOrDefaultAsync();
         }
-
-        var order = await _context.Orders
-            .Include(o => o.User)
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .FirstOrDefaultAsync(o => o.OrderId == id);
+        else
+        {
+            order = await _context.Orders
+                .Include(o => o.User)
+                .Include(o => o.Items)
+                .ThenInclude(i => i.Product)
+                .FirstOrDefaultAsync(o => o.OrderId == id);
+        }
 
         if (order == null)
         {
             return NotFound(new { message = $"Order #{id} not found." });
         }
 
+        var targetCanonical = OrderStatusConstants.AllStatuses.FirstOrDefault(s => s.Equals(dto.Status.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (targetCanonical == null)
+        {
+            return BadRequest(new { message = $"Invalid status '{dto.Status}'. Allowed: {string.Join(", ", OrderStatusConstants.AllStatuses)}" });
+        }
+
+        if (!OrderStatusConstants.IsValidTransition(order.Status, targetCanonical, order.PaymentMethod, out var transitionError))
+        {
+            return BadRequest(new { message = transitionError });
+        }
+
         var previousStatus = order.Status;
 
         // If status isn't changing, return current
-        if (previousStatus.Equals(canonicalStatus, StringComparison.OrdinalIgnoreCase))
+        if (previousStatus.Equals(targetCanonical, StringComparison.OrdinalIgnoreCase))
         {
             return Ok(MapToDetailDto(order));
         }
 
-        // 1. If transitioning TO "Cancelled" from another status -> Restock inventory
-        if (canonicalStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) &&
-            !previousStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
+        // Restock inventory if transitioning to Cancelled (idempotent)
+        if (targetCanonical.Equals(OrderStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase) &&
+            !previousStatus.Equals(OrderStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase))
         {
             foreach (var item in order.Items)
             {
@@ -292,43 +345,117 @@ public class OrdersController : ControllerBase
                     item.Product.UpdatedAt = DateTime.UtcNow;
                 }
             }
-            _logger.LogInformation("Order #{OrderId} cancelled. Restocked {Count} items.", order.OrderId, order.Items.Count);
-        }
-        // 2. If transitioning FROM "Cancelled" to active -> Deduct inventory (with validation)
-        else if (previousStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) &&
-                 !canonicalStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
-        {
-            // Validate stock for all items
-            foreach (var item in order.Items)
-            {
-                if (item.Product != null && item.Product.StockQuantity < item.Quantity)
-                {
-                    return BadRequest(new
-                    {
-                        message = $"Cannot re-open order #{order.OrderId}. Insufficient stock for '{item.Product.Name}'. Available: {item.Product.StockQuantity}, Required: {item.Quantity}"
-                    });
-                }
-            }
-
-            // Deduct stock
-            foreach (var item in order.Items)
-            {
-                if (item.Product != null)
-                {
-                    item.Product.StockQuantity -= item.Quantity;
-                    item.Product.UpdatedAt = DateTime.UtcNow;
-                }
-            }
-            _logger.LogInformation("Order #{OrderId} uncancelled. Deducted stock for {Count} items.", order.OrderId, order.Items.Count);
+            _logger.LogInformation("Order #{OrderId} cancelled by staff. Restocked {Count} items.", order.OrderId, order.Items.Count);
         }
 
-        order.Status = canonicalStatus;
+        order.Status = targetCanonical;
         order.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
+        if (transaction != null)
+        {
+            await transaction.CommitAsync();
+        }
+
         _logger.LogInformation("Order #{OrderId} status changed from '{PreviousStatus}' to '{NewStatus}' by {User}",
-            order.OrderId, previousStatus, canonicalStatus, User.Identity?.Name ?? "Staff");
+            order.OrderId, previousStatus, targetCanonical, User.Identity?.Name ?? "Staff");
+
+        return Ok(MapToDetailDto(order));
+    }
+
+    /// <summary>
+    /// Customer cancellation endpoint.
+    /// - Allowed only in 'Order placed' or 'Processing' statuses.
+    /// - Not allowed in 'Ready for delivery', 'Out for delivery', 'Ready for pickup', or 'Paid & Completed'.
+    /// - Restocks each item's inventory.
+    /// - Uses an atomic DB transaction with a row-level lock (FOR UPDATE).
+    /// - Fully idempotent: double-submitting does not double-restock inventory.
+    /// </summary>
+    [HttpPost("{id:int}/cancel")]
+    [HttpPatch("{id:int}/cancel")]
+    public async Task<ActionResult<OrderDetailDto>> CancelOrder(int id)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+        {
+            return Unauthorized(new { message = "Authentication required." });
+        }
+
+        var isStaffOrAdmin = IsStaffOrAdmin();
+
+        var isInMemory = _context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+        using var transaction = isInMemory ? null : await _context.Database.BeginTransactionAsync();
+
+        Order? order;
+        if (!isInMemory)
+        {
+            // Acquire row lock to ensure idempotency and prevent concurrent double-cancels
+            order = await _context.Orders
+                .FromSqlRaw("SELECT * FROM orders WHERE orderid = {0} FOR UPDATE", id)
+                .Include(o => o.User)
+                .Include(o => o.Items)
+                .ThenInclude(i => i.Product)
+                .FirstOrDefaultAsync();
+        }
+        else
+        {
+            order = await _context.Orders
+                .Include(o => o.User)
+                .Include(o => o.Items)
+                .ThenInclude(i => i.Product)
+                .FirstOrDefaultAsync(o => o.OrderId == id);
+        }
+
+        if (order == null)
+        {
+            return NotFound(new { message = $"Order #{id} was not found." });
+        }
+
+        // Verify customer owns this order (or is staff/admin)
+        if (!isStaffOrAdmin && order.UserId != currentUserId.Value)
+        {
+            return Forbid();
+        }
+
+        // Idempotency: If already cancelled, return existing state without restocking again
+        if (order.Status.Equals(OrderStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation("Order #{OrderId} cancel requested, but already Cancelled (idempotent response).", id);
+            return Ok(MapToDetailDto(order));
+        }
+
+        // Status rule validation: Only allowed in 'Order placed' or 'Processing'
+        if (!OrderStatusConstants.CanCancel(order.Status))
+        {
+            return BadRequest(new
+            {
+                message = $"Order #{id} cannot be cancelled because it is in status '{order.Status}'. Cancellation is only allowed when status is 'Order placed' or 'Processing'."
+            });
+        }
+
+        // Restock inventory for each item
+        foreach (var item in order.Items)
+        {
+            if (item.Product != null)
+            {
+                item.Product.StockQuantity += item.Quantity;
+                item.Product.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
+        order.Status = OrderStatusConstants.Cancelled;
+        order.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        if (transaction != null)
+        {
+            await transaction.CommitAsync();
+        }
+
+        _logger.LogInformation("Order #{OrderId} cancelled successfully by user #{UserId}. Restocked {ItemCount} items.",
+            order.OrderId, currentUserId.Value, order.Items.Count);
 
         return Ok(MapToDetailDto(order));
     }

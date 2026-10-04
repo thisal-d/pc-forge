@@ -15,6 +15,8 @@ public class AppDbContext : DbContext
     public DbSet<Product> Products => Set<Product>();
     public DbSet<CategoryFilter> CategoryFilters => Set<CategoryFilter>();
     public DbSet<FilterOption> FilterOptions => Set<FilterOption>();
+    public DbSet<Filter> Filters => Set<Filter>();
+    public DbSet<MasterFilterOption> MasterFilterOptions => Set<MasterFilterOption>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
@@ -111,6 +113,7 @@ public class AppDbContext : DbContext
             entity.HasKey(cf => cf.FilterId);
             entity.Property(cf => cf.FilterId).HasColumnName("filterid");
             entity.Property(cf => cf.CategoryId).HasColumnName("categoryid");
+            entity.Property(cf => cf.MasterFilterId).HasColumnName("masterfilterid");
             entity.Property(cf => cf.FilterKey).HasColumnName("filterkey").HasMaxLength(50).IsRequired();
             entity.Property(cf => cf.DisplayName).HasColumnName("displayname").HasMaxLength(100).IsRequired();
             entity.Property(cf => cf.FilterType).HasColumnName("filtertype").HasMaxLength(30).HasDefaultValue("multiselect");
@@ -123,6 +126,11 @@ public class AppDbContext : DbContext
                   .WithMany(c => c.Filters)
                   .HasForeignKey(cf => cf.CategoryId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(cf => cf.MasterFilter)
+                  .WithMany(f => f.CategoryFilters)
+                  .HasForeignKey(cf => cf.MasterFilterId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // 6. Map FilterOptions
@@ -141,6 +149,37 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // 6b. Map Master Filters
+        modelBuilder.Entity<Filter>(entity =>
+        {
+            entity.ToTable("filters");
+            entity.HasKey(f => f.FilterId);
+            entity.Property(f => f.FilterId).HasColumnName("filterid");
+            entity.Property(f => f.FilterKey).HasColumnName("filterkey").HasMaxLength(50).IsRequired();
+            entity.HasIndex(f => f.FilterKey).IsUnique();
+            entity.Property(f => f.DisplayName).HasColumnName("displayname").HasMaxLength(100).IsRequired();
+            entity.Property(f => f.FilterType).HasColumnName("filtertype").HasMaxLength(30).HasDefaultValue("multiselect");
+            entity.Property(f => f.Unit).HasColumnName("unit").HasMaxLength(20);
+            entity.Property(f => f.CreatedAt).HasColumnName("createdat").HasDefaultValueSql("NOW()");
+            entity.Property(f => f.UpdatedAt).HasColumnName("updatedat").HasDefaultValueSql("NOW()");
+        });
+
+        // 6c. Map MasterFilterOptions
+        modelBuilder.Entity<MasterFilterOption>(entity =>
+        {
+            entity.ToTable("master_filter_options");
+            entity.HasKey(mfo => mfo.OptionId);
+            entity.Property(mfo => mfo.OptionId).HasColumnName("optionid");
+            entity.Property(mfo => mfo.FilterId).HasColumnName("filterid");
+            entity.Property(mfo => mfo.OptionValue).HasColumnName("optionvalue").HasMaxLength(100).IsRequired();
+            entity.Property(mfo => mfo.DisplayOrder).HasColumnName("displayorder").HasDefaultValue(0);
+
+            entity.HasOne(mfo => mfo.Filter)
+                  .WithMany(f => f.Options)
+                  .HasForeignKey(mfo => mfo.FilterId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // 7. Map Orders
         modelBuilder.Entity<Order>(entity =>
         {
@@ -149,7 +188,7 @@ public class AppDbContext : DbContext
             entity.Property(o => o.OrderId).HasColumnName("orderid");
             entity.Property(o => o.UserId).HasColumnName("userid");
             entity.Property(o => o.TotalAmount).HasColumnName("totalamount").HasColumnType("decimal(12,2)").IsRequired();
-            entity.Property(o => o.Status).HasColumnName("status").HasMaxLength(50).HasDefaultValue("Pending");
+            entity.Property(o => o.Status).HasColumnName("status").HasMaxLength(50).HasDefaultValue("Order placed");
             entity.Property(o => o.ShippingAddress).HasColumnName("shippingaddress").IsRequired();
             entity.Property(o => o.PaymentMethod).HasColumnName("paymentmethod").HasMaxLength(50);
             entity.Property(o => o.CreatedAt).HasColumnName("createdat").HasDefaultValueSql("NOW()");

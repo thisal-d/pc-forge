@@ -13,13 +13,9 @@ export const ManageFiltersModal = ({
   onRemoveFilter,
   filterActionError,
   filterActionSuccess,
-  filterMode,
-  onFilterModeChange,
   selectedPoolFilterKey,
   onSelectedPoolFilterKeyChange,
   availableFiltersPool,
-  customFilterData,
-  onCustomFilterDataChange,
   onAddFilterAssignment,
 }) => {
   if (!category) return null;
@@ -68,16 +64,12 @@ export const ManageFiltersModal = ({
             onRemove={onRemoveFilter}
           />
 
-          {/* Section 2: Add / Assign Filter */}
+          {/* Section 2: Add / Assign Database Filter */}
           <AddFilterForm
-            filterMode={filterMode}
-            onFilterModeChange={onFilterModeChange}
             selectedPoolFilterKey={selectedPoolFilterKey}
             onSelectedPoolFilterKeyChange={onSelectedPoolFilterKeyChange}
             availableFiltersPool={availableFiltersPool}
             assignedFilters={assignedFilters}
-            customFilterData={customFilterData}
-            onCustomFilterDataChange={onCustomFilterDataChange}
             onSubmit={onAddFilterAssignment}
           />
         </div>

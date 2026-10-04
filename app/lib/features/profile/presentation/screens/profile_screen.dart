@@ -164,22 +164,25 @@ class ProfileScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: AppColors.border),
                       ),
-                      child: CheckboxListTile(
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                        title: const Text(
-                          'Change Security Password',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primaryDark,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: CheckboxListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                          title: const Text(
+                            'Change Security Password',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primaryDark,
+                            ),
                           ),
+                          activeColor: AppColors.primaryBlue,
+                          value: changePassword,
+                          onChanged: (val) {
+                            setModalState(() => changePassword = val ?? false);
+                          },
                         ),
-                        activeColor: AppColors.primaryBlue,
-                        value: changePassword,
-                        onChanged: (val) {
-                          setModalState(() => changePassword = val ?? false);
-                        },
                       ),
                     ),
 

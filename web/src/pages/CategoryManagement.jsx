@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { categoryService } from '../services/categoryService';
+import { filterService } from '../services/filterService.js';
 import {
   CategoryStats,
   CategoryToolbar,
@@ -80,16 +81,10 @@ export const CategoryManagement = () => {
   const [managingCategory, setManagingCategory] = useState(null);
   const [assignedFilters, setAssignedFilters] = useState([]);
   const [filtersLoading, setFiltersLoading] = useState(false);
+  const [masterFiltersPool, setMasterFiltersPool] = useState([]);
 
   // Filter Assignment Sub-form state
-  const [filterMode, setFilterMode] = useState('select'); // 'select' | 'custom'
   const [selectedPoolFilterKey, setSelectedPoolFilterKey] = useState('');
-  const [customFilterData, setCustomFilterData] = useState({
-    filterKey: '',
-    displayName: '',
-    filterType: 'multiselect',
-    unit: '',
-  });
   const [filterActionError, setFilterActionError] = useState('');
   const [filterActionSuccess, setFilterActionSuccess] = useState('');
 
@@ -121,10 +116,7 @@ export const CategoryManagement = () => {
     return categoryService.calculateStats(rawCategories);
   }, [rawCategories]);
 
-  // Available filter pool
-  const availableFiltersPool = useMemo(() => {
-    return categoryService.getAvailableFiltersPool();
-  }, []);
+
 
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
@@ -340,6 +332,7 @@ export const CategoryManagement = () => {
   };
 
   // ==========================================
+  // ==========================================
   // MANAGE FILTERS MODAL HANDLERS
   // ==========================================
   const handleOpenManageFilters = async (category) => {
@@ -347,21 +340,19 @@ export const CategoryManagement = () => {
     setFilterActionError('');
     setFilterActionSuccess('');
     setSelectedPoolFilterKey('');
-    setCustomFilterData({
-      filterKey: '',
-      displayName: '',
-      filterType: 'multiselect',
-      unit: '',
-    });
     setFiltersLoading(true);
 
     const catId = category.categoryId || category.id;
     try {
-      const filters = await categoryService.fetchFiltersForCategoryFromApi(catId);
-      setAssignedFilters(filters);
+      const [catFilters, masterList] = await Promise.all([
+        categoryService.fetchFiltersForCategoryFromApi(catId),
+        filterService.getFilters(),
+      ]);
+      setAssignedFilters(catFilters || []);
+      setMasterFiltersPool(masterList || []);
     } catch {
       const localFilters = categoryService.getFiltersForCategory(catId);
-      setAssignedFilters(localFilters);
+      setAssignedFilters(localFilters || []);
     } finally {
       setFiltersLoading(false);
     }
@@ -428,44 +419,29 @@ export const CategoryManagement = () => {
     setFilterActionError('');
     setFilterActionSuccess('');
 
-    const catId = managingCategory.categoryId || managingCategory.id;
-    let targetFilter = null;
-
-    if (filterMode === 'select') {
-      if (!selectedPoolFilterKey) {
-        setFilterActionError('Please select a filter from the list.');
-        return;
-      }
-      const poolMatch = availableFiltersPool.find(
-        (f) => f.filterKey.toLowerCase() === selectedPoolFilterKey.toLowerCase()
-      );
-      if (!poolMatch) {
-        setFilterActionError('Selected filter definition not found.');
-        return;
-      }
-      targetFilter = {
-        filterKey: poolMatch.filterKey,
-        displayName: poolMatch.displayName,
-        filterType: poolMatch.filterType,
-        unit: poolMatch.unit,
-      };
-    } else {
-      if (!customFilterData.displayName.trim()) {
-        setFilterActionError('Display name is required (e.g., "Memory Speed").');
-        return;
-      }
-      const autoKey =
-        customFilterData.filterKey.trim() ||
-        customFilterData.displayName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
-
-      targetFilter = {
-        filterKey: autoKey,
-        displayName: customFilterData.displayName.trim(),
-        filterType: customFilterData.filterType || 'multiselect',
-        unit: customFilterData.unit.trim() || null,
-      };
+    if (!selectedPoolFilterKey) {
+      setFilterActionError('Please select a filter from the database.');
+      return;
     }
 
+    const poolMatch = masterFiltersPool.find(
+      (f) => (f.filterKey || '').toLowerCase() === selectedPoolFilterKey.toLowerCase()
+    );
+    if (!poolMatch) {
+      setFilterActionError('Selected filter definition was not found in the database.');
+      return;
+    }
+
+    const targetFilter = {
+      masterFilterId: poolMatch.filterId,
+      filterKey: poolMatch.filterKey,
+      displayName: poolMatch.displayName,
+      filterType: poolMatch.filterType,
+      unit: poolMatch.unit,
+      options: Array.isArray(poolMatch.options) ? poolMatch.options.map((o) => o.value) : [],
+    };
+
+    const catId = managingCategory.categoryId || managingCategory.id;
     try {
       const added = await categoryService.addFilterToCategory(catId, targetFilter);
       const updatedList = await categoryService.fetchFiltersForCategoryFromApi(catId);
@@ -475,14 +451,8 @@ export const CategoryManagement = () => {
         prev.map((c) => ((c.categoryId === catId || c.id === catId) ? { ...c, filterCount: updatedList.length } : c))
       );
 
-      setFilterActionSuccess(`Filter "${added.displayName}" assigned successfully.`);
+      setFilterActionSuccess(`Filter "${added.displayName || poolMatch.displayName}" assigned to category "${managingCategory.name}".`);
       setSelectedPoolFilterKey('');
-      setCustomFilterData({
-        filterKey: '',
-        displayName: '',
-        filterType: 'multiselect',
-        unit: '',
-      });
       setTimeout(() => setFilterActionSuccess(''), 3500);
     } catch (err) {
       setFilterActionError(err.message || 'Failed to assign filter.');
@@ -621,13 +591,9 @@ export const CategoryManagement = () => {
         onRemoveFilter={handleRemoveFilter}
         filterActionError={filterActionError}
         filterActionSuccess={filterActionSuccess}
-        filterMode={filterMode}
-        onFilterModeChange={setFilterMode}
         selectedPoolFilterKey={selectedPoolFilterKey}
         onSelectedPoolFilterKeyChange={setSelectedPoolFilterKey}
-        availableFiltersPool={availableFiltersPool}
-        customFilterData={customFilterData}
-        onCustomFilterDataChange={setCustomFilterData}
+        availableFiltersPool={masterFiltersPool}
         onAddFilterAssignment={handleAddFilterAssignment}
       />
 

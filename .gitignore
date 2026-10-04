@@ -55,4 +55,6 @@ pubspec.lock
 **/deploy.env
 **/*.deploy.env
 !**/.env.example
-data
+/data/
+/Data/knowledge/
+!backend/Data/

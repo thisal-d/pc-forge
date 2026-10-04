@@ -17,6 +17,8 @@ vi.mock("../api/axiosInstance", () => ({
 
 import api from "../api/axiosInstance";
 import { buildReviewService } from "../services/buildReviewService.js";
+import { orderService } from "../services/orderService.js";
+import { filterService } from "../services/filterService.js";
 
 // ── Auth Service ──────────────────────────────────────────────────────────────
 describe("Auth – login()", () => {
@@ -196,4 +198,184 @@ describe("buildReviewService – updateBuildReview()", () => {
     ).rejects.toThrow("Build not found");
   });
 });
+
+// ── Order Service Methods ───────────────────────────────────────────────────
+describe("orderService – cancelOrder() & calculateStats()", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls POST /orders/{id}/cancel and returns cancelled order", async () => {
+    api.post.mockResolvedValueOnce({
+      data: {
+        orderId: 101,
+        status: "Cancelled",
+        totalAmount: 45000,
+      },
+    });
+
+    const result = await orderService.cancelOrder(101);
+    expect(api.post).toHaveBeenCalledWith("/orders/101/cancel");
+    expect(result.status).toBe("Cancelled");
+  });
+
+  it("calculates correct statistics for canonical order statuses", () => {
+    const mockOrders = [
+      { orderId: 1, status: "Order placed", totalAmount: 50000 },
+      { orderId: 2, status: "Processing", totalAmount: 30000 },
+      { orderId: 3, status: "Ready for delivery", totalAmount: 20000 },
+      { orderId: 4, status: "Out for delivery", totalAmount: 15000 },
+      { orderId: 5, status: "Ready for pickup", totalAmount: 80000 },
+      { orderId: 6, status: "Paid & Completed", totalAmount: 95000 },
+      { orderId: 7, status: "Cancelled", totalAmount: 40000 },
+    ];
+
+    const stats = orderService.calculateStats(mockOrders);
+
+    expect(stats.total).toBe(7);
+    expect(stats.orderPlaced).toBe(1);
+    expect(stats.processing).toBe(1);
+    expect(stats.readyForDelivery).toBe(1);
+    expect(stats.outForDelivery).toBe(1);
+    expect(stats.readyForPickup).toBe(1);
+    expect(stats.paidAndCompleted).toBe(1);
+    expect(stats.cancelled).toBe(1);
+    // Non-cancelled revenue: 50000 + 30000 + 20000 + 15000 + 80000 + 95000 = 290000
+    expect(stats.totalRevenue).toBe(290000);
+  });
+});
+
+// ── Filter Service Methods ──────────────────────────────────────────────────
+describe("filterService – Master filters DB management", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("getFilters() calls GET /filters and returns mapped filter items", async () => {
+    api.get.mockResolvedValueOnce({
+      data: [
+        {
+          filterId: 1,
+          filterKey: "cuda_cores",
+          displayName: "CUDA Cores",
+          filterType: "multiselect",
+          unit: null,
+          options: [{ optionId: 10, value: "3072", displayOrder: 1 }],
+          assignedCategoriesCount: 1,
+          assignedCategoryNames: ["GPU"],
+        },
+      ],
+    });
+
+    const result = await filterService.getFilters();
+    expect(api.get).toHaveBeenCalledWith("/filters");
+    expect(result).toHaveLength(1);
+    expect(result[0].filterKey).toBe("cuda_cores");
+    expect(result[0].options[0].value).toBe("3072");
+    expect(result[0].assignedCategoriesCount).toBe(1);
+  });
+
+  it("createFilter() sends valid payload to POST /filters", async () => {
+    api.post.mockResolvedValueOnce({
+      data: {
+        filterId: 5,
+        filterKey: "refresh_rate",
+        displayName: "Refresh Rate",
+        filterType: "multiselect",
+        unit: "Hz",
+        options: [{ optionId: 1, value: "144Hz" }, { optionId: 2, value: "240Hz" }],
+      },
+    });
+
+    const result = await filterService.createFilter({
+      filterKey: "refresh_rate",
+      displayName: "Refresh Rate",
+      filterType: "multiselect",
+      unit: "Hz",
+      options: ["144Hz", "240Hz"],
+    });
+
+    expect(api.post).toHaveBeenCalledWith("/filters", {
+      filterKey: "refresh_rate",
+      displayName: "Refresh Rate",
+      filterType: "multiselect",
+      unit: "Hz",
+      options: ["144Hz", "240Hz"],
+    });
+    expect(result.filterId).toBe(5);
+  });
+
+  it("updateFilter() sends updated payload to PUT /filters/{id}", async () => {
+    api.put.mockResolvedValueOnce({
+      data: {
+        filterId: 5,
+        filterKey: "refresh_rate",
+        displayName: "Display Refresh Rate",
+        filterType: "multiselect",
+        unit: "Hz",
+        options: [{ optionId: 1, value: "144Hz" }, { optionId: 2, value: "360Hz" }],
+      },
+    });
+
+    const result = await filterService.updateFilter(5, {
+      displayName: "Display Refresh Rate",
+      filterType: "multiselect",
+      unit: "Hz",
+      options: ["144Hz", "360Hz"],
+    });
+
+    expect(api.put).toHaveBeenCalledWith("/filters/5", {
+      displayName: "Display Refresh Rate",
+      filterType: "multiselect",
+      unit: "Hz",
+      options: ["144Hz", "360Hz"],
+    });
+    expect(result.displayName).toBe("Display Refresh Rate");
+  });
+
+  it("deleteFilter() calls DELETE /filters/{id}", async () => {
+    api.delete.mockResolvedValueOnce({
+      data: { message: "Filter deleted" },
+    });
+
+    const result = await filterService.deleteFilter(5);
+    expect(api.delete).toHaveBeenCalledWith("/filters/5");
+    expect(result.message).toBe("Filter deleted");
+  });
+
+  it("calculateStats() calculates correct KPI totals", () => {
+    const mockFilters = [
+      { filterId: 1, filterType: "multiselect", options: [{ value: "A" }, { value: "B" }] },
+      { filterId: 2, filterType: "multiselect", options: [{ value: "C" }] },
+      { filterId: 3, filterType: "singleselect", options: [{ value: "D" }, { value: "E" }] },
+      { filterId: 4, filterType: "range", options: [] },
+      { filterId: 5, filterType: "boolean", options: [{ value: "Yes" }, { value: "No" }] },
+    ];
+
+    const stats = filterService.calculateStats(mockFilters);
+    expect(stats.total).toBe(5);
+    expect(stats.multiselect).toBe(2);
+    expect(stats.singleselect).toBe(1);
+    expect(stats.range).toBe(1);
+    expect(stats.boolean).toBe(1);
+    expect(stats.totalOptions).toBe(7);
+  });
+
+  it("filterFilters() correctly filters by search and type", () => {
+    const mockFilters = [
+      { filterId: 1, filterKey: "cuda_cores", displayName: "CUDA Cores", filterType: "multiselect" },
+      { filterId: 2, filterKey: "socket", displayName: "Socket Type", filterType: "multiselect" },
+      { filterId: 3, filterKey: "wattage", displayName: "Power Wattage", filterType: "singleselect" },
+    ];
+
+    const searchMatch = filterService.filterFilters(mockFilters, { search: "cuda" });
+    expect(searchMatch).toHaveLength(1);
+    expect(searchMatch[0].filterKey).toBe("cuda_cores");
+
+    const typeMatch = filterService.filterFilters(mockFilters, { filterType: "singleselect" });
+    expect(typeMatch).toHaveLength(1);
+    expect(typeMatch[0].filterKey).toBe("wattage");
+  });
+});
+
 

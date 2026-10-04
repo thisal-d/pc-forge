@@ -76,4 +76,17 @@ class OrderService extends ChangeNotifier {
       return null;
     }
   }
+
+  /// Cancels an order, restocks inventory on backend, and updates local state.
+  Future<OrderModel> cancelOrder(int orderId, {String? token}) async {
+    final apiRes = await _apiService.cancelOrder(orderId, token: token);
+    final updatedOrder = OrderModel.fromJson(apiRes);
+
+    final idx = _orders.indexWhere((o) => o.orderId == orderId);
+    if (idx != -1) {
+      _orders[idx] = updatedOrder;
+    }
+    notifyListeners();
+    return updatedOrder;
+  }
 }

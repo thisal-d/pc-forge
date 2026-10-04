@@ -163,6 +163,42 @@ if (!app.Environment.IsEnvironment("Testing"))
                 WHERE userid IN (SELECT userid FROM staff) 
                   AND roleid != (SELECT roleid FROM roles WHERE rolename = 'Admin' LIMIT 1);
 
+                -- Ensure master filters and options tables exist
+                CREATE TABLE IF NOT EXISTS filters (
+                    filterid SERIAL PRIMARY KEY,
+                    filterkey VARCHAR(50) UNIQUE NOT NULL,
+                    displayname VARCHAR(100) NOT NULL,
+                    filtertype VARCHAR(30) NOT NULL DEFAULT 'multiselect',
+                    unit VARCHAR(20) NULL,
+                    createdat TIMESTAMPTZ DEFAULT NOW(),
+                    updatedat TIMESTAMPTZ DEFAULT NOW()
+                );
+
+                CREATE TABLE IF NOT EXISTS master_filter_options (
+                    optionid SERIAL PRIMARY KEY,
+                    filterid INT NOT NULL REFERENCES filters(filterid) ON DELETE CASCADE,
+                    optionvalue VARCHAR(100) NOT NULL,
+                    displayorder INT DEFAULT 0,
+                    CONSTRAINT uq_master_filter_option UNIQUE(filterid, optionvalue)
+                );
+
+                ALTER TABLE categoryfilters ADD COLUMN IF NOT EXISTS masterfilterid INT NULL REFERENCES filters(filterid) ON DELETE SET NULL;
+
+                -- Populate filters from existing categoryfilters if filters is empty
+                INSERT INTO filters (filterkey, displayname, filtertype, unit, createdat)
+                SELECT DISTINCT ON (LOWER(filterkey))
+                    LOWER(filterkey), displayname, filtertype, unit, NOW()
+                FROM categoryfilters
+                WHERE NOT EXISTS (SELECT 1 FROM filters WHERE LOWER(filters.filterkey) = LOWER(categoryfilters.filterkey));
+
+                -- Populate master_filter_options from existing filteroptions if empty
+                INSERT INTO master_filter_options (filterid, optionvalue, displayorder)
+                SELECT DISTINCT f.filterid, fo.optionvalue, fo.displayorder
+                FROM filteroptions fo
+                JOIN categoryfilters cf ON fo.filterid = cf.filterid
+                JOIN filters f ON LOWER(f.filterkey) = LOWER(cf.filterkey)
+                ON CONFLICT (filterid, optionvalue) DO NOTHING;
+
                 -- Synchronize primary key sequences with MAX(id) to prevent duplicate key constraint violations
                 DO $$
                 BEGIN
@@ -177,6 +213,12 @@ if (!app.Environment.IsEnvironment("Testing"))
                     END IF;
                     IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'filteroptions_optionid_seq') THEN
                         PERFORM setval('filteroptions_optionid_seq', (SELECT GREATEST(COALESCE(MAX(optionid), 1), 1) FROM filteroptions));
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'filters_filterid_seq') THEN
+                        PERFORM setval('filters_filterid_seq', (SELECT GREATEST(COALESCE(MAX(filterid), 1), 1) FROM filters));
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'master_filter_options_optionid_seq') THEN
+                        PERFORM setval('master_filter_options_optionid_seq', (SELECT GREATEST(COALESCE(MAX(optionid), 1), 1) FROM master_filter_options));
                     END IF;
                 END $$;
             ");
