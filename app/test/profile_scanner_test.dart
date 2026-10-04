@@ -26,6 +26,7 @@ class MockSearchApiService extends ApiService {
     String? capacity,
     String? vram,
     String? efficiency,
+    Map<String, String>? dynamicFilters,
   }) async {
     return [
       {

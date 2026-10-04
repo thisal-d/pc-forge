@@ -1,26 +1,6 @@
 import api from '../api/axiosInstance.js';
 
-// Global pool of standard component filters that can be assigned to categories
-export const STANDARD_FILTERS_CATALOG = [
-  { filterKey: 'brand', displayName: 'Brand / Manufacturer', filterType: 'multiselect', unit: null },
-  { filterKey: 'socket', displayName: 'Socket Type', filterType: 'multiselect', unit: null },
-  { filterKey: 'chipset', displayName: 'Chipset', filterType: 'multiselect', unit: null },
-  { filterKey: 'form_factor', displayName: 'Form Factor', filterType: 'multiselect', unit: null },
-  { filterKey: 'vram', displayName: 'VRAM Capacity', filterType: 'multiselect', unit: 'GB' },
-  { filterKey: 'memory_type', displayName: 'Memory Type', filterType: 'multiselect', unit: null },
-  { filterKey: 'ddr_type', displayName: 'DDR Type', filterType: 'multiselect', unit: null },
-  { filterKey: 'speed', displayName: 'Memory Speed / Bus', filterType: 'multiselect', unit: 'MHz' },
-  { filterKey: 'capacity', displayName: 'Capacity', filterType: 'multiselect', unit: 'GB' },
-  { filterKey: 'efficiency', displayName: 'Efficiency Rating', filterType: 'multiselect', unit: null },
-  { filterKey: 'wattage', displayName: 'Power Wattage', filterType: 'singleselect', unit: 'W' },
-  { filterKey: 'modular_type', displayName: 'Modular Type', filterType: 'singleselect', unit: null },
-  { filterKey: 'tdp', displayName: 'Thermal Design Power (TDP)', filterType: 'singleselect', unit: 'W' },
-  { filterKey: 'cores', displayName: 'Core Count', filterType: 'singleselect', unit: null },
-  { filterKey: 'threads', displayName: 'Thread Count', filterType: 'singleselect', unit: null },
-  { filterKey: 'clock_speed', displayName: 'Clock Speed', filterType: 'singleselect', unit: 'GHz' },
-  { filterKey: 'price_tier', displayName: 'Price Range', filterType: 'range', unit: 'LKR' },
-  { filterKey: 'rgb_lighting', displayName: 'RGB Lighting', filterType: 'boolean', unit: null },
-];
+
 
 const mapApiCategory = (cat) => {
   if (!cat) return null;
@@ -252,31 +232,38 @@ export const categoryService = {
     }
   },
 
-  // Get distinct pool of available filters that can be assigned
-  getAvailableFiltersPool() {
-    return [...STANDARD_FILTERS_CATALOG].sort((a, b) => a.displayName.localeCompare(b.displayName));
+  // Get distinct pool of available master filters from database
+  async getAvailableFiltersPool() {
+    try {
+      const response = await api.get('/filters');
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
+    } catch {
+      return [];
+    }
   },
 
-  // Assign an existing or new filter to a category (POST /api/categories/{id}/filters)
-  async addFilterToCategory(categoryId, { filterKey, displayName, filterType = 'multiselect', unit = null }) {
+  // Assign a filter to a category (POST /api/categories/{id}/filters)
+  async addFilterToCategory(categoryId, { masterFilterId, filterKey, displayName, filterType = 'multiselect', unit = null, options = null }) {
     const id = Number(categoryId);
     const cleanKey = (filterKey || '').trim().toLowerCase().replace(/\s+/g, '_');
     const cleanName = (displayName || '').trim();
 
-    if (!cleanKey) {
-      throw new Error('Filter key is required (e.g., "socket", "vram").');
-    }
-    if (!cleanName) {
-      throw new Error('Filter display name is required (e.g., "Socket Type").');
+    if (!cleanKey && !masterFilterId) {
+      throw new Error('Please select a valid filter to assign.');
     }
 
     try {
       const response = await api.post(`/categories/${id}/filters`, {
+        masterFilterId: masterFilterId ? Number(masterFilterId) : null,
         filterKey: cleanKey,
         displayName: cleanName,
         filterType: filterType || 'multiselect',
         unit: unit ? unit.trim() : null,
         isFilterable: true,
+        options: Array.isArray(options) ? options : null,
       });
       return response.data;
     } catch (err) {

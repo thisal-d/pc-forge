@@ -26,7 +26,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _selectedPaymentMethod = 'Cash on Delivery';
   bool _isProcessing = false;
 
-  bool get _isCodEligible => _cartService.totalAmount < 100000;
+  bool get _isCodEligible => _cartService.totalAmount <= 100000;
 
   @override
   void initState() {
@@ -37,8 +37,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _addressController.text = 'No. 45, Flower Road';
     _cityController.text = 'Colombo 07';
 
-    // If order total < 100,000, default to COD.
-    // If order total >= 100,000, COD is not available, default to In-Store Pickup & Payment.
+    // If order total <= 100,000, default to COD.
+    // If order total > 100,000, COD is not available, default to In-Store Pickup & Payment.
     if (_isCodEligible) {
       _selectedPaymentMethod = 'Cash on Delivery';
     } else {
@@ -67,7 +67,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    // Safety enforce: If order is >= 100,000, COD cannot be used
+    // Safety enforce: If order is > 100,000, COD cannot be used
     if (!_isCodEligible && _selectedPaymentMethod == 'Cash on Delivery') {
       _selectedPaymentMethod = 'In-Store Pickup & Payment';
     }
@@ -421,8 +421,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         const SizedBox(height: 4),
         Text(
           isCod
-              ? 'Orders under LKR 100,000 can be paid via Cash on Delivery or collected in-store.'
-              : 'Orders of LKR 100,000 or more require In-Store Showroom Pickup & Counter Payment.',
+              ? 'Orders up to LKR 100,000 can be paid via Cash on Delivery or collected in-store.'
+              : 'Orders exceeding LKR 100,000 require In-Store Showroom Pickup & Counter Payment.',
           style: const TextStyle(fontSize: 12, color: AppColors.secondaryText),
         ),
         const SizedBox(height: 16),
@@ -447,7 +447,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'High-Value Order Protection (≥ LKR 100,000)',
+                        'High-Value Order Protection (> LKR 100,000)',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -480,7 +480,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Order total is under LKR 100,000 — Cash on Delivery (COD) courier delivery is available!',
+                    'Order total is LKR 100,000 or less — Cash on Delivery (COD) courier delivery is available!',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF065F46)),
                   ),
                 ),

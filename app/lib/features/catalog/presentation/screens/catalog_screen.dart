@@ -148,10 +148,22 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 
   void _showFilterModal() {
+    CategoryModel? cat;
+    if (_filter.categoryId != null) {
+      for (final c in _categories) {
+        if (c.categoryId == _filter.categoryId) {
+          cat = c;
+          break;
+        }
+      }
+    }
+
     CatalogFilterModal.show(
       context,
       initialFilter: _filter,
       categoryId: _filter.categoryId,
+      categoryName: cat?.name,
+      repository: _repository,
       onApply: _applyFilter,
     );
   }

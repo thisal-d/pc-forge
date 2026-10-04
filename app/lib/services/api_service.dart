@@ -322,6 +322,7 @@ class ApiService {
     String? capacity,
     String? vram,
     String? efficiency,
+    Map<String, String>? dynamicFilters,
   }) async {
     final queryParams = <String, dynamic>{
       if (categoryId != null && categoryId > 0) 'categoryId': categoryId,
@@ -339,6 +340,14 @@ class ApiService {
       if (vram != null && vram.isNotEmpty) 'vram': vram,
       if (efficiency != null && efficiency.isNotEmpty) 'efficiency': efficiency,
     };
+
+    if (dynamicFilters != null && dynamicFilters.isNotEmpty) {
+      dynamicFilters.forEach((key, val) {
+        if (val.trim().isNotEmpty) {
+          queryParams[key] = val.trim();
+        }
+      });
+    }
 
     final res = await get('/Products', queryParameters: queryParams);
     if (res is List) {
@@ -392,6 +401,15 @@ class ApiService {
       return Map<String, dynamic>.from(res);
     }
     throw ApiException('Order #$id not found.');
+  }
+
+  /// Cancel Order (Customer Cancellation & Automatic Stock Return)
+  Future<Map<String, dynamic>> cancelOrder(int orderId, {String? token}) async {
+    final res = await post('/Orders/$orderId/cancel', {}, token: token);
+    if (res is Map) {
+      return Map<String, dynamic>.from(res);
+    }
+    return {'message': 'Order cancelled successfully'};
   }
 
   // ==================== AFTER-SALES SERVICE REQUESTS (MEMBER 05) ====================

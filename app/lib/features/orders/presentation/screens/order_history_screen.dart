@@ -24,10 +24,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
   final List<String> _statusFilters = [
     'ALL',
-    'PAID',
+    'ORDER PLACED',
     'PROCESSING',
-    'SHIPPED',
-    'DELIVERED',
+    'READY FOR DELIVERY',
+    'OUT FOR DELIVERY',
+    'READY FOR PICKUP',
+    'PAID & COMPLETED',
     'CANCELLED',
   ];
 
@@ -97,14 +99,18 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
   Color _getStatusColor(String status) {
     switch (status.toUpperCase()) {
-      case 'PAID':
-        return const Color(0xFF16A34A);
+      case 'ORDER PLACED':
+        return const Color(0xFFD97706);
       case 'PROCESSING':
         return AppColors.primaryBlue;
-      case 'SHIPPED':
+      case 'READY FOR DELIVERY':
+      case 'READY FOR PICKUP':
         return const Color(0xFF7C3AED);
-      case 'DELIVERED':
-        return const Color(0xFF0D9488);
+      case 'OUT FOR DELIVERY':
+        return const Color(0xFF2563EB);
+      case 'PAID & COMPLETED':
+      case 'PAID':
+        return const Color(0xFF16A34A);
       case 'CANCELLED':
         return AppColors.alertRed;
       default:

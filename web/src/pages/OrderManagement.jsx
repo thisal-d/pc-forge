@@ -114,16 +114,63 @@ export const OrderManagement = () => {
     loadOrders();
   };
 
+  // Helper to determine if order is Store Pickup
+  const isPickupOrder = (paymentMethod) => {
+    const m = (paymentMethod || '').toLowerCase();
+    return m.includes('pickup') || m.includes('counter');
+  };
+
+  const getOrderFlowSteps = (paymentMethod) => {
+    if (isPickupOrder(paymentMethod)) {
+      return ['Order placed', 'Processing', 'Ready for pickup', 'Paid & Completed'];
+    }
+    return ['Order placed', 'Processing', 'Ready for delivery', 'Out for delivery', 'Paid & Completed'];
+  };
+
+  const getStepIndex = (status, steps) => {
+    const s = (status || '').toLowerCase();
+    if (s === 'cancelled') return -1;
+    const idx = steps.findIndex((step) => step.toLowerCase() === s);
+    return idx !== -1 ? idx : 0;
+  };
+
+  // Get available next transitions strictly conforming to business rules:
+  // Forward-only, single step at a time, or Cancelled (if in Order placed or Processing)
+  const getAvailableTransitions = (order) => {
+    if (!order) return [];
+    const current = order.status || 'Order placed';
+    const steps = getOrderFlowSteps(order.paymentMethod);
+
+    const options = [{ value: current, label: `${current} (Current)`, disabled: true }];
+
+    if (current === 'Cancelled' || current === 'Paid & Completed') {
+      return options;
+    }
+
+    const currentIdx = steps.findIndex((s) => s.toLowerCase() === current.toLowerCase());
+    if (currentIdx !== -1 && currentIdx + 1 < steps.length) {
+      const nextStep = steps[currentIdx + 1];
+      options.push({ value: nextStep, label: `Move to: ${nextStep}`, disabled: false });
+    }
+
+    if (current.toLowerCase() === 'order placed' || current.toLowerCase() === 'processing') {
+      options.push({ value: 'Cancelled', label: 'Cancel Order (Restock Items)', disabled: false });
+    }
+
+    return options;
+  };
+
   // Open detailed inspection modal
   const handleViewOrder = async (orderSummary) => {
     setSelectedOrder(orderSummary);
-    setNewStatus(orderSummary.status || 'Pending');
     setModalLoading(true);
 
     try {
       const details = await orderService.getOrderById(orderSummary.orderId);
       setSelectedOrder(details);
-      setNewStatus(details.status || 'Pending');
+      const available = getAvailableTransitions(details);
+      const firstValidOption = available.find((opt) => !opt.disabled);
+      setNewStatus(firstValidOption ? firstValidOption.value : details.status || '');
     } catch (err) {
       console.error('Failed to load order details:', err);
       showNotification('Failed to load complete order details.', 'error');
@@ -162,6 +209,10 @@ export const OrderManagement = () => {
         )
       );
 
+      const available = getAvailableTransitions(updated);
+      const firstValidOption = available.find((opt) => !opt.disabled);
+      setNewStatus(firstValidOption ? firstValidOption.value : updated.status || '');
+
       showNotification(`Order #${updated.orderId} status updated to ${updated.status}.`);
     } catch (err) {
       console.error('Failed to update order status:', err);
@@ -174,38 +225,21 @@ export const OrderManagement = () => {
   // Overall KPI metrics
   const stats = useMemo(() => orderService.calculateStats(orders), [orders]);
 
-  // Stepper progress index
-  const getStepIndex = (status) => {
-    const s = (status || '').toLowerCase();
-    switch (s) {
-      case 'pending':
-        return 0;
-      case 'paid':
-        return 1;
-      case 'processing':
-        return 2;
-      case 'shipped':
-        return 3;
-      case 'delivered':
-        return 4;
-      case 'cancelled':
-        return -1;
-      default:
-        return 0;
-    }
-  };
-
   // Status Badge CSS class helper
   const getBadgeClass = (status) => {
     const s = (status || '').toLowerCase();
     switch (s) {
-      case 'paid':
-        return 'status-paid';
+      case 'order placed':
+        return 'status-pending';
       case 'processing':
         return 'status-processing';
-      case 'shipped':
+      case 'ready for delivery':
+      case 'ready for pickup':
         return 'status-shipped';
-      case 'delivered':
+      case 'out for delivery':
+        return 'status-shipped';
+      case 'paid & completed':
+      case 'paid and completed':
         return 'status-delivered';
       case 'cancelled':
         return 'status-cancelled';
@@ -290,8 +324,8 @@ export const OrderManagement = () => {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">Paid / Confirmed</span>
-            <span className="metric-value">{stats.paid}</span>
+            <span className="metric-label">Order Placed</span>
+            <span className="metric-value">{stats.orderPlaced}</span>
           </div>
         </div>
 
@@ -318,8 +352,8 @@ export const OrderManagement = () => {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">Shipped</span>
-            <span className="metric-value">{stats.shipped}</span>
+            <span className="metric-label">Ready / Out</span>
+            <span className="metric-value">{stats.readyForDelivery + stats.outForDelivery + stats.readyForPickup}</span>
           </div>
         </div>
 
@@ -331,8 +365,8 @@ export const OrderManagement = () => {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">Delivered</span>
-            <span className="metric-value">{stats.delivered}</span>
+            <span className="metric-label">Paid & Completed</span>
+            <span className="metric-value">{stats.paidAndCompleted}</span>
           </div>
         </div>
 
@@ -589,25 +623,29 @@ export const OrderManagement = () => {
                         <span className="stepper-label">Order Cancelled</span>
                       </div>
                     ) : (
-                      ['Paid', 'Processing', 'Shipped', 'Delivered'].map((stepName, idx) => {
-                        const currentStep = getStepIndex(selectedOrder.status);
-                        const isCompleted = currentStep > idx + 1;
-                        const isActive = currentStep === idx + 1;
+                      (() => {
+                        const flowSteps = getOrderFlowSteps(selectedOrder.paymentMethod);
+                        const currentStep = getStepIndex(selectedOrder.status, flowSteps);
 
-                        return (
-                          <div
-                            key={stepName}
-                            className={`stepper-step ${isActive ? 'active' : ''} ${
-                              isCompleted ? 'completed' : ''
-                            }`}
-                          >
-                            <div className="stepper-circle">
-                              {isCompleted ? '✓' : idx + 1}
+                        return flowSteps.map((stepName, idx) => {
+                          const isCompleted = currentStep > idx;
+                          const isActive = currentStep === idx;
+
+                          return (
+                            <div
+                              key={stepName}
+                              className={`stepper-step ${isActive ? 'active' : ''} ${
+                                isCompleted ? 'completed' : ''
+                              }`}
+                            >
+                              <div className="stepper-circle">
+                                {isCompleted ? '✓' : idx + 1}
+                              </div>
+                              <span className="stepper-label">{stepName}</span>
                             </div>
-                            <span className="stepper-label">{stepName}</span>
-                          </div>
-                        );
-                      })
+                          );
+                        });
+                      })()
                     )}
                   </div>
 
@@ -732,27 +770,41 @@ export const OrderManagement = () => {
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                   Change Status:
                 </label>
-                <select
-                  className="status-select"
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
-                  disabled={statusUpdating}
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Processing">Processing</option>
-                  <option value="Shipped">Shipped</option>
-                  <option value="Delivered">Delivered</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
+                {(() => {
+                  const transitions = getAvailableTransitions(selectedOrder);
+                  const validTransitions = transitions.filter((t) => !t.disabled);
+                  if (validTransitions.length === 0) {
+                    return (
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        No transitions available ({selectedOrder.status})
+                      </span>
+                    );
+                  }
+                  return (
+                    <>
+                      <select
+                        className="status-select"
+                        value={newStatus}
+                        onChange={(e) => setNewStatus(e.target.value)}
+                        disabled={statusUpdating}
+                      >
+                        {transitions.map((opt) => (
+                          <option key={opt.value} value={opt.value} disabled={opt.disabled}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
 
-                <button
-                  className="btn-primary"
-                  onClick={handleUpdateStatus}
-                  disabled={statusUpdating || newStatus === selectedOrder.status}
-                >
-                  {statusUpdating ? 'Updating...' : 'Update Status'}
-                </button>
+                      <button
+                        className="btn-primary"
+                        onClick={handleUpdateStatus}
+                        disabled={statusUpdating || !newStatus || newStatus === selectedOrder.status}
+                      >
+                        {statusUpdating ? 'Updating...' : 'Update Status'}
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

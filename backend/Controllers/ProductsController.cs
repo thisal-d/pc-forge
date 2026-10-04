@@ -143,6 +143,62 @@ public class ProductsController : ControllerBase
                 p.Name.ToLower().Contains(eff)).ToList();
         }
 
+        // Dynamic Filtering for any additional query parameters (e.g. cuda_cores, wattage, etc.)
+        var standardParams = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "categoryid", "brand", "search", "minprice", "maxprice", "instockonly", "sortby",
+            "socket", "chipset", "memorytype", "speed", "capacity", "vram", "efficiency"
+        };
+
+        foreach (var queryParam in Request.Query)
+        {
+            if (standardParams.Contains(queryParam.Key)) continue;
+
+            var filterKey = queryParam.Key.Trim().ToLower().Replace(" ", "_");
+            var filterVal = queryParam.Value.ToString().Trim().ToLower();
+            if (string.IsNullOrWhiteSpace(filterVal)) continue;
+
+            products = products.Where(p =>
+            {
+                // Check direct matching columns
+                if (filterKey == "form_factor" && p.FormFactor != null && p.FormFactor.ToLower() == filterVal)
+                    return true;
+                if (filterKey == "power_wattage" && p.PowerWattage.HasValue && p.PowerWattage.Value.ToString() == filterVal)
+                    return true;
+
+                // Check JSON specifications
+                if (!string.IsNullOrWhiteSpace(p.Specifications))
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(p.Specifications);
+                        foreach (var prop in doc.RootElement.EnumerateObject())
+                        {
+                            var normName = prop.Name.Trim().ToLower().Replace(" ", "_");
+                            if (normName == filterKey)
+                            {
+                                var valStr = prop.Value.ToString().Trim().ToLower();
+                                if (valStr.Contains(filterVal) || filterVal.Contains(valStr))
+                                {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        if (p.Specifications.ToLower().Contains(filterVal))
+                            return true;
+                    }
+                }
+
+                if (p.Model != null && p.Model.ToLower().Contains(filterVal)) return true;
+                if (p.Description != null && p.Description.ToLower().Contains(filterVal)) return true;
+
+                return false;
+            }).ToList();
+        }
+
         // 3. Sorting
         var ordered = sortBy switch
         {
