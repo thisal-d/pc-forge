@@ -105,11 +105,34 @@ CREATE INDEX idx_products_specifications ON Products USING GIN (Specifications);
 -- Allows Admins to add/edit filters and selectable options at runtime.
 -- ============================================================================
 
+-- 4b. MASTER FILTERS TABLE
+-- Master repository of technical specifications and filters managed by Admins
+CREATE TABLE Filters (
+    FilterId SERIAL PRIMARY KEY,
+    FilterKey VARCHAR(50) UNIQUE NOT NULL,
+    DisplayName VARCHAR(100) NOT NULL,
+    FilterType VARCHAR(30) DEFAULT 'multiselect',
+    Unit VARCHAR(20),
+    CreatedAt TIMESTAMPTZ DEFAULT NOW(),
+    UpdatedAt TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4c. MASTER FILTER OPTIONS TABLE
+CREATE TABLE MasterFilterOptions (
+    OptionId SERIAL PRIMARY KEY,
+    FilterId INT REFERENCES Filters(FilterId) ON DELETE CASCADE,
+    OptionValue VARCHAR(100) NOT NULL,
+    DisplayOrder INT DEFAULT 0,
+
+    CONSTRAINT UQ_MasterFilter_OptionValue UNIQUE(FilterId, OptionValue)
+);
+
 -- 5. CATEGORY FILTERS TABLE
 -- Defines which filter types belong to which category (e.g. Motherboard -> Chipset, Socket)
 CREATE TABLE CategoryFilters (
     FilterId SERIAL PRIMARY KEY,
     CategoryId INT REFERENCES Categories(CategoryId) ON DELETE CASCADE,
+    MasterFilterId INT REFERENCES Filters(FilterId) ON DELETE SET NULL,
     FilterKey VARCHAR(50) NOT NULL,       -- e.g., 'chipset', 'socket', 'ddr_type', 'speed', 'vram'
     DisplayName VARCHAR(100) NOT NULL,     -- e.g., 'Chipset', 'Socket Type', 'DDR Type', 'Memory Speed / Bus'
     FilterType VARCHAR(30) DEFAULT 'multiselect', -- 'multiselect', 'singleselect', 'range', 'boolean'

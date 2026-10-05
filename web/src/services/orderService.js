@@ -1,10 +1,12 @@
 import api from '../api/axiosInstance.js';
 
 export const ORDER_STATUSES = [
-  'Paid',
+  'Order placed',
   'Processing',
-  'Shipped',
-  'Delivered',
+  'Ready for delivery',
+  'Out for delivery',
+  'Ready for pickup',
+  'Paid & Completed',
   'Cancelled',
 ];
 
@@ -67,34 +69,57 @@ export const orderService = {
     }
   },
 
+  // Cancel order (with automatic backend inventory restock)
+  async cancelOrder(orderId) {
+    const id = Number(orderId);
+    if (!id || isNaN(id)) throw new Error('Invalid order ID.');
+
+    try {
+      const response = await api.post(`/orders/${id}/cancel`);
+      return response.data;
+    } catch (err) {
+      const backendMessage =
+        err.response?.data?.message ||
+        err.response?.data?.title ||
+        err.message || 'Failed to cancel order.';
+      throw new Error(backendMessage);
+    }
+  },
+
   // Calculate high-level order metrics
   calculateStats(orders = []) {
     if (!Array.isArray(orders)) {
       return {
         total: 0,
-        paid: 0,
+        orderPlaced: 0,
         processing: 0,
-        shipped: 0,
-        delivered: 0,
+        readyForDelivery: 0,
+        outForDelivery: 0,
+        readyForPickup: 0,
+        paidAndCompleted: 0,
         cancelled: 0,
         totalRevenue: 0,
       };
     }
 
     const total = orders.length;
-    let paid = 0;
+    let orderPlaced = 0;
     let processing = 0;
-    let shipped = 0;
-    let delivered = 0;
+    let readyForDelivery = 0;
+    let outForDelivery = 0;
+    let readyForPickup = 0;
+    let paidAndCompleted = 0;
     let cancelled = 0;
     let totalRevenue = 0;
 
     orders.forEach((o) => {
       const s = (o.status || '').toLowerCase();
-      if (s === 'paid') paid++;
+      if (s === 'order placed') orderPlaced++;
       else if (s === 'processing') processing++;
-      else if (s === 'shipped') shipped++;
-      else if (s === 'delivered') delivered++;
+      else if (s === 'ready for delivery') readyForDelivery++;
+      else if (s === 'out for delivery') outForDelivery++;
+      else if (s === 'ready for pickup') readyForPickup++;
+      else if (s === 'paid & completed' || s === 'paid and completed') paidAndCompleted++;
       else if (s === 'cancelled') cancelled++;
 
       // Count revenue from non-cancelled orders
@@ -105,10 +130,12 @@ export const orderService = {
 
     return {
       total,
-      paid,
+      orderPlaced,
       processing,
-      shipped,
-      delivered,
+      readyForDelivery,
+      outForDelivery,
+      readyForPickup,
+      paidAndCompleted,
       cancelled,
       totalRevenue,
     };

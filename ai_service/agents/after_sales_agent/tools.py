@@ -322,6 +322,8 @@ def validate_service_appointment(preferred_date: str, preferred_time: Optional[s
     date_lower = date_str.lower()
     if "tomorrow" in date_lower:
         parsed_date = (now + timedelta(days=1)).date()
+    elif "today" in date_lower:
+        parsed_date = now.date()
     else:
         for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%B %d, %Y", "%b %d, %Y", "%d-%m-%Y"]:
             try:
@@ -331,13 +333,42 @@ def validate_service_appointment(preferred_date: str, preferred_time: Optional[s
                 pass
 
     if not parsed_date:
-        parsed_date = (now + timedelta(days=2)).date()
+        return json.dumps({
+            "valid": False,
+            "error": "invalid_date",
+            "message": f"Could not recognize the date '{date_str}'. Please ask the customer for a valid date (Monday to Saturday)."
+        })
 
-    if parsed_date <= now.date():
-        parsed_date = (now + timedelta(days=1)).date()
+    if parsed_date < now.date():
+        return json.dumps({
+            "valid": False,
+            "error": "past_date",
+            "message": f"The selected date ({parsed_date.strftime('%Y-%m-%d')}) has already passed. Please explain that the date has already passed and ask for another date."
+        })
 
     if parsed_date.weekday() == 6:  # Sunday
-        parsed_date = parsed_date + timedelta(days=1)
+        return json.dumps({
+            "valid": False,
+            "error": "sunday_closed",
+            "message": f"The service center is closed on Sundays ({parsed_date.strftime('%Y-%m-%d')}). Please ask the customer to choose another date between Monday and Saturday."
+        })
+
+    # Check storewide maximum 10 service request capacity per date
+    ctx = after_sales_context_var.get()
+    existing_list = ctx.get("service_requests") if isinstance(ctx, dict) else None
+    if existing_list and isinstance(existing_list, list) and parsed_date:
+        d_str = parsed_date.strftime("%Y-%m-%d")
+        booked_same_date = sum(
+            1 for sr in existing_list
+            if str(sr.get("preferred_date") or "").startswith(d_str)
+            and str(sr.get("status") or "").upper() not in ("CANCELLED", "CANCELED")
+        )
+        if booked_same_date >= 10:
+            return json.dumps({
+                "valid": False,
+                "error": "capacity_exceeded",
+                "message": f"The selected date ({d_str}) has reached its maximum capacity of 10 service appointments (already has 10 requests booked). Please inform the customer and ask them to choose another date."
+            })
 
     time_str = (preferred_time or "").strip()
     if not time_str or time_str.lower() in ["none", "null", ""]:
@@ -346,7 +377,7 @@ def validate_service_appointment(preferred_date: str, preferred_time: Optional[s
             "missing": "time",
             "date": parsed_date.strftime("%Y-%m-%d"),
             "date_display": parsed_date.strftime("%A, %B %d, %Y"),
-            "message": f"Appointment date {parsed_date.strftime('%A, %B %d, %Y')} is noted, but preferred time was not provided by customer. Do NOT create a service request yet! Ask the customer what time slot between 09:00 AM and 06:00 PM works best for them."
+            "message": f"Appointment date {parsed_date.strftime('%A, %B %d, %Y')} is noted, but preferred time was not provided. Do not create the Service Request yet. Please ask the customer for a preferred time between 9:00 AM and 6:00 PM."
         })
 
     time_clean = time_str.upper()
@@ -378,7 +409,7 @@ def validate_service_appointment(preferred_date: str, preferred_time: Optional[s
         return json.dumps({
             "valid": False,
             "error": "outside_hours",
-            "message": f"Requested time '{preferred_time}' is outside working hours (09:00 AM to 06:00 PM, Mon-Sat). Please ask the customer to select a time between 09:00 AM and 06:00 PM."
+            "message": f"The service time must be between 9:00 AM and 6:00 PM. Requested time '{preferred_time}' is outside working hours. Please explain that the service time must be between 9:00 AM and 6:00 PM and ask for another time."
         })
 
     formatted_time = f"{((hour - 1) % 12) + 1:02d}:{minute:02d} {'PM' if hour >= 12 else 'AM'}"
@@ -390,6 +421,7 @@ def validate_service_appointment(preferred_date: str, preferred_time: Optional[s
         "time": formatted_time,
         "message": f"Service appointment confirmed for {parsed_date.strftime('%A, %B %d, %Y')} at {formatted_time}."
     })
+
 
 
 @tool
@@ -443,6 +475,8 @@ def update_service_appointment(
 def create_service_request(
     user_id: int,
     problem_description: str,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
     problem_category: str = "General",
     troubleshooting_summary: str = "",
     attempt_count: int = 5,
@@ -459,10 +493,12 @@ def create_service_request(
     Args:
         user_id: Authenticated customer user ID (e.g. 1).
         problem_description: Summary of the customer's reported symptom.
+        title: Short title/summary of the service request (e.g. 'PC won't boot into Windows').
+        description: Optional detailed description of the symptom or background.
         problem_category: Problem classification (e.g. 'Power / Boot', 'Display / Black Screen', etc.).
         troubleshooting_summary: Structured notes of steps attempted and outcomes for the technician.
         attempt_count: Number of troubleshooting steps attempted (1 to 5).
-        order_id: Verified purchase order ID if provided.
+        order_id: Verified purchase order ID if provided (optional).
         product_id: Product ID of the affected component if identified.
         product_name: Commercial name of component (e.g. 'NVIDIA GeForce RTX 4070 Ti').
         warranty_status: 'Active' or 'Expired'.
@@ -480,12 +516,69 @@ def create_service_request(
     ctx = after_sales_context_var.get()
     existing_list = ctx.get("service_requests") if isinstance(ctx, dict) else None
 
+    p_date = preferred_date or str((datetime.now() + timedelta(days=2)).date())
+    p_time = preferred_time or "10:00 AM"
+
+    # Past date validation
+    if preferred_date:
+        for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%B %d, %Y", "%b %d, %Y", "%d-%m-%Y"]:
+            try:
+                cand_d = datetime.strptime(str(preferred_date).strip(), fmt).date()
+                if cand_d < datetime.now().date():
+                    return json.dumps({
+                        "success": False,
+                        "error": "past_date",
+                        "message": f"The selected date ({preferred_date}) has already passed. Please ask the customer for another date."
+                    })
+                break
+            except Exception:
+                pass
+
+    # Operating hours validation (09:00 AM to 06:00 PM)
+    if preferred_time:
+        t_clean = str(preferred_time).strip().upper()
+        m12 = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(AM|PM)', t_clean)
+        hour = -1
+        minute = 0
+        if m12:
+            hour = int(m12.group(1))
+            minute = int(m12.group(2) or 0)
+            ampm = m12.group(3)
+            if ampm == "PM" and hour < 12: hour += 12
+            elif ampm == "AM" and hour == 12: hour = 0
+        else:
+            m24 = re.search(r'(\d{1,2}):(\d{2})', t_clean)
+            if m24:
+                hour = int(m24.group(1))
+                minute = int(m24.group(2))
+        if hour >= 0 and (hour < 9 or hour > 18 or (hour == 18 and minute > 0)):
+            return json.dumps({
+                "success": False,
+                "error": "outside_hours",
+                "message": f"The service time must be between 9:00 AM and 6:00 PM. '{preferred_time}' is outside working hours. Please choose another time."
+            })
+
+    # Capacity check: max 10 appointments per day storewide
+    if existing_list and isinstance(existing_list, list) and preferred_date:
+        booked_same_date = sum(
+            1 for sr in existing_list
+            if str(sr.get("preferred_date") or "").startswith(str(p_date))
+            and str(sr.get("status") or "").upper() not in ("CANCELLED", "CANCELED")
+        )
+        if booked_same_date >= 10:
+            return json.dumps({
+                "success": False,
+                "error": "capacity_exceeded",
+                "message": f"The selected date ({p_date}) has reached its maximum capacity of 10 service appointments (already has 10 requests booked). Please inform the customer and ask them to choose another date."
+            })
+
     # Check for duplicate open request in context to avoid multiple pending requests
     if existing_list and isinstance(existing_list, list):
         for sr in existing_list:
             status = str(sr.get("status") or "").upper()
-            cat = str(sr.get("problem_category") or sr.get("problemCategory") or "")
-            if status == "PENDING" and (cat == problem_category or order_id == sr.get("order_id")):
+            cat = str(sr.get("problem_category") or sr.get("problemCategory") or "").strip()
+            sr_order = sr.get("order_id") or sr.get("orderId")
+            if status == "PENDING" and ((cat and cat.lower() == problem_category.lower()) or (order_id and sr_order == order_id)):
                 cand_num = sr.get("service_request_number") or sr.get("serviceRequestNumber") or "SR-000108"
                 cand_id = sr.get("service_request_id") or sr.get("serviceRequestId") or 108
                 return json.dumps({
@@ -498,6 +591,8 @@ def create_service_request(
                     "order_number": f"PCF-10{order_id:03d}" if order_id else None,
                     "product_id": product_id,
                     "product_name": product_name or "Hardware Component",
+                    "title": title or sr.get("title") or problem_description,
+                    "description": description or sr.get("description") or problem_description,
                     "problem_description": problem_description,
                     "problem_category": problem_category,
                     "troubleshooting_summary": troubleshooting_summary,
@@ -511,8 +606,8 @@ def create_service_request(
                     "confirmation_message": f"Your Service Request ({cand_num}) appointment has been updated to {preferred_date or 'your chosen date'} at {preferred_time or '10:00 AM'}. Our technician will inspect your PC."
                 })
 
-    p_date = preferred_date or str((datetime.now() + timedelta(days=2)).date())
-    p_time = preferred_time or "10:00 AM"
+    res_title = (title or "").strip() or (f"Service: {product_name}" if product_name else (problem_description[:50] if len(problem_description) > 50 else problem_description))
+    res_desc = (description or "").strip() or problem_description
 
     return json.dumps({
         "success": True,
@@ -524,6 +619,8 @@ def create_service_request(
         "order_number": f"PCF-10{order_id:03d}" if order_id else None,
         "product_id": product_id,
         "product_name": product_name or "Hardware Component",
+        "title": res_title,
+        "description": res_desc,
         "problem_description": problem_description,
         "problem_category": problem_category,
         "troubleshooting_summary": troubleshooting_summary or f"AI Troubleshooting completed ({attempt_count} attempts).",
@@ -538,6 +635,7 @@ def create_service_request(
         "confirmation_message": (
             f"Your Service Request has been created successfully.\n\n"
             f"Service Request ID: {sr_number}\n"
+            f"Title: {res_title}\n"
             f"Order ID: {f'PCF-10{order_id:03d}' if order_id else 'N/A'}\n"
             f"Product: {product_name or 'Hardware Component'}\n"
             f"Warranty: {warranty_status}\n"

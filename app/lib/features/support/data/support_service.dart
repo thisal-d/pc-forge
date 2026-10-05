@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../../../core/auth_session.dart';
 import '../../../../services/api_service.dart';
-import 'models/support_ticket_model.dart';
+import 'models/support_service_request_model.dart';
 import 'models/ai_after_sales_model.dart';
 
 class SupportService extends ChangeNotifier {
@@ -22,9 +22,9 @@ class SupportService extends ChangeNotifier {
 
   bool get hasServiceRequests => _serviceRequests.isNotEmpty;
 
-  // Backward compatibility getter for existing ticket widgets & tests
-  List<SupportTicketModel> get tickets => _serviceRequests.map((sr) => SupportTicketModel(
-    ticketId: sr.serviceRequestId,
+  // Backward compatibility getter for existing widgets & tests
+  List<SupportServiceRequestModel> get tickets => _serviceRequests.map((sr) => SupportServiceRequestModel(
+    serviceRequestId: sr.serviceRequestId,
     orderId: sr.orderId,
     productId: sr.productId,
     productName: sr.productName,
@@ -40,9 +40,19 @@ class SupportService extends ChangeNotifier {
   bool get hasTickets => _serviceRequests.isNotEmpty;
 
   /// Load service requests from live backend API
-  Future<List<ServiceRequestModel>> loadServiceRequests({String? token}) async {
+  Future<List<ServiceRequestModel>> loadServiceRequests({
+    String? status,
+    String? startDate,
+    String? endDate,
+    String? token,
+  }) async {
     try {
-      final remoteList = await _apiService.fetchServiceRequests(token: token);
+      final remoteList = await _apiService.fetchServiceRequests(
+        status: status,
+        startDate: startDate,
+        endDate: endDate,
+        token: token,
+      );
       _serviceRequests.clear();
       for (final item in remoteList) {
         _serviceRequests.add(ServiceRequestModel.fromJson(item));
@@ -54,14 +64,67 @@ class SupportService extends ChangeNotifier {
     return _serviceRequests;
   }
 
+  /// Check Service Slot Availability for a given date
+  Future<Map<String, dynamic>> checkAvailability(String date, {String? token}) async {
+    try {
+      return await _apiService.checkServiceAvailability(date, token: token);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Cancel a Service Request
+  Future<bool> cancelServiceRequest(int id, {String? token}) async {
+    try {
+      await _apiService.cancelServiceRequest(id, token: token);
+      final idx = _serviceRequests.indexWhere((r) => r.serviceRequestId == id);
+      if (idx != -1) {
+        final cur = _serviceRequests[idx];
+        _serviceRequests[idx] = ServiceRequestModel(
+          serviceRequestId: cur.serviceRequestId,
+          serviceRequestNumber: cur.serviceRequestNumber,
+          userId: cur.userId,
+          customerName: cur.customerName,
+          orderId: cur.orderId,
+          productId: cur.productId,
+          productName: cur.productName,
+          title: cur.title,
+          description: cur.description,
+          problemDescription: cur.problemDescription,
+          problemCategory: cur.problemCategory,
+          troubleshootingSummary: cur.troubleshootingSummary,
+          attemptCount: cur.attemptCount,
+          warrantyStatus: cur.warrantyStatus,
+          warrantyExpiryDate: cur.warrantyExpiryDate,
+          preferredDate: cur.preferredDate,
+          preferredTime: cur.preferredTime,
+          status: 'CANCELLED',
+          priority: cur.priority,
+          assignedStaffName: cur.assignedStaffName,
+          technicianNotes: cur.technicianNotes,
+          resolution: cur.resolution,
+          attachmentUrl: cur.attachmentUrl,
+          createdAt: cur.createdAt,
+        );
+        notifyListeners();
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[SupportService] cancelServiceRequest error: $e');
+      rethrow;
+    }
+  }
+
   /// Backward-compatible loader
-  Future<List<SupportTicketModel>> loadTickets({String? token}) async {
+  Future<List<SupportServiceRequestModel>> loadTickets({String? token}) async {
     await loadServiceRequests(token: token);
     return tickets;
   }
 
   /// Create and submit a new Service Request to backend API
   Future<ServiceRequestModel> createServiceRequest({
+    String? title,
+    String? description,
     int? orderId,
     int? productId,
     String? productName,
@@ -76,7 +139,12 @@ class SupportService extends ChangeNotifier {
     String? attachmentUrl,
     String? token,
   }) async {
+    final finalTitle = (title != null && title.trim().isNotEmpty)
+        ? title.trim()
+        : (problemDescription.isNotEmpty ? problemDescription : 'Service Request');
     final apiRes = await _apiService.createServiceRequest(
+      title: finalTitle,
+      description: description,
       orderId: orderId,
       productId: productId,
       problemDescription: problemDescription,
@@ -98,7 +166,7 @@ class SupportService extends ChangeNotifier {
   }
 
   /// Backward-compatible ticket creation
-  Future<SupportTicketModel> createTicket({
+  Future<SupportServiceRequestModel> createTicket({
     int? orderId,
     int? productId,
     String? productName,
@@ -120,8 +188,8 @@ class SupportService extends ChangeNotifier {
       token: token,
     );
 
-    return SupportTicketModel(
-      ticketId: sr.serviceRequestId,
+    return SupportServiceRequestModel(
+      serviceRequestId: sr.serviceRequestId,
       orderId: sr.orderId,
       productId: sr.productId,
       productName: sr.productName,

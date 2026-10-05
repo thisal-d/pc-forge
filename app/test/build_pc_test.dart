@@ -147,6 +147,25 @@ class MockPickerApiService extends ApiService {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchCategoryFilters(int categoryId) async {
+    if (categoryId == 1) {
+      return [
+        {
+          'filterId': 1,
+          'categoryId': 1,
+          'categoryName': 'Processors (CPU)',
+          'filterKey': 'socket',
+          'displayName': 'Socket Type',
+          'filterType': 'select',
+          'options': ['AM5', 'LGA1700'],
+          'isFilterable': true,
+        },
+      ];
+    }
+    return [];
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> fetchProducts({
     int? categoryId,
     String? brand,
@@ -162,6 +181,7 @@ class MockPickerApiService extends ApiService {
     String? capacity,
     String? vram,
     String? efficiency,
+    Map<String, String>? dynamicFilters,
   }) async {
     final list = [
       {

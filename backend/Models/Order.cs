@@ -5,7 +5,7 @@ public class Order
     public int OrderId { get; set; }
     public int UserId { get; set; }
     public decimal TotalAmount { get; set; }
-    public string Status { get; set; } = "Pending";
+    public string Status { get; set; } = OrderStatusConstants.OrderPlaced;
     public string ShippingAddress { get; set; } = string.Empty;
     public string? PaymentMethod { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

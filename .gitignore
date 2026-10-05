@@ -39,6 +39,7 @@ ci-log
 
 # IDE / OS
 .idea/
+.vscode/
 *.swp
 *.swo
 .DS_Store
@@ -55,4 +56,6 @@ pubspec.lock
 **/deploy.env
 **/*.deploy.env
 !**/.env.example
-data
+/data/
+/Data/knowledge/
+!backend/Data/

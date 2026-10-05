@@ -17,6 +17,7 @@ import { SupportTickets } from './pages/SupportTickets';
 import { BuildReviews } from './pages/BuildReviews';
 import { OrderManagement } from './pages/OrderManagement';
 import { CouponManagement } from './pages/CouponManagement';
+import { FilterManagement } from './pages/FilterManagement';
 
 const AppLayout = () => {
   const { isAuthenticated } = useAuth();
@@ -113,6 +114,14 @@ const AppLayout = () => {
               element={
                 <ProtectedRoute allowedRoles={['Admin', 'Staff']}>
                   <CategoryManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/filters"
+              element={
+                <ProtectedRoute allowedRoles={['Admin', 'Staff']}>
+                  <FilterManagement />
                 </ProtectedRoute>
               }
             />

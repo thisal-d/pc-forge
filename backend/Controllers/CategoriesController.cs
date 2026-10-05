@@ -293,6 +293,104 @@ public class CategoriesController : ControllerBase
             })
             .ToListAsync();
 
+        // Dynamically harvest options for filters with no explicit FilterOption rows
+        var productsInCat = await _context.Products
+            .AsNoTracking()
+            .Where(p => p.CategoryId == categoryId)
+            .ToListAsync();
+
+        foreach (var filter in filters)
+        {
+            if (filter.Options.Count == 0)
+            {
+                var discoveredValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                // 1. Check brand if filterKey is brand
+                if (filter.FilterKey.Equals("brand", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var p in productsInCat)
+                    {
+                        if (!string.IsNullOrWhiteSpace(p.Brand))
+                            discoveredValues.Add(p.Brand.Trim());
+                    }
+                }
+
+                // 2. Check dedicated columns
+                if (filter.FilterKey.Equals("socket", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var p in productsInCat)
+                    {
+                        if (!string.IsNullOrWhiteSpace(p.Socket))
+                            discoveredValues.Add(p.Socket.Trim());
+                    }
+                }
+                else if (filter.FilterKey.Equals("memory_type", StringComparison.OrdinalIgnoreCase) || filter.FilterKey.Equals("ddr_type", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var p in productsInCat)
+                    {
+                        if (!string.IsNullOrWhiteSpace(p.MemoryType))
+                            discoveredValues.Add(p.MemoryType.Trim());
+                    }
+                }
+                else if (filter.FilterKey.Equals("form_factor", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var p in productsInCat)
+                    {
+                        if (!string.IsNullOrWhiteSpace(p.FormFactor))
+                            discoveredValues.Add(p.FormFactor.Trim());
+                    }
+                }
+
+                // 3. Check JSON specifications in products
+                foreach (var p in productsInCat)
+                {
+                    if (string.IsNullOrWhiteSpace(p.Specifications)) continue;
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(p.Specifications);
+                        foreach (var prop in doc.RootElement.EnumerateObject())
+                        {
+                            var normKey = prop.Name.Trim().ToLower().Replace(" ", "_");
+                            if (normKey == filter.FilterKey.ToLower())
+                            {
+                                var val = prop.Value.ToString().Trim();
+                                if (!string.IsNullOrEmpty(val))
+                                    discoveredValues.Add(val);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // 4. Fallback to master filter options in database if defined
+                if (discoveredValues.Count == 0)
+                {
+                    var master = await _context.Filters
+                        .AsNoTracking()
+                        .Include(f => f.Options)
+                        .FirstOrDefaultAsync(f => f.FilterKey.ToLower() == filter.FilterKey.ToLower());
+
+                    if (master != null && master.Options.Any())
+                    {
+                        foreach (var opt in master.Options.OrderBy(o => o.DisplayOrder))
+                        {
+                            discoveredValues.Add(opt.OptionValue);
+                        }
+                    }
+                }
+
+                int optIdx = 1;
+                filter.Options = discoveredValues
+                    .Select(val => new FilterOptionDto
+                    {
+                        OptionId = optIdx,
+                        Value = val,
+                        DisplayOrder = optIdx++
+                    })
+                    .ToList();
+            }
+        }
+
         return Ok(filters);
     }
 
@@ -309,13 +407,32 @@ public class CategoriesController : ControllerBase
             return NotFound(new { message = $"Category with ID {categoryId} not found." });
         }
 
-        if (string.IsNullOrWhiteSpace(dto.FilterKey) || string.IsNullOrWhiteSpace(dto.DisplayName))
+        // Look up master filter if MasterFilterId is provided or by FilterKey
+        Filter? masterFilter = null;
+        if (dto.MasterFilterId.HasValue && dto.MasterFilterId.Value > 0)
+        {
+            masterFilter = await _context.Filters
+                .Include(f => f.Options)
+                .FirstOrDefaultAsync(f => f.FilterId == dto.MasterFilterId.Value);
+        }
+
+        var keyInput = !string.IsNullOrWhiteSpace(dto.FilterKey) ? dto.FilterKey : masterFilter?.FilterKey;
+        var nameInput = !string.IsNullOrWhiteSpace(dto.DisplayName) ? dto.DisplayName : masterFilter?.DisplayName;
+
+        if (string.IsNullOrWhiteSpace(keyInput) || string.IsNullOrWhiteSpace(nameInput))
         {
             return BadRequest(new { message = "Filter key and display name are required." });
         }
 
-        var cleanKey = dto.FilterKey.Trim().ToLower().Replace(" ", "_");
-        var cleanName = dto.DisplayName.Trim();
+        var cleanKey = keyInput.Trim().ToLower().Replace(" ", "_");
+        var cleanName = nameInput.Trim();
+
+        if (masterFilter == null)
+        {
+            masterFilter = await _context.Filters
+                .Include(f => f.Options)
+                .FirstOrDefaultAsync(f => f.FilterKey.ToLower() == cleanKey);
+        }
 
         var exists = await _context.CategoryFilters
             .AnyAsync(cf => cf.CategoryId == categoryId && cf.FilterKey.ToLower() == cleanKey);
@@ -332,19 +449,45 @@ public class CategoriesController : ControllerBase
         var filter = new CategoryFilter
         {
             CategoryId = categoryId,
+            MasterFilterId = masterFilter?.FilterId,
             FilterKey = cleanKey,
             DisplayName = cleanName,
-            FilterType = string.IsNullOrWhiteSpace(dto.FilterType) ? "multiselect" : dto.FilterType.Trim(),
-            Unit = string.IsNullOrWhiteSpace(dto.Unit) ? null : dto.Unit.Trim(),
+            FilterType = !string.IsNullOrWhiteSpace(dto.FilterType) ? dto.FilterType.Trim() : (masterFilter?.FilterType ?? "multiselect"),
+            Unit = !string.IsNullOrWhiteSpace(dto.Unit) ? dto.Unit.Trim() : masterFilter?.Unit,
             DisplayOrder = dto.DisplayOrder ?? (maxOrder + 1),
             IsFilterable = dto.IsFilterable,
             CreatedAt = DateTime.UtcNow
         };
 
+        if (dto.Options != null && dto.Options.Any())
+        {
+            int order = 1;
+            foreach (var opt in dto.Options.Where(o => !string.IsNullOrWhiteSpace(o)))
+            {
+                filter.Options.Add(new FilterOption
+                {
+                    OptionValue = opt.Trim(),
+                    DisplayOrder = order++
+                });
+            }
+        }
+        else if (masterFilter != null && masterFilter.Options.Any())
+        {
+            int order = 1;
+            foreach (var opt in masterFilter.Options.OrderBy(o => o.DisplayOrder))
+            {
+                filter.Options.Add(new FilterOption
+                {
+                    OptionValue = opt.OptionValue,
+                    DisplayOrder = order++
+                });
+            }
+        }
+
         _context.CategoryFilters.Add(filter);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Assigned filter {Key} to category {CatId}", cleanKey, categoryId);
+        _logger.LogInformation("Assigned filter {Key} with {Count} options to category {CatId}", cleanKey, filter.Options.Count, categoryId);
 
         return Ok(new CategoryFilterDto
         {
@@ -357,7 +500,12 @@ public class CategoriesController : ControllerBase
             Unit = filter.Unit,
             DisplayOrder = filter.DisplayOrder,
             IsFilterable = filter.IsFilterable,
-            Options = new List<FilterOptionDto>()
+            Options = filter.Options.Select(fo => new FilterOptionDto
+            {
+                OptionId = fo.OptionId,
+                Value = fo.OptionValue,
+                DisplayOrder = fo.DisplayOrder
+            }).ToList()
         });
     }
 

@@ -1,9 +1,11 @@
 import 'models/category_model.dart';
+import 'models/category_filter_model.dart';
 import 'models/product_model.dart';
 import '../../../services/api_service.dart';
 
 class CatalogFilter {
   final int? categoryId;
+  final String? categoryName;
   final String? brand;
   final String? searchQuery;
   final double? minPrice;
@@ -11,7 +13,10 @@ class CatalogFilter {
   final bool inStockOnly;
   final String sortBy; // 'name_asc', 'price_asc', 'price_desc', 'stock_desc'
 
-  // Dynamic Facets (Nanotek style)
+  // Dynamic Facets Map: filterKey -> selectedValue
+  final Map<String, String> dynamicFilters;
+
+  // Dynamic Facets (legacy convenience getters & compatibility)
   final String? socket;           // Motherboard, CPU
   final String? chipset;          // Motherboard
   final String? formFactor;       // Motherboard, PSU
@@ -23,12 +28,14 @@ class CatalogFilter {
 
   const CatalogFilter({
     this.categoryId,
+    this.categoryName,
     this.brand,
     this.searchQuery,
     this.minPrice,
     this.maxPrice,
     this.inStockOnly = false,
     this.sortBy = 'name_asc',
+    this.dynamicFilters = const {},
     this.socket,
     this.chipset,
     this.formFactor,
@@ -51,11 +58,14 @@ class CatalogFilter {
       speed != null ||
       capacity != null ||
       vram != null ||
-      efficiencyRating != null;
+      efficiencyRating != null ||
+      dynamicFilters.isNotEmpty;
 
   CatalogFilter copyWith({
     int? categoryId,
     bool clearCategory = false,
+    String? categoryName,
+    bool clearCategoryName = false,
     String? brand,
     bool clearBrand = false,
     String? searchQuery,
@@ -79,15 +89,21 @@ class CatalogFilter {
     bool clearVram = false,
     String? efficiencyRating,
     bool clearEfficiencyRating = false,
+    Map<String, String>? dynamicFilters,
+    bool clearDynamicFilters = false,
   }) {
     return CatalogFilter(
       categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
+      categoryName: clearCategoryName ? null : (categoryName ?? this.categoryName),
       brand: clearBrand ? null : (brand ?? this.brand),
       searchQuery: searchQuery ?? this.searchQuery,
       minPrice: minPrice ?? this.minPrice,
       maxPrice: maxPrice ?? this.maxPrice,
       inStockOnly: inStockOnly ?? this.inStockOnly,
       sortBy: sortBy ?? this.sortBy,
+      dynamicFilters: clearDynamicFilters
+          ? const {}
+          : (dynamicFilters ?? this.dynamicFilters),
       socket: clearSocket ? null : (socket ?? this.socket),
       chipset: clearChipset ? null : (chipset ?? this.chipset),
       formFactor: clearFormFactor ? null : (formFactor ?? this.formFactor),
@@ -118,6 +134,15 @@ class CatalogRepository {
     return [];
   }
 
+  Future<List<CategoryFilterModel>> getCategoryFilters(int categoryId) async {
+    try {
+      final filters = await _apiService.fetchCategoryFilters(categoryId);
+      return filters.map((f) => CategoryFilterModel.fromJson(f)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
   Future<List<ProductModel>> getProducts({CatalogFilter? filter}) async {
     try {
       final apiProds = await _apiService.fetchProducts(
@@ -135,6 +160,7 @@ class CatalogRepository {
         capacity: filter?.capacity,
         vram: filter?.vram,
         efficiency: filter?.efficiencyRating,
+        dynamicFilters: filter?.dynamicFilters,
       );
       return apiProds.map((p) => ProductModel.fromJson(p)).toList();
     } catch (e) {

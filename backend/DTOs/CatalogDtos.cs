@@ -50,12 +50,14 @@ public class CategoryFilterDto
 
 public class CreateCategoryFilterDto
 {
+    public int? MasterFilterId { get; set; }
     public string FilterKey { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string FilterType { get; set; } = "multiselect";
     public string? Unit { get; set; }
     public int? DisplayOrder { get; set; }
     public bool IsFilterable { get; set; } = true;
+    public List<string>? Options { get; set; }
 }
 
 public class UpdateCategoryFilterDto

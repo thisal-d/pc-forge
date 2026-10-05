@@ -95,6 +95,8 @@ class _ComponentPickerSheetState extends State<ComponentPickerSheet> {
       context,
       initialFilter: _filter,
       categoryId: widget.slotInfo.categoryId,
+      categoryName: widget.slotInfo.title,
+      repository: _repository,
       onApply: (applied) => _applyFilter(applied),
     );
   }

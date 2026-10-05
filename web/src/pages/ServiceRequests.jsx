@@ -21,6 +21,8 @@ export const ServiceRequests = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [technicianFilter, setTechnicianFilter] = useState('all');
   const [warrantyFilter, setWarrantyFilter] = useState('all');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -29,14 +31,15 @@ export const ServiceRequests = () => {
   // Selected Service Request for detailed inspection
   const [activeSrId, setActiveSrId] = useState(null);
 
-  // Technician notes & diagnosis form
-  const [technicianNotes, setTechnicianNotes] = useState('');
-  const [resolutionText, setResolutionText] = useState('');
+  // Staff confidential internal notes form
+  const [internalNotesText, setInternalNotesText] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
   // Create Service Request modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createData, setCreateData] = useState({
+    title: '',
+    description: '',
     orderId: '',
     productId: '',
     problemDescription: '',
@@ -47,6 +50,8 @@ export const ServiceRequests = () => {
     priority: 'Normal',
   });
   const [creatingRequest, setCreatingRequest] = useState(false);
+  const [dateAvailability, setDateAvailability] = useState(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   // Notification toast
   const [notification, setNotification] = useState(null);
@@ -89,14 +94,12 @@ export const ServiceRequests = () => {
     ) || null;
   }, [requests, activeSrId]);
 
-  // Sync selected request fields to form
+  // Sync selected request internal notes to form
   useEffect(() => {
     if (selectedRequest) {
-      setTechnicianNotes(selectedRequest.technicianNotes || '');
-      setResolutionText(selectedRequest.resolution || '');
+      setInternalNotesText(selectedRequest.internalNotes || '');
     } else {
-      setTechnicianNotes('');
-      setResolutionText('');
+      setInternalNotesText('');
     }
   }, [selectedRequest]);
 
@@ -104,8 +107,21 @@ export const ServiceRequests = () => {
   const filteredRequests = useMemo(() => {
     return requests.filter((r) => {
       // Status
-      if (statusFilter !== 'all' && r.status?.toUpperCase() !== statusFilter.toUpperCase()) {
-        return false;
+      if (statusFilter !== 'all') {
+        const norm = (s) => (s || '').toUpperCase().replace(/_/g, ' ');
+        const fNorm = statusFilter.toUpperCase().replace(/_/g, ' ');
+        const rNorm = norm(r.status);
+        if (fNorm === 'IN PROGRESS') {
+          if (rNorm !== 'IN PROGRESS' && rNorm !== 'IN SERVICE' && rNorm !== 'UNDER REVIEW' && rNorm !== 'SCHEDULED') return false;
+        } else if (fNorm === 'COMPLETED') {
+          if (rNorm !== 'COMPLETED' && rNorm !== 'RESOLVED') return false;
+        } else if (fNorm === 'NO SHOW') {
+          if (rNorm !== 'NO SHOW') return false;
+        } else if (fNorm === 'CANCELLED') {
+          if (rNorm !== 'CANCELLED' && rNorm !== 'CANCELED') return false;
+        } else if (rNorm !== fNorm) {
+          return false;
+        }
       }
       // Priority
       if (priorityFilter !== 'all' && r.priority?.toLowerCase() !== priorityFilter.toLowerCase()) {
@@ -127,24 +143,37 @@ export const ServiceRequests = () => {
       if (warrantyFilter !== 'all' && (r.warrantyStatus || '').toLowerCase() !== warrantyFilter.toLowerCase()) {
         return false;
       }
+      // Date Range Filter (Preferred Appointment Date or CreatedAt)
+      if (startDateFilter) {
+        const sDate = new Date(startDateFilter);
+        const rDate = r.preferredDate ? new Date(r.preferredDate) : new Date(r.createdAt);
+        if (rDate < sDate) return false;
+      }
+      if (endDateFilter) {
+        const eDate = new Date(endDateFilter);
+        eDate.setHours(23, 59, 59, 999);
+        const rDate = r.preferredDate ? new Date(r.preferredDate) : new Date(r.createdAt);
+        if (rDate > eDate) return false;
+      }
       // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const num = (r.serviceRequestNumber || '').toLowerCase();
-        const desc = (r.problemDescription || '').toLowerCase();
+        const title = (r.title || '').toLowerCase();
+        const desc = (r.problemDescription || r.description || '').toLowerCase();
         const cust = (r.customerName || '').toLowerCase();
         const email = (r.customerEmail || '').toLowerCase();
         const prod = (r.productName || '').toLowerCase();
-        return num.includes(q) || desc.includes(q) || cust.includes(q) || email.includes(q) || prod.includes(q);
+        return num.includes(q) || title.includes(q) || desc.includes(q) || cust.includes(q) || email.includes(q) || prod.includes(q);
       }
       return true;
     });
-  }, [requests, statusFilter, priorityFilter, categoryFilter, technicianFilter, warrantyFilter, searchQuery]);
+  }, [requests, statusFilter, priorityFilter, categoryFilter, technicianFilter, warrantyFilter, startDateFilter, endDateFilter, searchQuery]);
 
   // Reset pagination on filter or search change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, priorityFilter, categoryFilter, technicianFilter, warrantyFilter, searchQuery]);
+  }, [statusFilter, priorityFilter, categoryFilter, technicianFilter, warrantyFilter, startDateFilter, endDateFilter, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
   const paginatedRequests = useMemo(() => {
@@ -158,8 +187,9 @@ export const ServiceRequests = () => {
       const updated = await serviceRequestService.updateServiceRequestStatus(
         id,
         newStatus,
-        technicianNotes || undefined,
-        resolutionText || undefined
+        undefined,
+        undefined,
+        internalNotesText || undefined
       );
       setRequests((prev) =>
         prev.map((r) => (r.serviceRequestId === id ? { ...r, ...updated } : r))
@@ -170,7 +200,7 @@ export const ServiceRequests = () => {
     }
   };
 
-  // Handle saving technician notes
+  // Handle saving staff internal notes
   const handleSaveNotes = async (e) => {
     e.preventDefault();
     if (!selectedRequest) return;
@@ -179,13 +209,14 @@ export const ServiceRequests = () => {
       const updated = await serviceRequestService.updateServiceRequestStatus(
         selectedRequest.serviceRequestId,
         selectedRequest.status,
-        technicianNotes,
-        resolutionText
+        undefined,
+        undefined,
+        internalNotesText
       );
       setRequests((prev) =>
         prev.map((r) => (r.serviceRequestId === selectedRequest.serviceRequestId ? { ...r, ...updated } : r))
       );
-      showNotification('success', 'Technician diagnosis and notes saved successfully.');
+      showNotification('success', 'Internal notes saved successfully.');
     } catch (err) {
       showNotification('error', err.message || 'Failed to save notes.');
     } finally {
@@ -219,20 +250,51 @@ export const ServiceRequests = () => {
     }
   };
 
+  // Check date capacity
+  const handleDateChange = async (dateStr) => {
+    setCreateData((prev) => ({ ...prev, preferredDate: dateStr }));
+    if (!dateStr) {
+      setDateAvailability(null);
+      return;
+    }
+    setCheckingAvailability(true);
+    try {
+      const info = await serviceRequestService.checkAvailability(dateStr);
+      setDateAvailability(info);
+    } catch {
+      setDateAvailability(null);
+    } finally {
+      setCheckingAvailability(false);
+    }
+  };
+
   // Handle manual Service Request creation
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    if (!createData.problemDescription.trim()) {
-      showNotification('error', 'Problem description is required.');
+    const title = (createData.title || '').trim();
+    if (!title) {
+      showNotification('error', 'Title is required for service request.');
+      return;
+    }
+
+    if (dateAvailability && !dateAvailability.isAvailable) {
+      showNotification('error', 'The selected date has reached its maximum capacity of 10 service appointments. Please choose another date.');
       return;
     }
 
     setCreatingRequest(true);
     try {
-      const created = await serviceRequestService.createServiceRequest(createData);
+      const created = await serviceRequestService.createServiceRequest({
+        ...createData,
+        title: title,
+        problemDescription: createData.description || title,
+        description: createData.description || null,
+      });
       setRequests((prev) => [created, ...prev]);
       setIsCreateModalOpen(false);
       setCreateData({
+        title: '',
+        description: '',
         orderId: '',
         productId: '',
         problemDescription: '',
@@ -242,6 +304,7 @@ export const ServiceRequests = () => {
         preferredTime: '10:00 AM',
         priority: 'Normal',
       });
+      setDateAvailability(null);
       showNotification('success', `Service Request ${created.serviceRequestNumber} created successfully.`);
     } catch (err) {
       showNotification('error', err.message || 'Failed to create service request.');
@@ -251,21 +314,23 @@ export const ServiceRequests = () => {
   };
 
   const getStatusBadge = (status) => {
-    switch ((status || '').toUpperCase()) {
+    const s = (status || '').toUpperCase().replace(/_/g, ' ');
+    switch (s) {
       case 'PENDING':
-        return <span className="badge badge-warning">PENDING</span>;
-      case 'UNDER_REVIEW':
-        return <span className="badge badge-info">UNDER REVIEW</span>;
-      case 'WAITING_FOR_CUSTOMER':
-        return <span className="badge badge-neutral">WAITING CUSTOMER</span>;
+        return <span className="badge badge-warning">Pending</span>;
+      case 'IN PROGRESS':
+      case 'IN SERVICE':
+      case 'UNDER REVIEW':
       case 'SCHEDULED':
-        return <span className="badge badge-primary">SCHEDULED</span>;
-      case 'IN_SERVICE':
-        return <span className="badge badge-secondary" style={{ backgroundColor: '#8b5cf6', color: '#fff' }}>IN SERVICE</span>;
+        return <span className="badge badge-secondary" style={{ backgroundColor: '#6366f1', color: '#fff' }}>In Progress</span>;
+      case 'COMPLETED':
       case 'RESOLVED':
-        return <span className="badge badge-success">RESOLVED</span>;
+        return <span className="badge badge-success">Completed</span>;
+      case 'NO SHOW':
+        return <span className="badge badge-neutral" style={{ backgroundColor: '#f97316', color: '#fff' }}>No Show</span>;
       case 'CANCELLED':
-        return <span className="badge badge-error">CANCELLED</span>;
+      case 'CANCELED':
+        return <span className="badge badge-error">Cancelled</span>;
       default:
         return <span className="badge badge-neutral">{status}</span>;
     }
@@ -274,9 +339,9 @@ export const ServiceRequests = () => {
   const getPriorityBadge = (p) => {
     switch ((p || '').toLowerCase()) {
       case 'urgent':
-        return <span className="badge badge-error">🔥 Urgent</span>;
+        return <span className="badge badge-error">Urgent</span>;
       case 'high':
-        return <span className="badge badge-warning">⚡ High</span>;
+        return <span className="badge badge-warning">High</span>;
       case 'normal':
         return <span className="badge badge-info">Normal</span>;
       case 'low':
@@ -293,7 +358,7 @@ export const ServiceRequests = () => {
         <div>
           <h1>After-Sales Service Requests</h1>
           <p className="subtitle">
-            Technician inspection workbench, AI troubleshooting history, warranty verification, and repair diagnostics.
+            Technician inspection workbench, service request details, and appointment lifecycle.
           </p>
         </div>
         <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -338,32 +403,32 @@ export const ServiceRequests = () => {
         <div className="stat-card stat-card-total">
           <span className="stat-label">Total Requests</span>
           <span className="stat-value">{stats.total}</span>
-          <span className="stat-subtext">All recorded claims</span>
+          <span className="stat-subtext">All recorded requests</span>
         </div>
         <div className="stat-card stat-card-inactive">
           <span className="stat-label">Pending Intake</span>
           <span className="stat-value" style={{ color: '#fbbf24' }}>{stats.pending}</span>
-          <span className="stat-subtext">Awaiting technician intake</span>
+          <span className="stat-subtext">Awaiting PC drop-off</span>
         </div>
         <div className="stat-card stat-card-tech">
-          <span className="stat-label">Under Review</span>
-          <span className="stat-value" style={{ color: '#60a5fa' }}>{stats.underReview}</span>
-          <span className="stat-subtext">Diagnostics in progress</span>
+          <span className="stat-label">In Progress</span>
+          <span className="stat-value" style={{ color: '#6366f1' }}>{stats.inProgress}</span>
+          <span className="stat-subtext">PC at store / On bench</span>
         </div>
         <div className="stat-card stat-card-active">
-          <span className="stat-label">Scheduled</span>
-          <span className="stat-value" style={{ color: '#34d399' }}>{stats.scheduled}</span>
-          <span className="stat-subtext">Appointments confirmed</span>
+          <span className="stat-label">Completed</span>
+          <span className="stat-value" style={{ color: '#10b981' }}>{stats.completed}</span>
+          <span className="stat-subtext">Requests completed</span>
         </div>
-        <div className="stat-card stat-card-tech">
-          <span className="stat-label">In Service / Bench</span>
-          <span className="stat-value" style={{ color: '#a78bfa' }}>{stats.inService}</span>
-          <span className="stat-subtext">On technician bench</span>
+        <div className="stat-card stat-card-inactive">
+          <span className="stat-label">No Show</span>
+          <span className="stat-value" style={{ color: '#f97316' }}>{stats.noShow}</span>
+          <span className="stat-subtext">Missed appointment</span>
         </div>
-        <div className="stat-card stat-card-active">
-          <span className="stat-label">Resolved</span>
-          <span className="stat-value" style={{ color: '#34d399' }}>{stats.resolved}</span>
-          <span className="stat-subtext">Completed repairs</span>
+        <div className="stat-card stat-card-inactive">
+          <span className="stat-label">Cancelled</span>
+          <span className="stat-value" style={{ color: '#ef4444' }}>{stats.cancelled}</span>
+          <span className="stat-subtext">Customer / staff cancelled</span>
         </div>
       </div>
 
@@ -377,7 +442,7 @@ export const ServiceRequests = () => {
             </span>
             <input
               type="text"
-              placeholder="Search by SR Number, Customer, Problem, or Product..."
+              placeholder="Search by Title, SR#, Customer, or Order..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               id="service-request-search-input"
@@ -404,49 +469,35 @@ export const ServiceRequests = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="all">All Statuses ({stats.total})</option>
-              <option value="PENDING">Pending Intake ({stats.pending})</option>
-              <option value="UNDER_REVIEW">Under Review ({stats.underReview})</option>
-              <option value="WAITING_FOR_CUSTOMER">Waiting Customer</option>
-              <option value="SCHEDULED">Scheduled ({stats.scheduled})</option>
-              <option value="IN_SERVICE">In Service ({stats.inService})</option>
-              <option value="RESOLVED">Resolved ({stats.resolved})</option>
-              <option value="CANCELLED">Cancelled</option>
+              <option value="Pending">Pending ({stats.pending})</option>
+              <option value="In Progress">In Progress ({stats.inProgress})</option>
+              <option value="Completed">Completed ({stats.completed})</option>
+              <option value="No Show">No Show ({stats.noShow})</option>
+              <option value="Cancelled">Cancelled ({stats.cancelled})</option>
             </select>
           </div>
 
-          {/* Priority Filter */}
+          {/* Date Range Filters */}
           <div className="filter-item">
-            <label htmlFor="sr-filter-priority">Priority:</label>
-            <select
-              id="sr-filter-priority"
+            <label htmlFor="sr-filter-start-date">From Date:</label>
+            <input
+              type="date"
+              id="sr-filter-start-date"
               className="filter-select"
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-            >
-              <option value="all">All Priorities</option>
-              <option value="Urgent">🔥 Urgent</option>
-              <option value="High">⚡ High</option>
-              <option value="Normal">Normal</option>
-              <option value="Low">Low</option>
-            </select>
+              value={startDateFilter}
+              onChange={(e) => setStartDateFilter(e.target.value)}
+            />
           </div>
 
-          {/* Category Filter */}
           <div className="filter-item">
-            <label htmlFor="sr-filter-category">Category:</label>
-            <select
-              id="sr-filter-category"
+            <label htmlFor="sr-filter-end-date">To Date:</label>
+            <input
+              type="date"
+              id="sr-filter-end-date"
               className="filter-select"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-            >
-              <option value="all">All Categories</option>
-              <option value="General">General Diagnosis</option>
-              <option value="Hardware Failure">Hardware Failure</option>
-              <option value="Thermal / Cooling">Thermal / Cooling</option>
-              <option value="Power Issue">Power Issue</option>
-              <option value="Software / BIOS">Software / BIOS</option>
-            </select>
+              value={endDateFilter}
+              onChange={(e) => setEndDateFilter(e.target.value)}
+            />
           </div>
 
           {/* Technician Filter */}
@@ -468,23 +519,8 @@ export const ServiceRequests = () => {
             </select>
           </div>
 
-          {/* Warranty Filter */}
-          <div className="filter-item">
-            <label htmlFor="sr-filter-warranty">Warranty:</label>
-            <select
-              id="sr-filter-warranty"
-              className="filter-select"
-              value={warrantyFilter}
-              onChange={(e) => setWarrantyFilter(e.target.value)}
-            >
-              <option value="all">All Warranties</option>
-              <option value="Active">Active Warranty</option>
-              <option value="Expired">Expired Warranty</option>
-            </select>
-          </div>
-
           {/* Action buttons */}
-          {(searchQuery || statusFilter !== 'all' || priorityFilter !== 'all' || categoryFilter !== 'all' || technicianFilter !== 'all' || warrantyFilter !== 'all') && (
+          {(searchQuery || statusFilter !== 'all' || priorityFilter !== 'all' || categoryFilter !== 'all' || technicianFilter !== 'all' || warrantyFilter !== 'all' || startDateFilter || endDateFilter) && (
             <button
               type="button"
               onClick={() => {
@@ -494,6 +530,8 @@ export const ServiceRequests = () => {
                 setCategoryFilter('all');
                 setTechnicianFilter('all');
                 setWarrantyFilter('all');
+                setStartDateFilter('');
+                setEndDateFilter('');
                 setCurrentPage(1);
               }}
               className="btn btn-outline-sm"
@@ -529,23 +567,21 @@ export const ServiceRequests = () => {
             <thead>
               <tr>
                 <th>SR Number</th>
+                <th>Request Title & Issue</th>
                 <th>Customer</th>
                 <th>Hardware / Order</th>
-                <th>Problem Category</th>
-                <th>Warranty</th>
                 <th>Appointment</th>
                 <th>Status</th>
-                <th>Priority</th>
                 <th>Assigned Tech</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             {loading ? (
-              <TableSkeleton rows={pageSize} columns={10} />
+              <TableSkeleton rows={pageSize} columns={8} />
             ) : paginatedRequests.length === 0 ? (
               <tbody>
                 <tr>
-                  <td colSpan={10} style={{ padding: 0 }}>
+                  <td colSpan={8} style={{ padding: 0 }}>
                     <div className="empty-state">
                       <div className="empty-state-icon">
                         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -564,6 +600,8 @@ export const ServiceRequests = () => {
                           setCategoryFilter('all');
                           setTechnicianFilter('all');
                           setWarrantyFilter('all');
+                          setStartDateFilter('');
+                          setEndDateFilter('');
                           setCurrentPage(1);
                         }}
                       >
@@ -586,6 +624,14 @@ export const ServiceRequests = () => {
                       {r.serviceRequestNumber}
                     </td>
                     <td>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{r.title || r.problemDescription}</div>
+                      {r.description && r.title && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {r.description}
+                        </div>
+                      )}
+                    </td>
+                    <td>
                       <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{r.customerName || `Customer #${r.userId}`}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.customerEmail}</div>
                     </td>
@@ -593,16 +639,6 @@ export const ServiceRequests = () => {
                       <div style={{ color: 'var(--text-main)', fontWeight: 500 }}>{r.productName || 'Hardware Component'}</div>
                       {r.orderId && (
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Order #ORD-{r.orderId}</span>
-                      )}
-                    </td>
-                    <td>
-                      <span className="badge badge-neutral">{r.problemCategory || 'General'}</span>
-                    </td>
-                    <td>
-                      {r.warrantyStatus === 'Active' ? (
-                        <span className="badge badge-success">Active</span>
-                      ) : (
-                        <span className="badge badge-error">Expired</span>
                       )}
                     </td>
                     <td>
@@ -616,7 +652,6 @@ export const ServiceRequests = () => {
                       )}
                     </td>
                     <td>{getStatusBadge(r.status)}</td>
-                    <td>{getPriorityBadge(r.priority)}</td>
                     <td>
                       <select
                         className="filter-select"
@@ -705,37 +740,39 @@ export const ServiceRequests = () => {
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
-                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'UNDER_REVIEW')}
+                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'Pending')}
                     className="btn btn-outline-sm"
+                    style={{ borderColor: '#f59e0b', color: '#b45309' }}
                   >
-                    Under Review
+                    Pending
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'SCHEDULED')}
+                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'In Progress')}
                     className="btn btn-outline-sm"
+                    style={{ backgroundColor: '#e0e7ff', borderColor: '#6366f1', color: '#4338ca', fontWeight: 600 }}
                   >
-                    Schedule Appointment
+                    In Progress (PC Received)
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'IN_SERVICE')}
-                    className="btn btn-outline-sm"
-                    style={{ color: '#8b5cf6', borderColor: '#c4b5fd' }}
-                  >
-                    Bench In-Service
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'RESOLVED')}
+                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'Completed')}
                     className="btn btn-primary"
                     style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
                   >
-                    ✓ Mark Resolved
+                    Completed
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'CANCELLED')}
+                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'No Show')}
+                    className="btn btn-outline-sm"
+                    style={{ borderColor: '#ea580c', color: '#c2410c' }}
+                  >
+                    No Show
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'Cancelled')}
                     className="btn btn-outline-sm"
                     style={{ color: 'var(--danger-text)', borderColor: 'var(--danger-border)' }}
                   >
@@ -744,11 +781,21 @@ export const ServiceRequests = () => {
                 </div>
               </div>
 
+              {/* Title & Description Banner */}
+              <div style={{ padding: '1rem', backgroundColor: '#f8fafc', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+                <h4 style={{ margin: '0 0 0.35rem 0', color: 'var(--primary)', fontSize: '1rem', fontWeight: 700 }}>
+                  {selectedRequest.title || 'Untitled Request'}
+                </h4>
+                <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                  {selectedRequest.description || selectedRequest.problemDescription || 'No description provided.'}
+                </p>
+              </div>
+
               {/* Info Cards Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                 {/* Customer Card */}
                 <div style={{ padding: '1rem', backgroundColor: '#ffffff', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)', fontSize: '0.875rem', fontWeight: 600 }}>👤 Customer Info</h4>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)', fontSize: '0.875rem', fontWeight: 600 }}>Customer Information</h4>
                   <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{selectedRequest.customerName || `User #${selectedRequest.userId}`}</div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{selectedRequest.customerEmail || 'No email on record'}</div>
                   {selectedRequest.customerPhone && (
@@ -758,92 +805,48 @@ export const ServiceRequests = () => {
 
                 {/* Order & Product Card */}
                 <div style={{ padding: '1rem', backgroundColor: '#ffffff', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)', fontSize: '0.875rem', fontWeight: 600 }}>📦 Hardware & Order</h4>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)', fontSize: '0.875rem', fontWeight: 600 }}>Hardware & Linked Order</h4>
                   <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{selectedRequest.productName || 'Hardware Component'}</div>
                   {selectedRequest.orderId ? (
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Order #{selectedRequest.orderId}</div>
+                    <div style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '0.85rem' }}>
+                      Linked Order: #{selectedRequest.orderId}
+                      {selectedRequest.orderNumber && ` (${selectedRequest.orderNumber})`}
+                    </div>
                   ) : (
-                    <div style={{ color: 'var(--text-subtle)', fontSize: '0.85rem' }}>Direct Component Request</div>
+                    <div style={{ color: 'var(--text-subtle)', fontSize: '0.85rem' }}>Direct / External Hardware</div>
                   )}
                 </div>
 
                 {/* Warranty & Appointment Card */}
                 <div style={{ padding: '1rem', backgroundColor: '#ffffff', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)', fontSize: '0.875rem', fontWeight: 600 }}>🛡️ Warranty & Service Slot</h4>
-                  <div>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Status: </span>
-                    {selectedRequest.warrantyStatus === 'Active' ? (
-                      <span className="badge badge-success">Active Coverage</span>
-                    ) : (
-                      <span className="badge badge-error">Expired Coverage</span>
-                    )}
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)', fontSize: '0.875rem', fontWeight: 600 }}>Service Slot & Warranty</h4>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>
+                    {selectedRequest.preferredDate || 'Date Not Set'}{' '}
+                    {selectedRequest.preferredTime && `(${selectedRequest.preferredTime})`}
                   </div>
-                  {selectedRequest.warrantyExpiryDate && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                      Expires: {new Date(selectedRequest.warrantyExpiryDate).toLocaleDateString()}
-                    </div>
-                  )}
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-main)' }}>
-                    📅 Appointment: {selectedRequest.preferredDate || 'Not specified'}{' '}
-                    {selectedRequest.preferredTime && `at ${selectedRequest.preferredTime}`}
+                  <div style={{ marginTop: '0.35rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Store hours: 9:00 AM - 6:00 PM</span>
                   </div>
                 </div>
               </div>
 
-              {/* Problem Description */}
-              <div style={{ padding: '1rem', backgroundColor: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                <h4 style={{ margin: '0 0 0.4rem 0', color: 'var(--text-main)', fontSize: '0.9rem', fontWeight: 600 }}>
-                  Customer Reported Symptom ({selectedRequest.problemCategory})
-                </h4>
-                <p style={{ margin: 0, color: 'var(--text-muted)', lineHeight: 1.5, fontSize: '0.875rem' }}>
-                  {selectedRequest.problemDescription}
-                </p>
-              </div>
-
-              {/* AI Troubleshooting Summary Card */}
-              <div style={{ padding: '1rem', backgroundColor: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 'var(--radius-lg)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                  <span style={{ fontSize: '1.1rem' }}>🤖</span>
-                  <h4 style={{ margin: 0, color: 'var(--primary-hover)', fontSize: '0.9rem', fontWeight: 600 }}>
-                    AI Troubleshooting Summary & Attempt Counter ({selectedRequest.attemptCount || 0} Attempts)
-                  </h4>
-                </div>
-                <div style={{ color: 'var(--text-main)', fontSize: '0.875rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                  {selectedRequest.troubleshootingSummary || 'No preliminary AI troubleshooting steps recorded for this request.'}
-                </div>
-              </div>
-
-              {/* Technician Notes & Diagnosis Editor */}
+              {/* Internal Notes & Diagnostics Editor */}
               <form onSubmit={handleSaveNotes} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.95rem', fontWeight: 600 }}>
-                  🛠️ Technician Bench Diagnosis & Resolution Notes
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                    Technician Diagnostics & Internal Bench Notes:
+                {/* Internal Notes - Hidden from Customer */}
+                <div style={{ padding: '1rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: 700, color: '#92400e', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    Staff / Admin Internal Notes (Confidential):
                   </label>
                   <textarea
                     rows={3}
                     className="filter-select"
-                    style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical', backgroundImage: 'none', padding: '0.65rem 0.85rem' }}
-                    placeholder="Record hardware bench findings, component swap notes, or technician remarks..."
-                    value={technicianNotes}
-                    onChange={(e) => setTechnicianNotes(e.target.value)}
+                    style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical', backgroundImage: 'none', padding: '0.65rem 0.85rem', backgroundColor: '#fff', borderColor: '#f59e0b' }}
+                    placeholder="Enter confidential notes, preliminary diagnosis, customer interaction history, or internal remarks..."
+                    value={internalNotesText}
+                    onChange={(e) => setInternalNotesText(e.target.value)}
                   />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                    Final Customer Resolution & Repair Confirmation:
-                  </label>
-                  <textarea
-                    rows={2}
-                    className="filter-select"
-                    style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical', backgroundImage: 'none', padding: '0.65rem 0.85rem' }}
-                    placeholder="Record resolution summary for the customer (e.g. Component replaced under manufacturer warranty, thermal paste reapplied)..."
-                    value={resolutionText}
-                    onChange={(e) => setResolutionText(e.target.value)}
-                  />
-                </div>
+
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
                   <button
                     type="button"
@@ -857,7 +860,7 @@ export const ServiceRequests = () => {
                     disabled={savingNotes}
                     className="btn btn-primary"
                   >
-                    {savingNotes ? 'Saving...' : 'Save Diagnosis & Notes'}
+                    {savingNotes ? 'Saving...' : 'Save Internal Notes'}
                   </button>
                 </div>
               </form>
@@ -878,7 +881,7 @@ export const ServiceRequests = () => {
             <div className="modal-header">
               <div>
                 <h3 className="modal-title" style={{ margin: 0 }}>Create New Service Request</h3>
-                <p className="modal-subtitle">Submit manual customer ticket for bench repair & diagnostics</p>
+                <p className="modal-subtitle">Submit customer ticket (Hours: 9:00 AM - 6:00 PM, Max 10 per day)</p>
               </div>
               <button
                 type="button"
@@ -894,69 +897,74 @@ export const ServiceRequests = () => {
               <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
-                    Linked Order ID (Optional):
+                    Title * :
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    required
                     className="filter-select"
                     style={{ width: '100%', backgroundImage: 'none', padding: '0.55rem 0.85rem' }}
-                    placeholder="e.g. 1 or 1001"
-                    value={createData.orderId}
-                    onChange={(e) => setCreateData({ ...createData, orderId: e.target.value })}
+                    placeholder="e.g. PC won't boot / GPU display issue"
+                    value={createData.title}
+                    onChange={(e) => setCreateData({ ...createData, title: e.target.value })}
                   />
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
-                    Problem Category:
+                    Description (Optional):
                   </label>
-                  <select
+                  <textarea
+                    rows={3}
                     className="filter-select"
-                    style={{ width: '100%' }}
-                    value={createData.problemCategory}
-                    onChange={(e) => setCreateData({ ...createData, problemCategory: e.target.value })}
-                  >
-                    <option value="Power / Boot Failure">Power / Boot Failure</option>
-                    <option value="Display / Black Screen">Display / Black Screen</option>
-                    <option value="Shutdowns / Restarts">Shutdowns / Restarts</option>
-                    <option value="Performance / Slowness">Performance / Slowness</option>
-                    <option value="Audio / Strange Noise">Audio / Strange Noise</option>
-                    <option value="GPU / Graphics Fault">GPU / Graphics Fault</option>
-                    <option value="General">General Hardware Defect</option>
-                  </select>
+                    style={{ width: '100%', backgroundImage: 'none', padding: '0.65rem 0.85rem', resize: 'vertical', fontFamily: 'inherit' }}
+                    placeholder="Provide any additional details or symptoms..."
+                    value={createData.description}
+                    onChange={(e) => setCreateData({ ...createData, description: e.target.value })}
+                  />
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
-                    Problem Description * :
+                    Linked Order ID (Optional - if bought from this store):
                   </label>
-                  <textarea
-                    rows={3}
-                    required
+                  <input
+                    type="number"
                     className="filter-select"
-                    style={{ width: '100%', backgroundImage: 'none', padding: '0.65rem 0.85rem', resize: 'vertical', fontFamily: 'inherit' }}
-                    placeholder="Describe the issue reported by the customer..."
-                    value={createData.problemDescription}
-                    onChange={(e) => setCreateData({ ...createData, problemDescription: e.target.value })}
+                    style={{ width: '100%', backgroundImage: 'none', padding: '0.55rem 0.85rem' }}
+                    placeholder="e.g. 101"
+                    value={createData.orderId}
+                    onChange={(e) => setCreateData({ ...createData, orderId: e.target.value })}
                   />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
-                      Preferred Date:
+                      Preferred Date *:
                     </label>
                     <input
                       type="date"
+                      required
                       className="filter-select"
                       style={{ width: '100%', backgroundImage: 'none', padding: '0.55rem 0.85rem' }}
                       value={createData.preferredDate}
-                      onChange={(e) => setCreateData({ ...createData, preferredDate: e.target.value })}
+                      onChange={(e) => handleDateChange(e.target.value)}
                     />
+                    {checkingAvailability && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Checking capacity...</span>
+                    )}
+                    {dateAvailability && (
+                      <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', fontWeight: 600, color: dateAvailability.isAvailable ? '#059669' : '#dc2626' }}>
+                        {dateAvailability.isAvailable
+                          ? `Available (${dateAvailability.remainingSlots} of 10 slots left)`
+                          : `Fully booked (${dateAvailability.bookedCount} of 10 slots used)`}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
-                      Preferred Time Slot:
+                      Preferred Time Slot (9 AM - 6 PM) *:
                     </label>
                     <select
                       className="filter-select"
@@ -964,11 +972,16 @@ export const ServiceRequests = () => {
                       value={createData.preferredTime}
                       onChange={(e) => setCreateData({ ...createData, preferredTime: e.target.value })}
                     >
+                      <option value="09:00 AM">09:00 AM</option>
                       <option value="10:00 AM">10:00 AM</option>
-                      <option value="11:30 AM">11:30 AM</option>
+                      <option value="11:00 AM">11:00 AM</option>
+                      <option value="12:00 PM">12:00 PM</option>
+                      <option value="01:00 PM">01:00 PM</option>
                       <option value="02:00 PM">02:00 PM</option>
-                      <option value="03:30 PM">03:30 PM</option>
+                      <option value="03:00 PM">03:00 PM</option>
+                      <option value="04:00 PM">04:00 PM</option>
                       <option value="05:00 PM">05:00 PM</option>
+                      <option value="06:00 PM">06:00 PM</option>
                     </select>
                   </div>
                 </div>
@@ -983,7 +996,7 @@ export const ServiceRequests = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={creatingRequest}
+                    disabled={creatingRequest || (dateAvailability && !dateAvailability.isAvailable)}
                     className="btn btn-primary"
                   >
                     {creatingRequest ? 'Creating...' : 'Create Service Request'}

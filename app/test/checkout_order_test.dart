@@ -21,7 +21,7 @@ class MockOrderApiService extends ApiService {
       'orderId': 1001,
       'userId': 42,
       'totalAmount': 764.00,
-      'status': 'Paid',
+      'status': 'Order placed',
       'shippingAddress': shippingAddress,
       'paymentMethod': paymentMethod,
       'createdAt': DateTime.now().toIso8601String(),
@@ -46,7 +46,7 @@ class MockOrderApiService extends ApiService {
         'orderId': 1001,
         'userId': 42,
         'totalAmount': 764.00,
-        'status': 'Paid',
+        'status': 'Order placed',
         'shippingAddress': '45 Flower Road, Colombo',
         'paymentMethod': 'Credit / Debit Card',
         'createdAt': DateTime.now().toIso8601String(),
@@ -65,6 +65,30 @@ class MockOrderApiService extends ApiService {
       }
     ];
   }
+
+  @override
+  Future<Map<String, dynamic>> cancelOrder(int orderId, {String? token}) async {
+    return {
+      'orderId': orderId,
+      'userId': 42,
+      'totalAmount': 764.00,
+      'status': 'Cancelled',
+      'shippingAddress': '45 Flower Road, Colombo',
+      'paymentMethod': 'Cash on Delivery',
+      'createdAt': DateTime.now().toIso8601String(),
+      'items': [
+        {
+          'orderItemId': 1,
+          'orderId': orderId,
+          'productId': 1,
+          'productName': 'GeForce RTX 4070 Ti 12GB',
+          'brand': 'NVIDIA',
+          'quantity': 1,
+          'unitPrice': 749.00,
+        }
+      ],
+    };
+  }
 }
 
 void main() {
@@ -82,7 +106,7 @@ void main() {
       OrderService.instance.setApiServiceForTesting(MockOrderApiService());
     });
 
-    test('places order from cart items, assigns ID, sets status Paid, and clears cart', () async {
+    test('places order from cart items, assigns ID, sets status Order placed, and clears cart', () async {
       CartService.instance.addItem(testGpu, quantity: 1);
       expect(CartService.instance.totalCount, 1);
 
@@ -95,7 +119,7 @@ void main() {
       );
 
       expect(order.orderId, greaterThanOrEqualTo(1001));
-      expect(order.status, 'Paid');
+      expect(order.status, 'Order placed');
       expect(order.items.length, 1);
       expect(order.items.first.productName, 'GeForce RTX 4070 Ti 12GB');
       expect(order.totalAmount, 764.00);
@@ -106,6 +130,22 @@ void main() {
       // Appears in OrderService history
       expect(OrderService.instance.hasOrders, true);
       expect(OrderService.instance.orders.first.orderId, order.orderId);
+    });
+
+    test('cancels active order and updates status to Cancelled', () async {
+      CartService.instance.addItem(testGpu, quantity: 1);
+      final order = await OrderService.instance.placeOrder(
+        userId: 42,
+        shippingAddress: '45 Flower Road, Colombo',
+        paymentMethod: 'Cash on Delivery',
+        cartItems: CartService.instance.items,
+        totalAmount: CartService.instance.totalAmount,
+      );
+      expect(order.status, 'Order placed');
+
+      final cancelled = await OrderService.instance.cancelOrder(order.orderId);
+      expect(cancelled.status, 'Cancelled');
+      expect(OrderService.instance.orders.first.status, 'Cancelled');
     });
   });
 
@@ -158,8 +198,8 @@ void main() {
       expect(find.byKey(const Key('continue_shopping_btn')), findsOneWidget);
     });
 
-    testWidgets('orders >= Rs. 100,000 require In-Store Pickup and disable Cash on Delivery', (WidgetTester tester) async {
-      // Setup cart with high-value item >= 100,000
+    testWidgets('orders > Rs. 100,000 require In-Store Pickup and disable Cash on Delivery', (WidgetTester tester) async {
+      // Setup cart with high-value item > 100,000
       const expensiveItem = ProductModel(
         productId: 99,
         name: 'Threadripper PRO 5995WX',
@@ -189,7 +229,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Step 1: Shows high value order protection banner
-      expect(find.text('High-Value Order Protection (≥ LKR 100,000)'), findsOneWidget);
+      expect(find.text('High-Value Order Protection (> LKR 100,000)'), findsOneWidget);
       expect(find.text('Limit Exceeded'), findsOneWidget);
 
       // Advance to Step 2 (Review)
