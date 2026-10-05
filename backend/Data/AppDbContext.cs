@@ -274,10 +274,13 @@ public class AppDbContext : DbContext
             entity.Property(sr => sr.UserId).HasColumnName("userid");
             entity.Property(sr => sr.OrderId).HasColumnName("orderid");
             entity.Property(sr => sr.ProductId).HasColumnName("productid");
+            entity.Property(sr => sr.Title).HasColumnName("title").HasMaxLength(200);
+            entity.Property(sr => sr.Description).HasColumnName("description");
             entity.Property(sr => sr.ProblemDescription).HasColumnName("problemdescription").IsRequired();
             entity.Property(sr => sr.ProblemCategory).HasColumnName("problemcategory").HasMaxLength(100).HasDefaultValue("General");
             entity.Property(sr => sr.TroubleshootingSummary).HasColumnName("troubleshootingsummary");
             entity.Property(sr => sr.AttemptCount).HasColumnName("attemptcount").HasDefaultValue(0);
+            entity.Property(sr => sr.InternalNotes).HasColumnName("internalnotes");
             entity.Property(sr => sr.WarrantyStatus).HasColumnName("warrantystatus").HasMaxLength(50).HasDefaultValue("Active");
             entity.Property(sr => sr.WarrantyExpiryDate).HasColumnName("warrantyexpirydate");
             entity.Property(sr => sr.PreferredDate).HasColumnName("preferreddate");

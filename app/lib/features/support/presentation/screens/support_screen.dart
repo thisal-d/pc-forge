@@ -19,15 +19,17 @@ class _SupportScreenState extends State<SupportScreen> {
   bool _isLoading = false;
   String _selectedStatus = 'ALL';
   String _searchQuery = '';
+  DateTime? _startDate;
+  DateTime? _endDate;
   int _displayedCount = 8;
   bool _isLoadingMore = false;
 
   final List<Map<String, String>> _statusFilters = [
     {'key': 'ALL', 'label': 'All Requests'},
     {'key': 'PENDING', 'label': 'Pending'},
-    {'key': 'UNDER_REVIEW', 'label': 'Under Review'},
-    {'key': 'SCHEDULED', 'label': 'Scheduled'},
-    {'key': 'RESOLVED', 'label': 'Resolved'},
+    {'key': 'IN PROGRESS', 'label': 'In Progress'},
+    {'key': 'COMPLETED', 'label': 'Completed'},
+    {'key': 'NO SHOW', 'label': 'No Show'},
     {'key': 'CANCELLED', 'label': 'Cancelled'},
   ];
 
@@ -78,34 +80,169 @@ class _SupportScreenState extends State<SupportScreen> {
     }
   }
 
+  Future<void> _pickDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+      initialDateRange: _startDate != null && _endDate != null
+          ? DateTimeRange(start: _startDate!, end: _endDate!)
+          : null,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primaryBlue,
+              onPrimary: Colors.white,
+              onSurface: AppColors.primaryDark,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+        _displayedCount = 8;
+      });
+    }
+  }
+
+  void _clearDateRange() {
+    setState(() {
+      _startDate = null;
+      _endDate = null;
+      _displayedCount = 8;
+    });
+  }
+
+  bool _isCancellable(String status) {
+    final s = status.toUpperCase().replaceAll('_', ' ');
+    return s != 'COMPLETED' && s != 'RESOLVED' && s != 'CANCELLED' && s != 'CANCELED' && s != 'NO SHOW';
+  }
+
+  Future<void> _confirmCancelRequest(ServiceRequestModel sr) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Service Request?'),
+        content: Text('Are you sure you want to cancel request ${sr.serviceRequestNumber}? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep Request'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.alertRed,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Yes, Cancel Request'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _supportService.cancelServiceRequest(sr.serviceRequestId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Service Request ${sr.serviceRequestNumber} has been cancelled.'),
+              backgroundColor: AppColors.alertRed,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to cancel request: $e'),
+              backgroundColor: AppColors.alertRed,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   List<ServiceRequestModel> _getFilteredRequests(List<ServiceRequestModel> requests) {
     return requests.where((sr) {
-      if (_selectedStatus != 'ALL' && sr.status.toUpperCase() != _selectedStatus) {
-        return false;
+      if (_selectedStatus != 'ALL') {
+        final norm = (String s) => s.toUpperCase().replaceAll('_', ' ');
+        final rStatus = norm(sr.status);
+        final fStatus = norm(_selectedStatus);
+
+        if (fStatus == 'IN PROGRESS') {
+          if (rStatus != 'IN PROGRESS' && rStatus != 'IN SERVICE' && rStatus != 'UNDER REVIEW' && rStatus != 'SCHEDULED') {
+            return false;
+          }
+        } else if (fStatus == 'COMPLETED') {
+          if (rStatus != 'COMPLETED' && rStatus != 'RESOLVED') return false;
+        } else if (fStatus == 'CANCELLED') {
+          if (rStatus != 'CANCELLED' && rStatus != 'CANCELED') return false;
+        } else if (fStatus == 'NO SHOW') {
+          if (rStatus != 'NO SHOW') return false;
+        } else if (rStatus != fStatus) {
+          return false;
+        }
       }
+
+      // Date Range Filter (Preferred date or CreatedAt)
+      if (_startDate != null) {
+        DateTime? rDate;
+        if (sr.preferredDate != null) {
+          rDate = DateTime.tryParse(sr.preferredDate!);
+        }
+        rDate ??= sr.createdAt;
+        final startDay = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+        if (rDate.isBefore(startDay)) return false;
+      }
+
+      if (_endDate != null) {
+        DateTime? rDate;
+        if (sr.preferredDate != null) {
+          rDate = DateTime.tryParse(sr.preferredDate!);
+        }
+        rDate ??= sr.createdAt;
+        final endDay = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59, 999);
+        if (rDate.isAfter(endDay)) return false;
+      }
+
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         final numMatch = sr.serviceRequestNumber.toLowerCase().contains(q);
+        final titleMatch = sr.title.toLowerCase().contains(q);
         final catMatch = sr.problemCategory.toLowerCase().contains(q);
         final descMatch = sr.problemDescription.toLowerCase().contains(q);
-        if (!numMatch && !catMatch && !descMatch) return false;
+        if (!numMatch && !titleMatch && !catMatch && !descMatch) return false;
       }
       return true;
     }).toList();
   }
 
   Color _getStatusColor(String status) {
-    switch (status.toUpperCase()) {
+    final s = status.toUpperCase().replaceAll('_', ' ');
+    switch (s) {
       case 'PENDING':
         return AppColors.warningAmber;
-      case 'UNDER_REVIEW':
-        return AppColors.primaryBlue;
+      case 'IN PROGRESS':
+      case 'IN SERVICE':
+      case 'UNDER REVIEW':
       case 'SCHEDULED':
+        return const Color(0xFF6366F1);
+      case 'COMPLETED':
       case 'RESOLVED':
         return AppColors.stockGreen;
-      case 'IN_SERVICE':
-        return const Color(0xFF8B5CF6);
+      case 'NO SHOW':
+        return const Color(0xFFF97316);
       case 'CANCELLED':
+      case 'CANCELED':
         return AppColors.alertRed;
       default:
         return AppColors.secondaryText;
@@ -113,16 +250,18 @@ class _SupportScreenState extends State<SupportScreen> {
   }
 
   int _getStatusStepIndex(String status) {
-    switch (status.toUpperCase()) {
+    final s = status.toUpperCase().replaceAll('_', ' ');
+    switch (s) {
       case 'PENDING':
         return 0;
-      case 'UNDER_REVIEW':
-        return 1;
+      case 'IN PROGRESS':
+      case 'IN SERVICE':
+      case 'UNDER REVIEW':
       case 'SCHEDULED':
-      case 'IN_SERVICE':
-        return 2;
+        return 1;
+      case 'COMPLETED':
       case 'RESOLVED':
-        return 3;
+        return 2;
       default:
         return 0;
     }
@@ -180,6 +319,34 @@ class _SupportScreenState extends State<SupportScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+
+              // Title & Description Banner
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      sr.title.isNotEmpty ? sr.title : sr.problemDescription,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.primaryDark),
+                    ),
+                    if (sr.description != null && sr.description!.isNotEmpty && sr.description != sr.title) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        sr.description!,
+                        style: const TextStyle(fontSize: 13, color: AppColors.secondaryText, height: 1.4),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 16),
 
               // Stepper Progress
@@ -407,6 +574,24 @@ class _SupportScreenState extends State<SupportScreen> {
                 ),
               ],
 
+              // Customer Cancel Request Button
+              if (_isCancellable(sr.status)) ...[
+                const SizedBox(height: 20),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _confirmCancelRequest(sr);
+                  },
+                  icon: const Icon(Icons.cancel_outlined, color: AppColors.alertRed),
+                  label: const Text('Cancel This Service Request', style: TextStyle(color: AppColors.alertRed, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.alertRed),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 20),
             ],
           ),
@@ -573,49 +758,91 @@ class _SupportScreenState extends State<SupportScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          TextField(
-                            controller: _searchController,
-                            style: const TextStyle(fontSize: 14),
-                            decoration: InputDecoration(
-                              hintText: 'Search request #, category, issue...',
-                              hintStyle: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
-                              prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.secondaryText),
-                              suffixIcon: _searchQuery.isNotEmpty
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear_rounded, size: 18),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        setState(() {
-                                          _searchQuery = '';
-                                          _displayedCount = 8;
-                                        });
-                                      },
-                                    )
-                                  : null,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              filled: true,
-                              fillColor: AppColors.background,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(color: AppColors.border),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  style: const TextStyle(fontSize: 14),
+                                  decoration: InputDecoration(
+                                    hintText: 'Search request #, title, category...',
+                                    hintStyle: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
+                                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.secondaryText),
+                                    suffixIcon: _searchQuery.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear_rounded, size: 18),
+                                            onPressed: () {
+                                              _searchController.clear();
+                                              setState(() {
+                                                _searchQuery = '';
+                                                _displayedCount = 8;
+                                              });
+                                            },
+                                          )
+                                        : null,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    filled: true,
+                                    fillColor: AppColors.background,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(color: AppColors.border),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(color: AppColors.border),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(color: AppColors.primaryBlue),
+                                    ),
+                                  ),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _searchQuery = val.trim();
+                                      _displayedCount = 8;
+                                    });
+                                  },
+                                ),
                               ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(color: AppColors.border),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                tooltip: 'Filter by Date Range',
+                                onPressed: _pickDateRange,
+                                icon: Icon(
+                                  Icons.date_range_rounded,
+                                  color: (_startDate != null || _endDate != null) ? AppColors.primaryBlue : AppColors.secondaryText,
+                                ),
                               ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(color: AppColors.primaryBlue),
+                            ],
+                          ),
+                          if (_startDate != null && _endDate != null) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryBlue.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.event_available_rounded, size: 14, color: AppColors.primaryBlue),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Date: ${_startDate!.year}-${_startDate!.month.toString().padLeft(2, '0')}-${_startDate!.day.toString().padLeft(2, '0')} to ${_endDate!.year}-${_endDate!.month.toString().padLeft(2, '0')}-${_endDate!.day.toString().padLeft(2, '0')}',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryBlue),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: _clearDateRange,
+                                    child: const Icon(Icons.close_rounded, size: 14, color: AppColors.primaryBlue),
+                                  ),
+                                ],
                               ),
                             ),
-                            onChanged: (val) {
-                              setState(() {
-                                _searchQuery = val.trim();
-                                _displayedCount = 8;
-                              });
-                            },
-                          ),
+                          ],
                           const SizedBox(height: 10),
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
@@ -695,6 +922,8 @@ class _SupportScreenState extends State<SupportScreen> {
                                             setState(() {
                                               _searchQuery = '';
                                               _selectedStatus = 'ALL';
+                                              _startDate = null;
+                                              _endDate = null;
                                               _displayedCount = 8;
                                             });
                                           },
@@ -750,12 +979,30 @@ class _SupportScreenState extends State<SupportScreen> {
                                             Row(
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
-                                                Text(
-                                                  sr.serviceRequestNumber,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w800,
-                                                    fontSize: 15,
-                                                    color: AppColors.primaryDark,
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        sr.serviceRequestNumber,
+                                                        style: const TextStyle(
+                                                          fontWeight: FontWeight.w800,
+                                                          fontSize: 13,
+                                                          color: AppColors.primaryBlue,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        sr.title.isNotEmpty ? sr.title : sr.problemDescription,
+                                                        style: const TextStyle(
+                                                          fontWeight: FontWeight.w700,
+                                                          fontSize: 15,
+                                                          color: AppColors.primaryDark,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
                                                 Container(
@@ -775,13 +1022,15 @@ class _SupportScreenState extends State<SupportScreen> {
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              sr.problemDescription,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(fontSize: 13, color: AppColors.primaryDark),
-                                            ),
+                                            if (sr.description != null && sr.description!.isNotEmpty && sr.description != sr.title) ...[
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                sr.description!,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontSize: 13, color: AppColors.secondaryText),
+                                              ),
+                                            ],
                                             const SizedBox(height: 10),
                                             Row(
                                               children: [
@@ -798,8 +1047,10 @@ class _SupportScreenState extends State<SupportScreen> {
                                                 ),
                                                 const SizedBox(width: 8),
                                                 if (sr.preferredDate != null) ...[
+                                                  const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.secondaryText),
+                                                  const SizedBox(width: 4),
                                                   Text(
-                                                    '📅 ${sr.preferredDate}',
+                                                    '${sr.preferredDate}',
                                                     style: const TextStyle(fontSize: 11, color: AppColors.secondaryText),
                                                   ),
                                                   const SizedBox(width: 8),
@@ -811,6 +1062,26 @@ class _SupportScreenState extends State<SupportScreen> {
                                                 ),
                                               ],
                                             ),
+                                            if (_isCancellable(sr.status)) ...[
+                                              const Divider(height: 16),
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.end,
+                                                children: [
+                                                  TextButton.icon(
+                                                    onPressed: () => _confirmCancelRequest(sr),
+                                                    icon: const Icon(Icons.cancel_outlined, size: 14, color: AppColors.alertRed),
+                                                    label: const Text(
+                                                      'Cancel Request',
+                                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.alertRed),
+                                                    ),
+                                                    style: TextButton.styleFrom(
+                                                      visualDensity: VisualDensity.compact,
+                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       ),

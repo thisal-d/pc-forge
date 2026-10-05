@@ -3,7 +3,7 @@ import 'service_request_model.dart';
 
 export 'service_request_model.dart';
 
-class AiRmaTicketModel {
+class AiRmaServiceRequestModel {
   final int ticketId;
   final String rmaNumber;
   final int? orderId;
@@ -17,7 +17,7 @@ class AiRmaTicketModel {
   final String? attachmentUrl;
   final String createdAt;
 
-  const AiRmaTicketModel({
+  const AiRmaServiceRequestModel({
     required this.ticketId,
     required this.rmaNumber,
     this.orderId,
@@ -32,8 +32,8 @@ class AiRmaTicketModel {
     this.createdAt = '',
   });
 
-  factory AiRmaTicketModel.fromJson(Map<String, dynamic> json) {
-    return AiRmaTicketModel(
+  factory AiRmaServiceRequestModel.fromJson(Map<String, dynamic> json) {
+    return AiRmaServiceRequestModel(
       ticketId: (json['ticket_id'] as num?)?.toInt() ??
           (json['ticketId'] as num?)?.toInt() ??
           (json['service_request_id'] as num?)?.toInt() ??
@@ -104,7 +104,7 @@ class AiAfterSalesChatResultModel {
   final bool serviceRequestRequired;
   final bool serviceRequestMode;
   final ServiceRequestModel? serviceRequest;
-  final AiRmaTicketModel? ticket;
+  final AiRmaServiceRequestModel? ticket;
   final List<String> agentTrace;
   final String? error;
 
@@ -151,11 +151,11 @@ class AiAfterSalesChatResultModel {
       srModel = ServiceRequestModel.fromJson(Map<String, dynamic>.from(json['serviceRequest'] as Map));
     }
 
-    AiRmaTicketModel? ticketModel;
+    AiRmaServiceRequestModel? ticketModel;
     if (json['ticket'] is Map) {
-      ticketModel = AiRmaTicketModel.fromJson(Map<String, dynamic>.from(json['ticket'] as Map));
+      ticketModel = AiRmaServiceRequestModel.fromJson(Map<String, dynamic>.from(json['ticket'] as Map));
     } else if (srModel != null) {
-      ticketModel = AiRmaTicketModel(
+      ticketModel = AiRmaServiceRequestModel(
         ticketId: srModel.serviceRequestId,
         rmaNumber: srModel.serviceRequestNumber,
         orderId: srModel.orderId,
@@ -186,3 +186,6 @@ class AiAfterSalesChatResultModel {
     );
   }
 }
+
+// Backward-compatibility alias
+typedef AiRmaTicketModel = AiRmaServiceRequestModel;

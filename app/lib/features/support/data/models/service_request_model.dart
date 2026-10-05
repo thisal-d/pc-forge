@@ -6,6 +6,8 @@ class ServiceRequestModel {
   final int? orderId;
   final int? productId;
   final String? productName;
+  final String title;
+  final String? description;
   final String problemDescription;
   final String problemCategory;
   final String? troubleshootingSummary;
@@ -30,6 +32,8 @@ class ServiceRequestModel {
     this.orderId,
     this.productId,
     this.productName,
+    this.title = '',
+    this.description,
     required this.problemDescription,
     this.problemCategory = 'General',
     this.troubleshootingSummary,
@@ -46,6 +50,60 @@ class ServiceRequestModel {
     this.attachmentUrl,
     required this.createdAt,
   });
+
+  ServiceRequestModel copyWith({
+    int? serviceRequestId,
+    String? serviceRequestNumber,
+    int? userId,
+    String? customerName,
+    int? orderId,
+    int? productId,
+    String? productName,
+    String? title,
+    String? description,
+    String? problemDescription,
+    String? problemCategory,
+    String? troubleshootingSummary,
+    int? attemptCount,
+    String? warrantyStatus,
+    DateTime? warrantyExpiryDate,
+    String? preferredDate,
+    String? preferredTime,
+    String? status,
+    String? priority,
+    String? assignedStaffName,
+    String? technicianNotes,
+    String? resolution,
+    String? attachmentUrl,
+    DateTime? createdAt,
+  }) {
+    return ServiceRequestModel(
+      serviceRequestId: serviceRequestId ?? this.serviceRequestId,
+      serviceRequestNumber: serviceRequestNumber ?? this.serviceRequestNumber,
+      userId: userId ?? this.userId,
+      customerName: customerName ?? this.customerName,
+      orderId: orderId ?? this.orderId,
+      productId: productId ?? this.productId,
+      productName: productName ?? this.productName,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      problemDescription: problemDescription ?? this.problemDescription,
+      problemCategory: problemCategory ?? this.problemCategory,
+      troubleshootingSummary: troubleshootingSummary ?? this.troubleshootingSummary,
+      attemptCount: attemptCount ?? this.attemptCount,
+      warrantyStatus: warrantyStatus ?? this.warrantyStatus,
+      warrantyExpiryDate: warrantyExpiryDate ?? this.warrantyExpiryDate,
+      preferredDate: preferredDate ?? this.preferredDate,
+      preferredTime: preferredTime ?? this.preferredTime,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      assignedStaffName: assignedStaffName ?? this.assignedStaffName,
+      technicianNotes: technicianNotes ?? this.technicianNotes,
+      resolution: resolution ?? this.resolution,
+      attachmentUrl: attachmentUrl ?? this.attachmentUrl,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 
   factory ServiceRequestModel.fromJson(Map<String, dynamic> json) {
     DateTime? expDate;
@@ -73,6 +131,19 @@ class ServiceRequestModel {
         json['rmaNumber']?.toString() ??
         'SR-${sId.toString().padLeft(6, '0')}';
 
+    final probDesc = json['problemDescription']?.toString() ??
+        json['problem_description']?.toString() ??
+        json['description']?.toString() ??
+        '';
+
+    final parsedTitle = json['title']?.toString() ??
+        json['subject']?.toString() ??
+        (probDesc.isNotEmpty ? probDesc : 'Service Request');
+
+    final parsedDesc = json['description']?.toString() ??
+        json['problemDescription']?.toString() ??
+        json['problem_description']?.toString();
+
     return ServiceRequestModel(
       serviceRequestId: sId,
       serviceRequestNumber: sNum,
@@ -81,10 +152,9 @@ class ServiceRequestModel {
       orderId: (json['orderId'] as num?)?.toInt() ?? (json['order_id'] as num?)?.toInt(),
       productId: (json['productId'] as num?)?.toInt() ?? (json['product_id'] as num?)?.toInt(),
       productName: json['productName']?.toString() ?? json['product_name']?.toString(),
-      problemDescription: json['problemDescription']?.toString() ??
-          json['problem_description']?.toString() ??
-          json['description']?.toString() ??
-          '',
+      title: parsedTitle,
+      description: parsedDesc,
+      problemDescription: probDesc.isNotEmpty ? probDesc : parsedTitle,
       problemCategory: json['problemCategory']?.toString() ??
           json['problem_category']?.toString() ??
           json['issueType']?.toString() ??
@@ -118,6 +188,8 @@ class ServiceRequestModel {
       'orderId': orderId,
       'productId': productId,
       'productName': productName,
+      'title': title,
+      'description': description,
       'problemDescription': problemDescription,
       'problemCategory': problemCategory,
       'troubleshootingSummary': troubleshootingSummary,

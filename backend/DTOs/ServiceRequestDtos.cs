@@ -4,11 +4,13 @@ namespace PCForge.Api.DTOs;
 
 public class CreateServiceRequestDto
 {
+    public string? Title { get; set; }
+    public string? Description { get; set; }
+
     public int? OrderId { get; set; }
     public int? ProductId { get; set; }
 
-    [Required]
-    public string ProblemDescription { get; set; } = string.Empty;
+    public string? ProblemDescription { get; set; }
 
     public string ProblemCategory { get; set; } = "General";
     public string? TroubleshootingSummary { get; set; }
@@ -28,6 +30,18 @@ public class UpdateServiceRequestDto
     public int? AssignedStaffId { get; set; }
     public string? TechnicianNotes { get; set; }
     public string? Resolution { get; set; }
+    public string? InternalNotes { get; set; }
+    public DateTime? PreferredDate { get; set; }
+    public string? PreferredTime { get; set; }
+}
+
+public class ServiceAvailabilityDto
+{
+    public string Date { get; set; } = string.Empty;
+    public int BookedCount { get; set; }
+    public int MaxCapacity { get; set; } = 10;
+    public int RemainingSlots { get; set; }
+    public bool IsAvailable { get; set; }
 }
 
 public class ServiceRequestDetailDto
@@ -42,6 +56,8 @@ public class ServiceRequestDetailDto
     public DateTime? OrderDate { get; set; }
     public int? ProductId { get; set; }
     public string? ProductName { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
     public string ProblemDescription { get; set; } = string.Empty;
     public string ProblemCategory { get; set; } = "General";
     public string? TroubleshootingSummary { get; set; }
@@ -50,12 +66,13 @@ public class ServiceRequestDetailDto
     public DateTime? WarrantyExpiryDate { get; set; }
     public DateTime? PreferredDate { get; set; }
     public string? PreferredTime { get; set; }
-    public string Status { get; set; } = "PENDING";
+    public string Status { get; set; } = "Pending";
     public string Priority { get; set; } = "Normal";
     public int? AssignedStaffId { get; set; }
     public string? AssignedStaffName { get; set; }
     public string? TechnicianNotes { get; set; }
     public string? Resolution { get; set; }
+    public string? InternalNotes { get; set; }
     public string? AttachmentUrl { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -71,19 +88,22 @@ public class ServiceRequestSummaryDto
     public int? OrderId { get; set; }
     public int? ProductId { get; set; }
     public string? ProductName { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
     public string ProblemDescription { get; set; } = string.Empty;
     public string ProblemCategory { get; set; } = "General";
     public string WarrantyStatus { get; set; } = "Active";
     public DateTime? WarrantyExpiryDate { get; set; }
     public DateTime? PreferredDate { get; set; }
     public string? PreferredTime { get; set; }
-    public string Status { get; set; } = "PENDING";
+    public string Status { get; set; } = "Pending";
     public string Priority { get; set; } = "Normal";
     public string? TroubleshootingSummary { get; set; }
     public int AttemptCount { get; set; }
     public string? AttachmentUrl { get; set; }
     public int? AssignedStaffId { get; set; }
     public string? AssignedStaffName { get; set; }
+    public string? InternalNotes { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

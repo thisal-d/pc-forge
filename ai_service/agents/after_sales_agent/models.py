@@ -20,6 +20,8 @@ class ServiceRequestDetails(BaseModel):
     order_number: Optional[str] = Field(default=None, description="Linked order code: PCF-10XXX")
     product_id: Optional[int] = Field(default=None, description="Target component product ID")
     product_name: Optional[str] = Field(default=None, description="Component name: e.g. NVIDIA RTX 4070 Ti")
+    title: Optional[str] = Field(default=None, description="Brief title/summary of the service request")
+    description: Optional[str] = Field(default=None, description="Detailed problem description (optional)")
     problem_description: str = Field(default="", description="Customer-reported symptom")
     problem_category: str = Field(default="General", description="Troubleshooting category")
     troubleshooting_summary: Optional[str] = Field(default=None, description="Steps attempted and AI assessment")

@@ -415,16 +415,49 @@ class ApiService {
   // ==================== AFTER-SALES SERVICE REQUESTS (MEMBER 05) ====================
 
   /// Fetch Service Requests for Current Customer
-  Future<List<Map<String, dynamic>>> fetchServiceRequests({String? token}) async {
-    final res = await get('/ServiceRequests', token: token);
+  Future<List<Map<String, dynamic>>> fetchServiceRequests({
+    String? status,
+    String? startDate,
+    String? endDate,
+    String? token,
+  }) async {
+    final queryParams = <String>[];
+    if (status != null && status.isNotEmpty && status.toUpperCase() != 'ALL') {
+      queryParams.add('status=${Uri.encodeComponent(status)}');
+    }
+    if (startDate != null && startDate.isNotEmpty) {
+      queryParams.add('startDate=${Uri.encodeComponent(startDate)}');
+    }
+    if (endDate != null && endDate.isNotEmpty) {
+      queryParams.add('endDate=${Uri.encodeComponent(endDate)}');
+    }
+
+    final endpoint = queryParams.isEmpty ? '/ServiceRequests' : '/ServiceRequests?${queryParams.join('&')}';
+    final res = await get(endpoint, token: token);
     if (res is List) {
       return res.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     }
     return [];
   }
 
+  /// Check Service Slot Availability for a Specific Date (Max 10 per day)
+  Future<Map<String, dynamic>> checkServiceAvailability(String date, {String? token}) async {
+    final res = await get('/ServiceRequests/availability?date=$date', token: token);
+    if (res is Map<String, dynamic>) return res;
+    return <String, dynamic>{};
+  }
+
+  /// Cancel a Service Request
+  Future<Map<String, dynamic>> cancelServiceRequest(int id, {String? token}) async {
+    final res = await post('/ServiceRequests/$id/cancel', {}, token: token);
+    if (res is Map<String, dynamic>) return res;
+    return <String, dynamic>{'message': 'Service request cancelled'};
+  }
+
   /// Create and Submit a new Service Request
   Future<Map<String, dynamic>> createServiceRequest({
+    String? title,
+    String? description,
     int? orderId,
     int? productId,
     required String problemDescription,
@@ -441,6 +474,8 @@ class ApiService {
     return await post(
       '/ServiceRequests',
       {
+        'title': (title != null && title.trim().isNotEmpty) ? title.trim() : (problemDescription.isNotEmpty ? problemDescription : 'Service Request'),
+        if (description != null) 'description': description,
         'orderId': orderId,
         'productId': productId,
         'problemDescription': problemDescription,

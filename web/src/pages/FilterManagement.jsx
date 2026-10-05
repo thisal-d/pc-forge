@@ -1155,7 +1155,7 @@ export const FilterManagement = () => {
 
               {deleteCandidate.assignedCategoriesCount > 0 ? (
                 <div style={{ padding: '0.85rem', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '8px', color: '#9f1239', fontSize: '0.825rem' }}>
-                  <strong>⚠️ Warning:</strong> This filter is currently assigned to {deleteCandidate.assignedCategoriesCount} category/categories:
+                  <strong>Warning:</strong> This filter is currently assigned to {deleteCandidate.assignedCategoriesCount} category/categories:
                   <div style={{ marginTop: '0.4rem', fontWeight: 600 }}>
                     {deleteCandidate.assignedCategoryNames.join(', ')}
                   </div>

@@ -93,7 +93,7 @@ def test_get_order_and_warranty_tools():
 
 
 def test_validate_service_appointment_tool():
-    """Validates service appointment validation rules (requires both date and time)."""
+    """Validates service appointment validation rules (requires both date and time, rejects past dates and outside hours)."""
     # 1. Both date and time provided
     val_both = validate_service_appointment.invoke({
         "preferred_date": "Tomorrow",
@@ -112,6 +112,35 @@ def test_validate_service_appointment_tool():
     d_date_only = json.loads(val_date_only)
     assert d_date_only["valid"] is False
     assert d_date_only["missing"] == "time"
+
+    # 3. Past date provided -> must return valid=False with error='past_date' and explain date has passed
+    val_past = validate_service_appointment.invoke({
+        "preferred_date": "2020-01-01",
+        "preferred_time": "10:00 AM"
+    })
+    d_past = json.loads(val_past)
+    assert d_past["valid"] is False
+    assert d_past["error"] == "past_date"
+    assert "already passed" in d_past["message"]
+
+    # 4. Outside operating hours (< 9 AM or > 6 PM) -> must return valid=False with error='outside_hours'
+    val_early = validate_service_appointment.invoke({
+        "preferred_date": "Tomorrow",
+        "preferred_time": "07:30 AM"
+    })
+    d_early = json.loads(val_early)
+    assert d_early["valid"] is False
+    assert d_early["error"] == "outside_hours"
+    assert "9:00 AM" in d_early["message"]
+
+    val_late = validate_service_appointment.invoke({
+        "preferred_date": "Tomorrow",
+        "preferred_time": "08:00 PM"
+    })
+    d_late = json.loads(val_late)
+    assert d_late["valid"] is False
+    assert d_late["error"] == "outside_hours"
+    assert "6:00 PM" in d_late["message"]
 
 
 def test_update_service_appointment_tool():
@@ -150,6 +179,58 @@ def test_create_service_request_tool():
     assert data["service_request_number"].startswith("SR-")
     assert data["status"] == "PENDING"
     assert data["attempt_count"] == 3
+    assert "title" in data
+    assert "description" in data
+
+
+def test_create_service_request_with_title_and_description():
+    """Validates that title and optional description are stored properly in service request."""
+    sr_raw = create_service_request.invoke({
+        "user_id": 1,
+        "title": "GPU Artifacting under load",
+        "description": "Green squares and lines appear on screen during 3D gaming.",
+        "problem_description": "Green squares and lines appear on screen during 3D gaming.",
+        "problem_category": "Display / GPU",
+        "preferred_date": "2026-10-12",
+        "preferred_time": "02:00 PM"
+    })
+    data = json.loads(sr_raw)
+    assert data["success"] is True
+    assert data["title"] == "GPU Artifacting under load"
+    assert data["description"] == "Green squares and lines appear on screen during 3D gaming."
+    assert data["status"] == "PENDING"
+
+
+def test_validate_and_create_service_request_max_capacity():
+    """Validates that a date with 10 existing appointments triggers capacity limit error."""
+    from ai_service.agents.after_sales_agent.tools import after_sales_context_var
+    target_date = "2026-10-26"  # Monday
+    # Populate context with 10 appointments on target_date
+    fake_srs = [
+        {"service_request_id": i, "service_request_number": f"SR-{i:06d}", "preferred_date": f"{target_date}T10:00:00Z", "status": "PENDING"}
+        for i in range(1, 11)
+    ]
+    after_sales_context_var.set({"service_requests": fake_srs})
+
+    # Validate appointment should reject due to capacity
+    val_res = json.loads(validate_service_appointment.invoke({
+        "preferred_date": target_date,
+        "preferred_time": "11:00 AM"
+    }))
+    assert val_res["valid"] is False
+    assert val_res["error"] == "capacity_exceeded"
+    assert "maximum capacity of 10" in val_res["message"]
+
+    # Create service request should also reject due to capacity
+    sr_res = json.loads(create_service_request.invoke({
+        "user_id": 1,
+        "problem_description": "Need thermal paste replacement",
+        "preferred_date": target_date,
+        "preferred_time": "11:00 AM"
+    }))
+    assert sr_res["success"] is False
+    assert sr_res["error"] == "capacity_exceeded"
+
 
 
 # ------------------------------------------------------------------------------
@@ -213,4 +294,19 @@ def test_api_after_sales_chat_switch_to_service_request_mode():
     reply_lower2 = d2["reply"].lower()
     # The agent should ask for the Order ID to verify purchase/warranty
     assert any(term in reply_lower2 for term in ["order", "warranty", "purchase", "order id"])
+
+
+def test_after_sales_chat_suggest_service_request_after_5_attempts():
+    """Verifies that after 5 unsuccessful troubleshooting attempts, the agent suggests creating a Service Request."""
+    req = AfterSalesChatRequest(
+        user_id=1,
+        message="I tried Step 5 and the PC still will not turn on.",
+        session_id="test_5_attempts_session",
+    )
+    res = run_after_sales_chat(req)
+    assert res.success is True
+    assert res.service_request_mode is True or res.service_request_required is True
+    reply_lower = res.reply.lower()
+    assert "service request" in reply_lower
+
 

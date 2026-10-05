@@ -377,6 +377,8 @@ public class AiAgentService : IAiAgentService
                     ServiceRequestNumber = sr.ServiceRequestNumber,
                     OrderId = sr.OrderId,
                     ProductId = sr.ProductId,
+                    Title = sr.Title,
+                    Description = sr.Description,
                     ProblemDescription = sr.ProblemDescription,
                     ProblemCategory = sr.ProblemCategory,
                     WarrantyStatus = sr.WarrantyStatus,
@@ -410,6 +412,169 @@ public class AiAgentService : IAiAgentService
 
             if (result == null)
             {
+                // Intelligent fallback when AI microservice is offline:
+                // Enables agentic intake of Service Requests directly via chat
+                var msg = (request.Message ?? "").Trim();
+                var lower = msg.ToLowerInvariant();
+
+                bool isSrIntent = lower.Contains("service request") || lower.Contains("book") || lower.Contains("appointment") || lower.Contains("repair");
+
+                if (isSrIntent)
+                {
+                    DateTime? extractedDate = null;
+                    var dateMatch = Regex.Match(msg, @"\b(\d{4}-\d{2}-\d{2})\b");
+                    if (dateMatch.Success && DateTime.TryParse(dateMatch.Groups[1].Value, out var dt))
+                    {
+                        extractedDate = DateTime.SpecifyKind(dt.Date, DateTimeKind.Utc);
+                    }
+                    else if (lower.Contains("tomorrow"))
+                    {
+                        extractedDate = DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(1), DateTimeKind.Utc);
+                        if (extractedDate.Value.DayOfWeek == DayOfWeek.Sunday) extractedDate = extractedDate.Value.AddDays(1);
+                    }
+
+                    string? extractedTime = null;
+                    var timeMatch = Regex.Match(msg, @"\b(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm))\b");
+                    if (timeMatch.Success)
+                    {
+                        extractedTime = timeMatch.Groups[1].Value.ToUpperInvariant();
+                    }
+
+                    int? extractedOrderId = request.OrderId;
+                    var orderMatch = Regex.Match(msg, @"(?:order\s*#?|pcf-10)\s*(\d+)", RegexOptions.IgnoreCase);
+                    if (orderMatch.Success && int.TryParse(orderMatch.Groups[1].Value, out var oid))
+                    {
+                        extractedOrderId = oid;
+                    }
+
+                    if (extractedDate.HasValue && !string.IsNullOrEmpty(extractedTime))
+                    {
+                        var valErrors = new List<string>();
+                        if (extractedDate.Value.Date < DateTime.UtcNow.Date)
+                            valErrors.Add("The selected date has already passed. Please select a future date (Monday to Saturday).");
+                        if (extractedDate.Value.DayOfWeek == DayOfWeek.Sunday)
+                            valErrors.Add("The service center is closed on Sundays. Please select Monday through Saturday.");
+
+                        var count = await db.ServiceRequests.CountAsync(sr =>
+                            sr.PreferredDate.HasValue &&
+                            sr.PreferredDate.Value.Date == extractedDate.Value.Date &&
+                            sr.Status.ToLower() != "cancelled" &&
+                            sr.Status.ToLower() != "canceled");
+                        if (count >= 10)
+                            valErrors.Add($"The selected date ({extractedDate.Value:yyyy-MM-dd}) already has 10 requests booked. Please choose another date.");
+
+                        var tMatch = Regex.Match(extractedTime, @"^(\d{1,2})(?::(\d{2}))?\s*([APap][Mm])$");
+                        if (tMatch.Success)
+                        {
+                            var h = int.Parse(tMatch.Groups[1].Value);
+                            var m = string.IsNullOrEmpty(tMatch.Groups[2].Value) ? 0 : int.Parse(tMatch.Groups[2].Value);
+                            var ampm = tMatch.Groups[3].Value.ToUpperInvariant();
+                            if (ampm == "PM" && h < 12) h += 12;
+                            if (ampm == "AM" && h == 12) h = 0;
+                            if (h < 9 || h > 18 || (h == 18 && m > 0))
+                                valErrors.Add("The service time must be between 9:00 AM and 6:00 PM. Please choose another time.");
+                        }
+
+                        if (valErrors.Count == 0)
+                        {
+                            var isExplicitCreation = lower.Contains("please create") || lower.Contains("confirm") || lower.Contains("submit") || lower.Contains("proceed") || lower.Contains("yes");
+
+                            var generatedTitle = !string.IsNullOrWhiteSpace(request.ProblemCategory) && request.ProblemCategory != "General"
+                                ? $"{request.ProblemCategory} Issue"
+                                : (msg.Length > 50 ? msg[..47] + "..." : msg);
+                            var generatedDescription = $"Customer symptom: {msg}. Troubleshooting steps attempted prior to service booking.";
+
+                            if (!isExplicitCreation)
+                            {
+                                return new AfterSalesChatResponseDto
+                                {
+                                    Success = true,
+                                    Reply = $"I have generated your Service Request details based on our conversation:\n\nTitle: {generatedTitle}\nDescription: {generatedDescription}\nPreferred Date: {extractedDate.Value:yyyy-MM-dd}\nPreferred Time: {extractedTime}\nOrder ID: {(extractedOrderId.HasValue ? $"PCF-10{extractedOrderId:03d}" : "N/A")}\n\nPlease review the title and description above. You can confirm to submit, or let me know if you would like to edit them.",
+                                    ServiceRequestMode = true,
+                                    ServiceRequestRequired = true,
+                                    ServiceRequest = new ServiceRequestInfoDto
+                                    {
+                                        OrderId = extractedOrderId,
+                                        Title = generatedTitle,
+                                        Description = generatedDescription,
+                                        ProblemDescription = generatedDescription,
+                                        ProblemCategory = request.ProblemCategory ?? "General",
+                                        PreferredDate = extractedDate.Value.ToString("yyyy-MM-dd"),
+                                        PreferredTime = extractedTime,
+                                        Status = "Draft",
+                                        Priority = "Normal"
+                                    }
+                                };
+                            }
+
+                            var maxId = await db.ServiceRequests.MaxAsync(sr => (int?)sr.ServiceRequestId) ?? 100;
+                            var srNumber = $"SR-{(maxId + 1):D6}";
+                            var newSr = new ServiceRequest
+                            {
+                                ServiceRequestNumber = srNumber,
+                                UserId = request.UserId > 0 ? request.UserId : 1,
+                                OrderId = extractedOrderId,
+                                Title = generatedTitle,
+                                Description = generatedDescription,
+                                ProblemDescription = generatedDescription,
+                                ProblemCategory = request.ProblemCategory ?? "General",
+                                PreferredDate = extractedDate,
+                                PreferredTime = extractedTime,
+                                Status = "Pending",
+                                Priority = "Normal",
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+                            db.ServiceRequests.Add(newSr);
+                            await db.SaveChangesAsync();
+
+                            return new AfterSalesChatResponseDto
+                            {
+                                Success = true,
+                                Reply = $"Your Service Request has been created successfully.\n\nService Request ID: {srNumber}\nTitle: {newSr.Title}\nOrder ID: {(newSr.OrderId.HasValue ? $"PCF-10{newSr.OrderId:03d}" : "N/A")}\nPreferred Date: {extractedDate.Value:yyyy-MM-dd}\nPreferred Time: {extractedTime}\nStatus: Pending\n\nPlease bring your PC or affected component to our service center for technician inspection.",
+                                ServiceRequestMode = true,
+                                ServiceRequestRequired = true,
+                                ServiceRequest = new ServiceRequestInfoDto
+                                {
+                                    Id = newSr.ServiceRequestId,
+                                    ServiceRequestId = newSr.ServiceRequestId,
+                                    ServiceRequestNumber = newSr.ServiceRequestNumber,
+                                    OrderId = newSr.OrderId,
+                                    Title = newSr.Title,
+                                    Description = newSr.Description,
+                                    ProblemDescription = newSr.ProblemDescription,
+                                    ProblemCategory = newSr.ProblemCategory,
+                                    PreferredDate = newSr.PreferredDate?.ToString("yyyy-MM-dd"),
+                                    PreferredTime = newSr.PreferredTime,
+                                    Status = newSr.Status,
+                                    Priority = newSr.Priority,
+                                    CreatedAt = newSr.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                                }
+                            };
+                        }
+                        else
+                        {
+                            return new AfterSalesChatResponseDto
+                            {
+                                Success = true,
+                                Reply = $"We could not schedule your service appointment: {string.Join(" ", valErrors)} Please provide a valid date (Monday - Saturday) and time between 9:00 AM and 6:00 PM.",
+                                ServiceRequestMode = true,
+                                ServiceRequestRequired = true
+                            };
+                        }
+                    }
+                    else
+                    {
+                        return new AfterSalesChatResponseDto
+                        {
+                            Success = true,
+                            Reply = "I can help you create a Service Request! Please specify your preferred appointment date (Monday - Saturday) and time between 09:00 AM and 06:00 PM. (Note: storewide capacity is max 10 appointments per day).",
+                            ServiceRequestMode = true,
+                            ServiceRequestRequired = true
+                        };
+                    }
+                }
+
                 return new AfterSalesChatResponseDto
                 {
                     Success = false,
@@ -449,6 +614,18 @@ public class AiAgentService : IAiAgentService
                                 validationErrors.Add("Service center is closed on Sundays. Please select Monday - Saturday.");
                             }
                             parsedPreferredDate = DateTime.SpecifyKind(dt.Date, DateTimeKind.Utc);
+
+                            // Storewide maximum capacity check: Max 10 appointments per date
+                            var dateCount = await db.ServiceRequests.CountAsync(sr =>
+                                sr.PreferredDate.HasValue &&
+                                sr.PreferredDate.Value.Date == parsedPreferredDate.Value.Date &&
+                                sr.Status.ToLower() != "cancelled" &&
+                                sr.Status.ToLower() != "canceled");
+
+                            if (dateCount >= 10)
+                            {
+                                validationErrors.Add($"The selected date ({parsedPreferredDate.Value:yyyy-MM-dd}) has reached its maximum capacity of 10 service appointments. Please select another date.");
+                            }
                         }
                         else
                         {
@@ -507,6 +684,14 @@ public class AiAgentService : IAiAgentService
                     {
                         _logger.LogWarning("Deterministic validation failed on AI Service Request: {Errors}", string.Join("; ", validationErrors));
                         result.AgentTrace.Add($"[ASP.NET Core Validation Warning] {string.Join("; ", validationErrors)}");
+                        var errorMsg = string.Join(" ", validationErrors);
+                        if (!result.Reply.Contains(errorMsg))
+                        {
+                            result.Reply += $"\n\n[Notice: We could not schedule this appointment: {errorMsg}]";
+                        }
+                        result.ServiceRequest = null;
+                        result.ServiceRequestRequired = true;
+                        result.ServiceRequestMode = true;
                     }
                     else
                     {
@@ -515,12 +700,24 @@ public class AiAgentService : IAiAgentService
                         var authoritativeSrNumber = $"SR-{(maxId + 1):D6}";
                         var provisionalSrNumber = srDto.ServiceRequestNumber;
 
+                        var resolvedTitle = !string.IsNullOrWhiteSpace(srDto.Title)
+                            ? srDto.Title.Trim()
+                            : (!string.IsNullOrWhiteSpace(srDto.ProblemDescription)
+                                ? srDto.ProblemDescription.Trim()
+                                : "Service Request");
+
+                        var resolvedDesc = !string.IsNullOrWhiteSpace(srDto.Description)
+                            ? srDto.Description.Trim()
+                            : srDto.ProblemDescription?.Trim();
+
                         var newServiceRequest = new ServiceRequest
                         {
                             ServiceRequestNumber = authoritativeSrNumber,
                             UserId = request.UserId > 0 ? request.UserId : 1,
                             OrderId = srDto.OrderId,
                             ProductId = srDto.ProductId,
+                            Title = resolvedTitle,
+                            Description = resolvedDesc,
                             ProblemDescription = srDto.ProblemDescription.Trim(),
                             ProblemCategory = string.IsNullOrWhiteSpace(srDto.ProblemCategory) ? "General" : srDto.ProblemCategory.Trim(),
                             TroubleshootingSummary = srDto.TroubleshootingSummary,
@@ -529,7 +726,7 @@ public class AiAgentService : IAiAgentService
                             WarrantyExpiryDate = verifiedExpiryDate,
                             PreferredDate = parsedPreferredDate,
                             PreferredTime = srDto.PreferredTime,
-                            Status = "PENDING",
+                            Status = "Pending",
                             Priority = !string.IsNullOrWhiteSpace(srDto.Priority) ? srDto.Priority : "Normal",
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
@@ -545,6 +742,9 @@ public class AiAgentService : IAiAgentService
                         srDto.Id = newServiceRequest.ServiceRequestId;
                         srDto.ServiceRequestId = newServiceRequest.ServiceRequestId;
                         srDto.ServiceRequestNumber = newServiceRequest.ServiceRequestNumber;
+                        srDto.Title = newServiceRequest.Title;
+                        srDto.Description = newServiceRequest.Description;
+                        srDto.Status = newServiceRequest.Status;
                         srDto.WarrantyStatus = newServiceRequest.WarrantyStatus;
                         srDto.WarrantyExpiryDate = newServiceRequest.WarrantyExpiryDate?.ToString("yyyy-MM-dd");
                         srDto.CreatedAt = newServiceRequest.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ");
@@ -553,6 +753,7 @@ public class AiAgentService : IAiAgentService
                         {
                             result.Ticket.TicketId = newServiceRequest.ServiceRequestId;
                             result.Ticket.RmaNumber = newServiceRequest.ServiceRequestNumber;
+                            result.Ticket.Status = "Pending";
                             result.Ticket.CreatedAt = newServiceRequest.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ");
                         }
 

@@ -2,12 +2,14 @@ import api from '../api/axiosInstance.js';
 
 export const serviceRequestService = {
   // Fetch live service requests from backend API (GET /api/ServiceRequests)
-  async fetchServiceRequests({ status, search, priority } = {}) {
+  async fetchServiceRequests({ status, search, priority, startDate, endDate } = {}) {
     try {
       const params = {};
       if (status && status !== 'all') params.status = status;
       if (search && search.trim()) params.search = search.trim();
       if (priority && priority !== 'all') params.priority = priority;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
 
       const response = await api.get('/ServiceRequests', { params });
       return Array.isArray(response.data) ? response.data : [];
@@ -28,32 +30,67 @@ export const serviceRequestService = {
     }
   },
 
+  // Check appointment availability for a date (GET /api/ServiceRequests/availability?date=YYYY-MM-DD)
+  async checkAvailability(date) {
+    try {
+      const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
+      const response = await api.get('/ServiceRequests/availability', { params: { date: dateStr } });
+      return response.data;
+    } catch (err) {
+      console.error('Failed to check availability:', err?.response?.data || err.message);
+      return { isAvailable: true, remainingSlots: 10, bookedCount: 0 };
+    }
+  },
+
+  // Cancel service request (POST /api/ServiceRequests/{id}/cancel)
+  async cancelServiceRequest(id) {
+    try {
+      const response = await api.post(`/ServiceRequests/${id}/cancel`);
+      return response.data;
+    } catch (err) {
+      const backendMessage =
+        err.response?.data?.message ||
+        err.response?.data?.title ||
+        err.message ||
+        'Failed to cancel service request.';
+      throw new Error(backendMessage);
+    }
+  },
+
   // Compute live KPI analytics
   getStats(requestsList = []) {
     if (!Array.isArray(requestsList)) {
-      return { total: 0, pending: 0, underReview: 0, scheduled: 0, inService: 0, resolved: 0, urgentOrHigh: 0 };
+      return { total: 0, pending: 0, inProgress: 0, completed: 0, noShow: 0, cancelled: 0, urgentOrHigh: 0 };
     }
 
+    const norm = (s) => (s || '').toUpperCase().replace(/_/g, ' ');
     const total = requestsList.length;
-    const pending = requestsList.filter((r) => r.status === 'PENDING').length;
-    const underReview = requestsList.filter((r) => r.status === 'UNDER_REVIEW').length;
-    const scheduled = requestsList.filter((r) => r.status === 'SCHEDULED').length;
-    const inService = requestsList.filter((r) => r.status === 'IN_SERVICE').length;
-    const resolved = requestsList.filter((r) => r.status === 'RESOLVED').length;
+    const pending = requestsList.filter((r) => norm(r.status) === 'PENDING').length;
+    const inProgress = requestsList.filter((r) => {
+      const s = norm(r.status);
+      return s === 'IN PROGRESS' || s === 'IN SERVICE' || s === 'UNDER REVIEW' || s === 'SCHEDULED';
+    }).length;
+    const completed = requestsList.filter((r) => {
+      const s = norm(r.status);
+      return s === 'COMPLETED' || s === 'RESOLVED';
+    }).length;
+    const noShow = requestsList.filter((r) => norm(r.status) === 'NO SHOW').length;
+    const cancelled = requestsList.filter((r) => norm(r.status) === 'CANCELLED' || norm(r.status) === 'CANCELED').length;
     const urgentOrHigh = requestsList.filter(
-      (r) => (r.priority === 'High' || r.priority === 'Urgent') && r.status !== 'RESOLVED' && r.status !== 'CANCELLED'
+      (r) => (r.priority === 'High' || r.priority === 'Urgent') && norm(r.status) !== 'COMPLETED' && norm(r.status) !== 'RESOLVED' && norm(r.status) !== 'CANCELLED'
     ).length;
 
-    return { total, pending, underReview, scheduled, inService, resolved, urgentOrHigh };
+    return { total, pending, inProgress, completed, noShow, cancelled, urgentOrHigh };
   },
 
-  // Update service request status, diagnosis, and resolution notes (PUT /api/ServiceRequests/{id})
-  async updateServiceRequestStatus(id, newStatus, technicianNotes = null, resolution = null) {
+  // Update service request status, diagnosis, internal notes, and resolution (PUT /api/ServiceRequests/{id})
+  async updateServiceRequestStatus(id, newStatus, technicianNotes = null, resolution = null, internalNotes = null) {
     try {
       const response = await api.put(`/ServiceRequests/${id}`, {
         status: newStatus,
-        technicianNotes: technicianNotes || undefined,
-        resolution: resolution || undefined,
+        technicianNotes: technicianNotes !== null ? technicianNotes : undefined,
+        resolution: resolution !== null ? resolution : undefined,
+        internalNotes: internalNotes !== null ? internalNotes : undefined,
       });
       return response.data;
     } catch (err) {

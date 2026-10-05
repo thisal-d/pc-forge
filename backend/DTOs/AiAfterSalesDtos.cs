@@ -82,6 +82,12 @@ public class ServiceRequestContextDto
     [JsonPropertyName("product_id")]
     public int? ProductId { get; set; }
 
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
     [JsonPropertyName("problem_description")]
     public string ProblemDescription { get; set; } = string.Empty;
 
@@ -121,6 +127,9 @@ public class AfterSalesChatRequestDto
     [JsonPropertyName("order_id")]
     public int? OrderId { get; set; }
 
+    [JsonPropertyName("problem_category")]
+    public string? ProblemCategory { get; set; }
+
     [JsonPropertyName("customer")]
     public CustomerContextDto? Customer { get; set; }
 
@@ -156,6 +165,12 @@ public class ServiceRequestInfoDto
 
     [JsonPropertyName("product_name")]
     public string? ProductName { get; set; }
+
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
 
     [JsonPropertyName("problem_description")]
     public string ProblemDescription { get; set; } = string.Empty;
