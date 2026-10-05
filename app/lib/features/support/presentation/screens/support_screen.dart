@@ -3,6 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/models/service_request_model.dart';
 import '../../data/support_service.dart';
 import 'ai_support_chat_screen.dart';
+import 'create_service_request_screen.dart';
 
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
@@ -701,12 +702,12 @@ class _SupportScreenState extends State<SupportScreen> {
         onPressed: () async {
           await Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const AiSupportChatScreen()),
+            MaterialPageRoute(builder: (_) => const CreateServiceRequestScreen()),
           );
           _loadRequests();
         },
-        icon: const Icon(Icons.auto_awesome_rounded),
-        label: const Text('New Service Request (AI)', style: TextStyle(fontWeight: FontWeight.bold)),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('New Service Request', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue))
@@ -719,7 +720,7 @@ class _SupportScreenState extends State<SupportScreen> {
                     color: AppColors.primaryBlue,
                     onRefresh: _loadRequests,
                     child: ListView(
-                      padding: const EdgeInsets.all(20),
+                       padding: const EdgeInsets.all(20),
                       children: [
                         _buildAiBanner(),
                         const SizedBox(height: 32),
@@ -737,9 +738,53 @@ class _SupportScreenState extends State<SupportScreen> {
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'Need help with a PC or hardware part? Chat with our AI After-Sales Assistant or submit a service request.',
+                          'Need help with a PC or hardware part? Submit a service request manually or get guided AI troubleshooting.',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 13, color: AppColors.secondaryText),
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const CreateServiceRequestScreen()),
+                                  );
+                                  _loadRequests();
+                                },
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: const Text('Submit Request'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryBlue,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const AiSupportChatScreen()),
+                                  );
+                                  _loadRequests();
+                                },
+                                icon: const Icon(Icons.auto_awesome, size: 18, color: AppColors.primaryBlue),
+                                label: const Text('AI Diagnose'),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  side: const BorderSide(color: AppColors.primaryBlue),
+                                  foregroundColor: AppColors.primaryBlue,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

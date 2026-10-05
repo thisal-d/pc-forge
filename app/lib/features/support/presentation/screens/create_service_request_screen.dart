@@ -78,12 +78,6 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
       }
     }
 
-    if (_titleController.text.isEmpty) {
-      _titleController.text = 'GPU is overheating';
-      _descriptionController.text =
-          'The GPU temperatures reach over 90°C during gaming sessions and cause sudden shutdowns.';
-    }
-
     _checkDateAvailability(_formattedSelectedDate);
   }
 
@@ -217,7 +211,7 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // AI Assistant Recommended Banner
+              // Optional AI Troubleshooting Banner
               Container(
                 padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 16),
@@ -235,12 +229,12 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Preferred: Chat with AI Agent',
+                            'Want step-by-step diagnostic guidance?',
                             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primaryBlue),
                           ),
                           const SizedBox(height: 2),
                           const Text(
-                            'Get instant warranty checks, real-time troubleshooting, and automated service request intake.',
+                            'Chat with our AI diagnostic assistant for real-time troubleshooting before booking.',
                             style: TextStyle(fontSize: 11.5, color: AppColors.secondaryText),
                           ),
                           const SizedBox(height: 6),
@@ -254,7 +248,7 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
                               );
                             },
                             child: const Text(
-                              'Switch to AI Chat Support \u2192',
+                              'Switch to AI Diagnostic Chat \u2192',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,

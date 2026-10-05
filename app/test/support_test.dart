@@ -275,5 +275,16 @@ void main() {
       expect(find.text('Issue Category'), findsOneWidget);
       expect(find.text('Title *'), findsOneWidget);
     });
+
+    testWidgets('SupportScreen renders New Service Request manual action button', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: SupportScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('New Service Request'), findsOneWidget);
+    });
   });
 }

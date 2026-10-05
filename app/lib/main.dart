@@ -16,6 +16,7 @@ import 'features/orders/presentation/screens/order_detail_screen.dart';
 import 'features/scanner/presentation/screens/scanner_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/support/presentation/screens/support_screen.dart';
+import 'features/support/presentation/screens/create_service_request_screen.dart';
 import 'features/support/presentation/screens/ai_support_chat_screen.dart';
 import 'features/build_pc/presentation/screens/build_pc_hub_screen.dart';
 import 'features/build_pc/presentation/screens/manual_builder_screen.dart';
@@ -52,8 +53,9 @@ class PCForgeApp extends StatelessWidget {
         AppRoutes.scanner: (context) => const ScannerScreen(),
         AppRoutes.profile: (context) => const ProfileScreen(),
         AppRoutes.support: (context) => const SupportScreen(),
-        AppRoutes.createServiceRequest: (context) => const AiSupportChatScreen(),
-        AppRoutes.createTicket: (context) => const AiSupportChatScreen(),
+        AppRoutes.createServiceRequest: (context) => const CreateServiceRequestScreen(),
+        AppRoutes.createTicket: (context) => const CreateServiceRequestScreen(),
+        AppRoutes.aiSupportChat: (context) => const AiSupportChatScreen(),
         AppRoutes.buildPc: (context) => const BuildPcHubScreen(),
         AppRoutes.manualBuilder: (context) => const ManualBuilderScreen(),
         AppRoutes.aiBuilder: (context) => const AiPcBuilderScreen(),

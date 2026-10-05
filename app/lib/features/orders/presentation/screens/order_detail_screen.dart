@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../data/models/order_model.dart';
 import '../../data/order_service.dart';
 import '../../../support/presentation/screens/ai_support_chat_screen.dart';
+import '../../../support/presentation/screens/create_service_request_screen.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final OrderModel? order;
@@ -405,6 +406,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
               ),
             ] else ...[
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CreateServiceRequestScreen(initialOrderId: displayOrder.orderId),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.assignment_outlined),
+                label: const Text('Submit Service Request'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -414,9 +433,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                   );
                 },
-                icon: const Icon(Icons.auto_awesome),
-                label: const Text('Claim Warranty / Service Request (AI)'),
+                icon: const Icon(Icons.auto_awesome, color: AppColors.primaryBlue),
+                label: const Text('Troubleshoot with AI Assistant'),
                 style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primaryBlue,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
