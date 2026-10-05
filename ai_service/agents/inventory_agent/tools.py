@@ -245,7 +245,7 @@ def reserve_stock(
         session_id: Active requirement gathering session ID.
         hold_minutes: Hold duration in minutes (standard is 15 minutes per project specifications).
     Returns:
-        JSON string confirming reservation_id, expires_at timestamp, and 'Reserved ✓' status.
+        JSON string confirming reservation_id, expires_at timestamp, and 'Reserved' status.
     """
     try:
         if isinstance(product_ids_json, list):

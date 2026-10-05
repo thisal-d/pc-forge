@@ -7,10 +7,13 @@ public class ServiceRequest
     public int UserId { get; set; }
     public int? OrderId { get; set; }
     public int? ProductId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
     public string ProblemDescription { get; set; } = string.Empty;
     public string ProblemCategory { get; set; } = "General";
     public string? TroubleshootingSummary { get; set; }
     public int AttemptCount { get; set; } = 0;
+    public string? InternalNotes { get; set; }
     public string WarrantyStatus { get; set; } = "Active";
     public DateTime? WarrantyExpiryDate { get; set; }
     public DateTime? PreferredDate { get; set; }

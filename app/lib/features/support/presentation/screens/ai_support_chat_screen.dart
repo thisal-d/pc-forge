@@ -396,10 +396,10 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
 
           // Service Request Confirmation Card
           if (msg.serviceRequest != null) ...[
-            _buildServiceRequestCard(msg.serviceRequest!),
+            _buildServiceRequestCard(msg, msg.serviceRequest!),
             const SizedBox(height: 16),
           ] else if (msg.ticket != null) ...[
-            _buildLegacyTicketCard(msg.ticket!),
+            _buildRmaServiceRequestCard(msg.ticket!),
             const SizedBox(height: 16),
           ],
         ],
@@ -407,7 +407,215 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
     }
   }
 
-  Widget _buildServiceRequestCard(ServiceRequestModel sr) {
+  Widget _buildServiceRequestCard(AiAfterSalesChatMessage msg, ServiceRequestModel sr) {
+    final isDraft = sr.status.toUpperCase() == 'DRAFT';
+    if (isDraft) {
+      return _buildDraftConfirmationCard(msg, sr);
+    }
+    return _buildConfirmedServiceRequestCard(msg, sr);
+  }
+
+  Widget _buildDraftConfirmationCard(AiAfterSalesChatMessage msg, ServiceRequestModel sr) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFC7D2FE), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF5B4DFF).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Review Service Request',
+                style: TextStyle(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFC7D2FE)),
+                ),
+                child: const Text(
+                  'Pending Confirmation',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF4338CA),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Generated from your troubleshooting conversation. Please review or edit before confirming:',
+            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 12),
+
+          // Generated Title & Description Container
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'TITLE',
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 0.5),
+                    ),
+                    InkWell(
+                      onTap: _isLoading ? null : () => _showEditDraftDialog(msg, sr),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.edit_outlined, size: 14, color: Color(0xFF5B4DFF)),
+                          SizedBox(width: 4),
+                          Text('Edit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF5B4DFF))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  sr.title,
+                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                ),
+                if (sr.description != null && sr.description!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Text(
+                    'DESCRIPTION',
+                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 0.5),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    sr.description!,
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.35),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          if (sr.preferredDate != null) ...[
+            _buildServiceRequestRow(
+              label: 'Preferred Appointment',
+              value: '${sr.preferredDate} at ${sr.preferredTime ?? "10:00 AM"}',
+              isBold: true,
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          if (sr.orderId != null) ...[
+            _buildServiceRequestRow(
+              label: 'Order Reference',
+              value: 'PCF-10${sr.orderId.toString().padLeft(3, '0')}',
+              isBold: true,
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          _buildServiceRequestRow(
+            label: 'Initial Status',
+            value: 'Pending',
+            isBold: true,
+            valueColor: const Color(0xFFB45309),
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : () => _showEditDraftDialog(msg, sr),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF5B4DFF),
+                      side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                    child: const Text('Edit Details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : () => _handleConfirmAndSubmitDraft(msg, sr),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5B4DFF),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                    child: const Text('Confirm & Create', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConfirmedServiceRequestCard(AiAfterSalesChatMessage msg, ServiceRequestModel sr) {
+    Color statusBg;
+    Color statusFg;
+    final st = sr.status.toUpperCase();
+    if (st == 'PENDING') {
+      statusBg = const Color(0xFFFEF3C7);
+      statusFg = const Color(0xFFB45309);
+    } else if (st == 'IN PROGRESS' || st == 'IN_PROGRESS') {
+      statusBg = const Color(0xFFDBEAFE);
+      statusFg = const Color(0xFF1D4ED8);
+    } else if (st == 'COMPLETED') {
+      statusBg = const Color(0xFFD1FAE5);
+      statusFg = const Color(0xFF065F46);
+    } else if (st == 'NO SHOW' || st == 'NO_SHOW') {
+      statusBg = const Color(0xFFF1F5F9);
+      statusFg = const Color(0xFF475569);
+    } else if (st == 'CANCELLED' || st == 'CANCELED') {
+      statusBg = const Color(0xFFFEE2E2);
+      statusFg = const Color(0xFF991B1B);
+    } else {
+      statusBg = const Color(0xFFFEF3C7);
+      statusFg = const Color(0xFFB45309);
+    }
+
+    final isPending = st == 'PENDING';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -441,30 +649,64 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
+                  color: statusBg,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   sr.status,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFFB45309),
+                    color: statusFg,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          _buildTicketRow(
+          if (sr.title.isNotEmpty) ...[
+            Text(
+              sr.title,
+              style: const TextStyle(
+                fontSize: 15.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            if (sr.description != null && sr.description!.isNotEmpty && sr.description != sr.title) ...[
+              const SizedBox(height: 4),
+              Text(
+                sr.description!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF64748B),
+                  height: 1.35,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            const SizedBox(height: 12),
+          ],
+
+          if (sr.orderId != null) ...[
+            _buildServiceRequestRow(
+              label: 'Order ID',
+              value: 'PCF-10${sr.orderId.toString().padLeft(3, '0')}',
+              isBold: true,
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          _buildServiceRequestRow(
             label: 'Product',
             value: sr.productName ?? 'PC Hardware Component',
             isBold: true,
           ),
           const SizedBox(height: 8),
 
-          _buildTicketRow(
+          _buildServiceRequestRow(
             label: 'Warranty',
             value: sr.warrantyStatus,
             valueColor: sr.warrantyStatus == 'Active' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
@@ -473,7 +715,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
           const SizedBox(height: 8),
 
           if (sr.preferredDate != null) ...[
-            _buildTicketRow(
+            _buildServiceRequestRow(
               label: 'Appointment',
               value: '${sr.preferredDate} (${sr.preferredTime ?? "10:00 AM"})',
               isBold: true,
@@ -488,25 +730,269 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
 
           const SizedBox(height: 16),
 
-          SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: OutlinedButton(
-              onPressed: () => _handleAttachPhoto(sr.serviceRequestNumber),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF5B4DFF),
-                side: const BorderSide(color: Color(0xFF5B4DFF), width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: OutlinedButton(
+                    onPressed: () => _handleAttachPhoto(sr.serviceRequestNumber),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF5B4DFF),
+                      side: const BorderSide(color: Color(0xFF5B4DFF), width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                    child: const Text('Attach Photo', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  ),
+                ),
               ),
-              child: const Text('Attach Photo Proof', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5B4DFF),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                    child: const Text('View Requests', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          if (isPending) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 40,
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _isLoading ? null : () => _handleCancelServiceRequest(msg, sr),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFEF4444),
+                  side: const BorderSide(color: Color(0xFFFCA5A5)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Cancel Request', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+              ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showEditDraftDialog(AiAfterSalesChatMessage msg, ServiceRequestModel sr) {
+    final titleCtrl = TextEditingController(text: sr.title);
+    final descCtrl = TextEditingController(text: sr.description ?? sr.problemDescription);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Edit Service Request', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Title', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF475569))),
+              const SizedBox(height: 6),
+              TextField(
+                controller: titleCtrl,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text('Description', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF475569))),
+              const SizedBox(height: 6),
+              TextField(
+                controller: descCtrl,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newTitle = titleCtrl.text.trim();
+              final newDesc = descCtrl.text.trim();
+              if (newTitle.isNotEmpty) {
+                final updated = sr.copyWith(
+                  title: newTitle,
+                  description: newDesc,
+                  problemDescription: newDesc.isNotEmpty ? newDesc : newTitle,
+                );
+                final idx = _messages.indexOf(msg);
+                if (idx != -1) {
+                  setState(() {
+                    _messages[idx] = AiAfterSalesChatMessage(
+                      text: msg.text,
+                      isUser: msg.isUser,
+                      serviceRequest: updated,
+                      ticket: msg.ticket,
+                      attemptCount: msg.attemptCount,
+                      problemCategory: msg.problemCategory,
+                      serviceRequestMode: msg.serviceRequestMode,
+                    );
+                  });
+                }
+              }
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF5B4DFF),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Save Changes'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLegacyTicketCard(AiRmaTicketModel ticket) {
+  Future<void> _handleConfirmAndSubmitDraft(AiAfterSalesChatMessage msg, ServiceRequestModel draft) async {
+    setState(() => _isLoading = true);
+    try {
+      final created = await SupportService.instance.createServiceRequest(
+        title: draft.title,
+        description: draft.description,
+        problemDescription: (draft.description != null && draft.description!.isNotEmpty)
+            ? draft.description!
+            : draft.title,
+        orderId: draft.orderId,
+        productName: draft.productName,
+        problemCategory: draft.problemCategory,
+        troubleshootingSummary: draft.title,
+        preferredDate: draft.preferredDate,
+        preferredTime: draft.preferredTime,
+        attemptCount: draft.attemptCount,
+      );
+
+      final idx = _messages.indexOf(msg);
+      if (idx != -1) {
+        setState(() {
+          _messages[idx] = AiAfterSalesChatMessage(
+            text: 'Your Service Request has been confirmed and submitted successfully! Status is Pending.',
+            isUser: false,
+            serviceRequest: created,
+            attemptCount: msg.attemptCount,
+            problemCategory: msg.problemCategory,
+            serviceRequestMode: true,
+          );
+        });
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF10B981),
+            content: Text('Service Request #${created.serviceRequestNumber} created with status Pending.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFEF4444),
+            content: Text('Failed to submit Service Request: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleCancelServiceRequest(AiAfterSalesChatMessage msg, ServiceRequestModel sr) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Service Request', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Text('Are you sure you want to cancel Service Request #${sr.serviceRequestNumber}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep Request'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Cancel Request'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final success = await SupportService.instance.cancelServiceRequest(sr.serviceRequestId);
+      if (success) {
+        final updated = sr.copyWith(status: 'CANCELLED');
+        final idx = _messages.indexOf(msg);
+        if (idx != -1) {
+          setState(() {
+            _messages[idx] = AiAfterSalesChatMessage(
+              text: 'Service Request #${sr.serviceRequestNumber} has been cancelled.',
+              isUser: false,
+              serviceRequest: updated,
+              attemptCount: msg.attemptCount,
+              problemCategory: msg.problemCategory,
+              serviceRequestMode: msg.serviceRequestMode,
+            );
+          });
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF10B981),
+              content: Text('Service Request #${sr.serviceRequestNumber} cancelled.'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFEF4444),
+            content: Text('Failed to cancel request: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Widget _buildRmaServiceRequestCard(AiRmaServiceRequestModel rmaSr) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -519,19 +1005,19 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Service Request #${ticket.rmaNumber}',
+            'Service Request #${rmaSr.rmaNumber}',
             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 12),
-          _buildTicketRow(label: 'Component', value: ticket.componentName, isBold: true),
+          _buildServiceRequestRow(label: 'Component', value: rmaSr.componentName, isBold: true),
           const SizedBox(height: 8),
-          _buildTicketRow(label: 'Issue Category', value: ticket.issueType, isBold: true),
+          _buildServiceRequestRow(label: 'Issue Category', value: rmaSr.issueType, isBold: true),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             height: 44,
             child: OutlinedButton(
-              onPressed: () => _handleAttachPhoto(ticket.rmaNumber),
+              onPressed: () => _handleAttachPhoto(rmaSr.rmaNumber),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF5B4DFF),
                 side: const BorderSide(color: Color(0xFF5B4DFF), width: 1.5),
@@ -545,7 +1031,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
     );
   }
 
-  Widget _buildTicketRow({
+  Widget _buildServiceRequestRow({
     required String label,
     required String value,
     bool isBold = false,

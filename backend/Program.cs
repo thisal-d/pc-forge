@@ -199,6 +199,14 @@ if (!app.Environment.IsEnvironment("Testing"))
                 JOIN filters f ON LOWER(f.filterkey) = LOWER(cf.filterkey)
                 ON CONFLICT (filterid, optionvalue) DO NOTHING;
 
+                -- Ensure servicerequests columns for Title, Description, and InternalNotes exist
+                ALTER TABLE servicerequests ADD COLUMN IF NOT EXISTS title VARCHAR(200);
+                ALTER TABLE servicerequests ADD COLUMN IF NOT EXISTS description TEXT;
+                ALTER TABLE servicerequests ADD COLUMN IF NOT EXISTS internalnotes TEXT;
+                UPDATE servicerequests 
+                SET title = COALESCE(troubleshootingsummary, SUBSTRING(problemdescription, 1, 100), 'Service Request') 
+                WHERE title IS NULL OR title = '';
+
                 -- Synchronize primary key sequences with MAX(id) to prevent duplicate key constraint violations
                 DO $$
                 BEGIN

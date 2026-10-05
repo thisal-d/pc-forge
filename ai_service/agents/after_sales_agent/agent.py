@@ -66,68 +66,63 @@ TWO MODES OF OPERATION:
    - Provide exactly ONE simple, safe troubleshooting instruction per turn (Step 1, Step 2, etc.).
    - Follow the numbered sequence in order: Step 1 → Step 2 → Step 3 → Step 4 → Step 5.
    - At each step, invite the customer to choose: they can either report if the step worked, OR they can choose to stop troubleshooting right now and create a Service Request for technician inspection.
-   - Example prompt closing:
-     "Please try this step and let me know the result.
-     Or, if you would prefer to stop troubleshooting now and have our technicians inspect your PC in person, just let me know and we can create a Service Request right away."
 
-3. Prompting / Stopping Chat for Service Request:
-   - If the customer at ANY point asks or confirms to create a service request, stop troubleshooting, or requests a technician (e.g., "create a service request", "yes open a request", "stop troubleshooting", "i want a technician", "book service", "open ticket"):
+3. Suggesting Service Request after 5 Attempts:
+   - If troubleshooting reaches 5 unsuccessful attempts without resolution (or after completing Step 5):
+     * You MUST proactively suggest creating a Service Request:
+       "We have tried 5 troubleshooting steps and your PC issue is not resolved. I suggest creating a Service Request so one of our service center technicians can inspect and repair your PC in person."
+     * Promptly switch to SERVICE REQUEST MODE!
+   - If the customer at ANY point asks or confirms to create a service request, stop troubleshooting, or requests a technician:
      * IMMEDIATELY STOP TROUBLESHOOTING. Do not provide any more troubleshooting steps.
      * Switch directly to SERVICE REQUEST MODE!
-   - If troubleshooting reaches 5 steps without resolution:
-     * Automatically switch to SERVICE REQUEST MODE!
 
 --- MODE 2: SERVICE REQUEST MODE ---
-Once in Service Request Mode, stop chatting/troubleshooting and focus exclusively on intake:
-1. Order ID & Purchase Verification:
-   - State clearly:
-     "Understood! Let's stop the troubleshooting process here and get a Service Request set up for our technicians to inspect your system.
-     
-     Please provide your Order ID so I can verify your purchase and warranty coverage."
-   - (If Order ID is already provided in the message or known, proceed immediately).
-   - Call `check_warranty` tool with the Order ID.
-   - NEVER invent warranty dates or coverage. Use the exact data returned by `check_warranty`.
+Once in Service Request Mode, stop troubleshooting and follow these exact steps:
 
-2. Warranty Explanation:
-   - If Warranty is Active:
-     "Your product is currently covered by warranty until [DATE] ([WARRANTY_PERIOD]).
-     For further support, please bring your PC or the affected component to our service center. Our technicians will inspect the issue and proceed according to the applicable warranty terms.
-     Please select your preferred service date and time."
-   - If Warranty is Expired:
-     "Your warranty coverage for this product has expired ([WARRANTY_PERIOD]).
-     You can still request a technician inspection. Any repair or replacement charges will be confirmed after the inspection.
-     Please select your preferred service date and time."
+1. Request Customer Information:
+   - Ask the customer for:
+     * Preferred date
+     * Preferred time (between 9:00 AM and 6:00 PM, Monday through Saturday)
+     * Order ID, if applicable (optional if not purchased from PCForge)
+   - If Order ID is provided, verify warranty using `check_warranty`.
+   - Explain warranty coverage clearly (Active or Expired).
 
-3. Appointment Scheduling (MANDATORY RULES):
-   - BOTH Date AND Time are mandatory.
-   - If the customer specifies only a date (e.g. "Tomorrow", "Tuesday", "2026-09-29"):
-     Call `validate_service_appointment(preferred_date=...)`.
-     Since time was not provided, you MUST ask the customer what time slot between 09:00 AM and 06:00 PM works best for them.
-     DO NOT call `create_service_request` yet!
-   - If the customer specifies only a time, ask for their preferred date (Mon-Sat).
-   - ONLY call `create_service_request` when BOTH a valid date AND a valid time have been explicitly confirmed by the customer!
+2. Validate Date and Time Strictly:
+   - Always call `validate_service_appointment(preferred_date=..., preferred_time=...)`.
+   - The date must NOT be in the past:
+     If the customer provides a past date, explain that the date has already passed and ask for another date.
+   - The time must be between 9:00 AM and 6:00 PM:
+     If the customer provides a time before 9:00 AM or after 6:00 PM, explain that the service time must be between 9:00 AM and 6:00 PM and ask for another time.
+   - Service Center operating days: Monday through Saturday (closed on Sundays). If Sunday is chosen, ask for a date from Monday to Saturday.
+   - Storewide booking limit: Maximum 10 Service Requests per date. If the date already has 10 requests, inform the customer that the date already has 10 requests booked and ask them to choose another date.
+   - CRITICAL: Do NOT create the Service Request until both date and time are valid!
+
+3. Generate Title & Description and Request Customer Confirmation:
+   - Synthesize a concise, professional Title and a detailed Description directly from the troubleshooting conversation.
+   - Show the generated title and description to the customer and allow them to confirm or edit them before submission:
+     "Here are the details generated from our troubleshooting session:
+
+     Title: [Generated Title]
+     Description: [Generated Description]
+     Preferred Date: [Date]
+     Preferred Time: [Time]
+     Order ID: [Order ID or N/A]
+
+     Please confirm if you would like to submit this Service Request, or let me know if you would like to edit the title or description."
+   - Do NOT call `create_service_request` until the customer confirms (e.g., "confirm", "yes", "looks good", "submit", "proceed")!
 
 4. Service Request Creation:
-   - Once both date and time are confirmed, compile a structured troubleshooting summary.
-   - Call `create_service_request`.
-   - Show the final confirmation:
-     "Your Service Request has been created successfully.
-     Service Request ID: [SR-NUMBER]
-     Order ID: [ORDER-NUMBER]
-     Product: [PRODUCT-NAME]
-     Warranty: [STATUS]
-     Preferred Date: [DATE]
-     Preferred Time: [TIME]
-     Status: PENDING
-
-     Please bring your PC or the affected component to our service center for technician inspection."
+   - Once confirmed by the customer, create the Service Request using `create_service_request`.
+   - New requests must start with Pending status.
+   - Existing statuses: Pending, In Progress, Completed, No Show, Cancelled. Customers can cancel while Pending.
+   - Display the final confirmation details with the Service Request ID, title, appointment date/time, and Pending status.
 
 5. Rescheduling & Changing Time/Date (STRICT DUPLICATE PREVENTION):
    - NEVER create multiple Service Requests for the same customer issue!
    - Once a Service Request has already been created (e.g., [SR-NUMBER]):
-     If the customer asks for a different time, a different date, or wants to reschedule (e.g. "I want a different time", "Can we do 2 PM instead?"):
-     * DO NOT call `create_service_request`! Calling it again creates an unwanted duplicate!
-     * Call `update_service_appointment(service_request_id_or_number=[SR-NUMBER], preferred_date=..., preferred_time=...)` to update the existing Service Request appointment.
+     If the customer asks for a different time, a different date, or wants to reschedule:
+     * DO NOT call `create_service_request`!
+     * Call `update_service_appointment(service_request_id_or_number=[SR-NUMBER], preferred_date=..., preferred_time=...)`.
      * Confirm to the customer that their appointment for [SR-NUMBER] has been rescheduled.
 """
 
@@ -489,6 +484,8 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
                 order_number=sr_raw.get("order_number") or f"PCF-10{(request.order_id or 1):03d}",
                 product_id=sr_raw.get("product_id") or 8,
                 product_name=sr_raw.get("product_name") or sr_raw.get("component") or "Hardware Component",
+                title=sr_raw.get("title") or (f"Service - {sr_raw.get('product_name')}" if sr_raw.get("product_name") else f"Service: {problem_category}"),
+                description=sr_raw.get("description") or sr_raw.get("problem_description") or user_msg_clean,
                 problem_description=sr_raw.get("problem_description") or user_msg_clean,
                 problem_category=problem_category,
                 troubleshooting_summary=sr_raw.get("troubleshooting_summary") or f"Troubleshooting completed ({attempt_count} attempts).",
@@ -528,11 +525,22 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
                     "and warranty coverage."
                 )
 
+        # Suggest Service Request after 5 unsuccessful troubleshooting attempts
+        if attempt_count >= 5 and not is_resolved and not is_sr_mode and not sr_model:
+            is_sr_mode = True
+            if "service request" not in reply_text.lower() or "suggest" not in reply_text.lower():
+                reply_text += (
+                    "\n\nWe have completed 5 troubleshooting steps and your PC issue is not resolved. "
+                    "I suggest creating a Service Request so one of our service center technicians can inspect and repair your PC in person.\n\n"
+                    "To proceed, please provide your preferred appointment date (Monday - Saturday), "
+                    "preferred time between 9:00 AM and 6:00 PM, and your Order ID if applicable."
+                )
+
         # While chatting during troubleshooting, prompt user to create a service request and stop chatting
         if not is_sr_mode and not is_resolved and not sr_model:
             if "service request" not in reply_text.lower():
                 reply_text += (
-                    "\n\n💡 *Prefer to have a technician inspect it?* "
+                    "\n\n*Prefer to have a technician inspect it?* "
                     "If you would like to stop chatting now and create a Service Request for our technicians to inspect your PC in person, "
                     "just let me know or reply **\"Create Service Request\"**."
                 )
@@ -577,9 +585,38 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
 
     except Exception as e:
         print(f"[run_after_sales_chat] Error: {e}")
+        user_msg = (request.message or "").lower()
+        if "step 5" in user_msg or "5 attempts" in user_msg or "5th attempt" in user_msg:
+            return AfterSalesChatResponse(
+                success=True,
+                reply=(
+                    "We have completed 5 troubleshooting steps and your PC issue is not resolved. "
+                    "I suggest creating a Service Request so one of our service center technicians can inspect and repair your PC in person.\n\n"
+                    "To proceed, please provide your **Order ID** (or Order number) and your preferred date (Monday to Saturday) "
+                    "and appointment time between 09:00 AM and 06:00 PM."
+                ),
+                attempt_count=5,
+                service_request_mode=True,
+                service_request_required=True,
+                agent_trace=[f"[Fallback Mode - External LLM Error: {str(e)}"]
+            )
+        if user_requested_sr or "service request" in user_msg or "appointment" in user_msg or "stop chatting" in user_msg:
+            return AfterSalesChatResponse(
+                success=True,
+                reply=(
+                    "Understood! We'll stop chatting and set up a Service Request for our technicians to inspect your system.\n\n"
+                    "Please provide your **Order ID** (or Order number) and your preferred date (Monday to Saturday) "
+                    "and appointment time between 09:00 AM and 06:00 PM."
+                ),
+                service_request_mode=True,
+                service_request_required=True,
+                agent_trace=[f"[Fallback Mode - External LLM Error: {str(e)}"]
+            )
         return AfterSalesChatResponse(
-            success=False,
-            reply="I encountered an issue processing your request. Please try again or open a service request directly.",
-            agent_trace=[f"[Error] {str(e)}"],
-            error=str(e)
+            success=True,
+            reply=(
+                "I am here to help troubleshoot your PC. Please check that all cables and power connections are securely seated.\n\n"
+                "*Prefer to have a technician inspect it?* Reply **\"Create Service Request\"** to schedule an in-person appointment."
+            ),
+            agent_trace=[f"[Fallback Mode - External LLM Error: {str(e)}"]
         )

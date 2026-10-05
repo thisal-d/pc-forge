@@ -526,7 +526,7 @@ class ProfileScreen extends StatelessWidget {
 
                 const SizedBox(height: 24),
 
-                // 5. SUPPORT & WARRANTY
+                // 5. SUPPORT & SERVICE
                 _buildSectionHeader(title: 'SUPPORT & SERVICE'),
                 const SizedBox(height: 8),
                 _buildCardGroup([
@@ -536,6 +536,13 @@ class ProfileScreen extends StatelessWidget {
                     title: 'Support & Warranty (RMA)',
                     subtitle: 'Report hardware faults, thermals & claim warranty',
                     onTap: () => Navigator.pushNamed(context, AppRoutes.support),
+                  ),
+                  _MenuRowItem(
+                    icon: Icons.post_add_rounded,
+                    iconBgColor: const Color(0xFF0284C7),
+                    title: 'Submit Service Request',
+                    subtitle: 'Book repair or hardware diagnostic appointment manually',
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.createServiceRequest),
                   ),
                   _MenuRowItem(
                     icon: Icons.verified_user_rounded,

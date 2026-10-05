@@ -3,6 +3,7 @@ import { orderService, ORDER_STATUSES } from '../services/orderService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Pagination } from '../components/common/Pagination.jsx';
 import { TableSkeleton } from '../components/common/TableSkeleton.jsx';
+import { CheckIcon } from '../components/icons/index.js';
 import '../styles/pages/orders.css';
 
 export const OrderManagement = () => {
@@ -639,7 +640,7 @@ export const OrderManagement = () => {
                               }`}
                             >
                               <div className="stepper-circle">
-                                {isCompleted ? '✓' : idx + 1}
+                                {isCompleted ? <CheckIcon size={12} /> : idx + 1}
                               </div>
                               <span className="stepper-label">{stepName}</span>
                             </div>

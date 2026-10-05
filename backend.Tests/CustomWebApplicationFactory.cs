@@ -1,4 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Hosting;
@@ -129,7 +129,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
 public class MockAiAgentService : PCForge.Api.Services.IAiAgentService
 {
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly Dictionary<string, RequirementChatResponseDto> _sessions = new();
+
+    public MockAiAgentService(IServiceScopeFactory scopeFactory)
+    {
+        _scopeFactory = scopeFactory;
+    }
 
     public Task<RequirementChatResponseDto> SendRequirementChatMessageAsync(string sessionId, string message)
     {
@@ -158,7 +164,113 @@ public class MockAiAgentService : PCForge.Api.Services.IAiAgentService
     public Task<BuildGenerationResponseDto>  GenerateBuildAsync(BuildGenerationRequestDto request)     => Task.FromResult(new BuildGenerationResponseDto { Success = true });
     public Task<StockVerificationResponseDto> VerifyBuildStockAsync(StockVerificationRequestDto request) => Task.FromResult(new StockVerificationResponseDto { AllInStock = true });
     public Task<OrderProposalResponseDto>    CreateOrderProposalAsync(OrderPlanningRequestDto request)  => Task.FromResult(new OrderProposalResponseDto { Success = true, Proposal = new OrderProposalDto { Status = "WAITING_FOR_APPROVAL" } });
-    public Task<AfterSalesChatResponseDto>   SendAfterSalesChatMessageAsync(AfterSalesChatRequestDto r) => Task.FromResult(new AfterSalesChatResponseDto { Success = true, Reply = "How can I help with your order?" });
+
+    public async Task<AfterSalesChatResponseDto> SendAfterSalesChatMessageAsync(AfterSalesChatRequestDto r)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var msg = (r.Message ?? "").Trim();
+        var lower = msg.ToLowerInvariant();
+
+        if (lower.Contains("service request") || lower.Contains("book") || lower.Contains("appointment"))
+        {
+            DateTime? extractedDate = null;
+            var dateMatch = System.Text.RegularExpressions.Regex.Match(msg, @"\b(\d{4}-\d{2}-\d{2})\b");
+            if (dateMatch.Success && DateTime.TryParse(dateMatch.Groups[1].Value, out var dt))
+            {
+                extractedDate = DateTime.SpecifyKind(dt.Date, DateTimeKind.Utc);
+            }
+
+            string? extractedTime = null;
+            var timeMatch = System.Text.RegularExpressions.Regex.Match(msg, @"\b(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm))\b");
+            if (timeMatch.Success)
+            {
+                extractedTime = timeMatch.Groups[1].Value.ToUpperInvariant();
+            }
+
+            if (extractedDate.HasValue && !string.IsNullOrEmpty(extractedTime))
+            {
+                var valErrors = new List<string>();
+                if (extractedDate.Value.Date < DateTime.UtcNow.Date)
+                    valErrors.Add("Appointment date cannot be in the past.");
+                if (extractedDate.Value.DayOfWeek == DayOfWeek.Sunday)
+                    valErrors.Add("Service center is closed on Sundays. Please select Monday - Saturday.");
+
+                var count = await db.ServiceRequests.CountAsync(sr =>
+                    sr.PreferredDate.HasValue &&
+                    sr.PreferredDate.Value.Date == extractedDate.Value.Date &&
+                    sr.Status.ToLower() != "cancelled" &&
+                    sr.Status.ToLower() != "canceled");
+                if (count >= 10)
+                    valErrors.Add($"The selected date ({extractedDate.Value:yyyy-MM-dd}) has reached its maximum capacity of 10 service appointments. Please select another date.");
+
+                if (valErrors.Count == 0)
+                {
+                    var maxId = await db.ServiceRequests.MaxAsync(sr => (int?)sr.ServiceRequestId) ?? 100;
+                    var srNumber = $"SR-{(maxId + 1):D6}";
+                    var title = msg.Length > 60 ? msg[..57] + "..." : msg;
+                    var newSr = new ServiceRequest
+                    {
+                        ServiceRequestNumber = srNumber,
+                        UserId = r.UserId > 0 ? r.UserId : 1,
+                        OrderId = r.OrderId,
+                        Title = title,
+                        Description = msg,
+                        ProblemDescription = msg,
+                        ProblemCategory = "General",
+                        PreferredDate = extractedDate,
+                        PreferredTime = extractedTime,
+                        Status = "Pending",
+                        Priority = "Normal",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    db.ServiceRequests.Add(newSr);
+                    await db.SaveChangesAsync();
+
+                    return new AfterSalesChatResponseDto
+                    {
+                        Success = true,
+                        Reply = $"Your Service Request has been created successfully.\n\nService Request ID: {srNumber}\nTitle: {newSr.Title}\nStatus: Pending",
+                        ServiceRequestMode = true,
+                        ServiceRequestRequired = true,
+                        ServiceRequest = new ServiceRequestInfoDto
+                        {
+                            Id = newSr.ServiceRequestId,
+                            ServiceRequestId = newSr.ServiceRequestId,
+                            ServiceRequestNumber = newSr.ServiceRequestNumber,
+                            OrderId = newSr.OrderId,
+                            Title = newSr.Title,
+                            Description = newSr.Description,
+                            ProblemDescription = newSr.ProblemDescription,
+                            PreferredDate = newSr.PreferredDate?.ToString("yyyy-MM-dd"),
+                            PreferredTime = newSr.PreferredTime,
+                            Status = newSr.Status,
+                            Priority = newSr.Priority,
+                            CreatedAt = newSr.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                        }
+                    };
+                }
+                else
+                {
+                    return new AfterSalesChatResponseDto
+                    {
+                        Success = true,
+                        Reply = $"We could not schedule your service appointment: {string.Join(" ", valErrors)} Please select another time between 9:00 AM and 6:00 PM.",
+                        ServiceRequestMode = true,
+                        ServiceRequestRequired = true
+                    };
+                }
+            }
+        }
+
+        return new AfterSalesChatResponseDto
+        {
+            Success = true,
+            Reply = "How can I help with your order?"
+        };
+    }
 }
 
 public class MockEmailService : IEmailService

@@ -39,6 +39,7 @@ ci-log
 
 # IDE / OS
 .idea/
+.vscode/
 *.swp
 *.swo
 .DS_Store
