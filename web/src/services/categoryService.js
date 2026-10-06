@@ -222,7 +222,15 @@ export const categoryService = {
           displayOrder: f.displayOrder || index + 1,
           isFilterable: f.isFilterable !== false,
           optionsCount: Array.isArray(f.options) ? f.options.length : 0,
-          options: Array.isArray(f.options) ? f.options : [],
+          options: Array.isArray(f.options)
+            ? f.options.map((o, optIdx) => ({
+                optionId: o.optionId || o.filterOptionId || o.id || optIdx + 1,
+                filterOptionId: o.filterOptionId || o.optionId || o.id || optIdx + 1,
+                value: o.value ?? o.optionValue ?? (typeof o === 'string' ? o : ''),
+                optionValue: o.optionValue ?? o.value ?? (typeof o === 'string' ? o : ''),
+                displayOrder: o.displayOrder || optIdx + 1,
+              }))
+            : [],
         }));
       }
       return [];

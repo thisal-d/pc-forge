@@ -2,6 +2,35 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { filterService } from '../services/filterService.js';
 import { CloseIcon, AlertTriangleIcon, CheckCircleIcon } from '../components/icons/index.js';
 
+// Slug generator
+export const slugify = (text) => {
+  return (text || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+};
+
+// Auto-format option value with unit of measure if appropriate
+export const formatOptionWithUnit = (rawOpt, unit) => {
+  const trimmed = (rawOpt || '').trim();
+  const cleanUnit = (unit || '').trim();
+  if (!trimmed) return '';
+  if (!cleanUnit) return trimmed;
+
+  const unitLower = cleanUnit.toLowerCase();
+  const trimmedLower = trimmed.toLowerCase();
+
+  // If it already ends with unit (case-insensitive)
+  if (trimmedLower.endsWith(unitLower)) {
+    const withoutUnit = trimmed.slice(0, trimmed.length - cleanUnit.length).trimEnd();
+    return withoutUnit ? `${withoutUnit}${cleanUnit}` : cleanUnit;
+  }
+
+  // Auto-append unit if value doesn't already have it
+  return `${trimmed}${cleanUnit}`;
+};
+
 export const FilterManagement = () => {
   const [filters, setFilters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,15 +106,6 @@ export const FilterManagement = () => {
     return filterService.calculateStats(filters);
   }, [filters]);
 
-  // Slug generator
-  const slugify = (text) => {
-    return (text || '')
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-  };
-
   // ----------------------------------------------------
   // CREATE FILTER HANDLERS
   // ----------------------------------------------------
@@ -120,21 +140,43 @@ export const FilterManagement = () => {
   };
 
   const handleAddCreateOption = (e) => {
-    e.preventDefault();
-    const opt = (createOptionInput || '').trim();
-    if (!opt) return;
+    if (e && e.preventDefault) e.preventDefault();
+    const raw = (createOptionInput || '').trim();
+    if (!raw) return;
 
-    if (createForm.options.some((o) => o.toLowerCase() === opt.toLowerCase())) {
-      setCreateErrors((prev) => ({ ...prev, option: `Option "${opt}" is already added.` }));
-      return;
+    // Support comma-separated batch input if user enters "100, 200"
+    const rawList = raw.includes(',')
+      ? raw.split(',').map((s) => s.trim()).filter(Boolean)
+      : [raw];
+
+    const newOptionsToAdd = [];
+    let duplicateMsg = '';
+
+    for (const item of rawList) {
+      const formatted = formatOptionWithUnit(item, createForm.unit);
+      if (!formatted) continue;
+
+      const alreadyExists =
+        createForm.options.some((o) => o.toLowerCase() === formatted.toLowerCase()) ||
+        newOptionsToAdd.some((o) => o.toLowerCase() === formatted.toLowerCase());
+
+      if (alreadyExists) {
+        duplicateMsg = `Option "${formatted}" is already added.`;
+      } else {
+        newOptionsToAdd.push(formatted);
+      }
     }
 
-    setCreateForm((prev) => ({
-      ...prev,
-      options: [...prev.options, opt],
-    }));
-    setCreateOptionInput('');
-    setCreateErrors((prev) => ({ ...prev, option: '' }));
+    if (newOptionsToAdd.length > 0) {
+      setCreateForm((prev) => ({
+        ...prev,
+        options: [...prev.options, ...newOptionsToAdd],
+      }));
+      setCreateOptionInput('');
+      setCreateErrors((prev) => ({ ...prev, option: duplicateMsg || '' }));
+    } else if (duplicateMsg) {
+      setCreateErrors((prev) => ({ ...prev, option: duplicateMsg }));
+    }
   };
 
   const handleRemoveCreateOption = (indexToRemove) => {
@@ -196,7 +238,9 @@ export const FilterManagement = () => {
       displayName: filter.displayName,
       filterType: filter.filterType || 'multiselect',
       unit: filter.unit || '',
-      options: Array.isArray(filter.options) ? filter.options.map((o) => o.value) : [],
+      options: Array.isArray(filter.options)
+        ? filter.options.map((o) => (typeof o === 'object' ? (o.value ?? o.optionValue ?? '') : String(o)))
+        : [],
     });
     setEditOptionInput('');
     setEditErrors({});
@@ -210,21 +254,43 @@ export const FilterManagement = () => {
   };
 
   const handleAddEditOption = (e) => {
-    e.preventDefault();
-    const opt = (editOptionInput || '').trim();
-    if (!opt) return;
+    if (e && e.preventDefault) e.preventDefault();
+    const raw = (editOptionInput || '').trim();
+    if (!raw) return;
 
-    if (editForm.options.some((o) => o.toLowerCase() === opt.toLowerCase())) {
-      setEditErrors((prev) => ({ ...prev, option: `Option "${opt}" is already added.` }));
-      return;
+    // Support comma-separated batch input if user enters "100, 200"
+    const rawList = raw.includes(',')
+      ? raw.split(',').map((s) => s.trim()).filter(Boolean)
+      : [raw];
+
+    const newOptionsToAdd = [];
+    let duplicateMsg = '';
+
+    for (const item of rawList) {
+      const formatted = formatOptionWithUnit(item, editForm.unit);
+      if (!formatted) continue;
+
+      const alreadyExists =
+        editForm.options.some((o) => o.toLowerCase() === formatted.toLowerCase()) ||
+        newOptionsToAdd.some((o) => o.toLowerCase() === formatted.toLowerCase());
+
+      if (alreadyExists) {
+        duplicateMsg = `Option "${formatted}" is already added.`;
+      } else {
+        newOptionsToAdd.push(formatted);
+      }
     }
 
-    setEditForm((prev) => ({
-      ...prev,
-      options: [...prev.options, opt],
-    }));
-    setEditOptionInput('');
-    setEditErrors((prev) => ({ ...prev, option: '' }));
+    if (newOptionsToAdd.length > 0) {
+      setEditForm((prev) => ({
+        ...prev,
+        options: [...prev.options, ...newOptionsToAdd],
+      }));
+      setEditOptionInput('');
+      setEditErrors((prev) => ({ ...prev, option: duplicateMsg || '' }));
+    } else if (duplicateMsg) {
+      setEditErrors((prev) => ({ ...prev, option: duplicateMsg }));
+    }
   };
 
   const handleRemoveEditOption = (indexToRemove) => {
@@ -878,6 +944,12 @@ export const FilterManagement = () => {
                     </button>
                   </div>
 
+                  {createForm.unit && createForm.unit.trim() && (
+                    <div style={{ fontSize: '0.76rem', color: '#6366f1', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span>Unit of measure <strong>{createForm.unit.trim()}</strong> will be automatically appended (e.g. 100 &rarr; 100{createForm.unit.trim()}).</span>
+                    </div>
+                  )}
+
                   {createErrors.option && (
                     <div style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: '0.5rem' }}>
                       {createErrors.option}
@@ -1065,6 +1137,12 @@ export const FilterManagement = () => {
                       + Add
                     </button>
                   </div>
+
+                  {editForm.unit && editForm.unit.trim() && (
+                    <div style={{ fontSize: '0.76rem', color: '#6366f1', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span>Unit of measure <strong>{editForm.unit.trim()}</strong> will be automatically appended (e.g. 100 &rarr; 100{editForm.unit.trim()}).</span>
+                    </div>
+                  )}
 
                   {editErrors.option && (
                     <div style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: '0.5rem' }}>

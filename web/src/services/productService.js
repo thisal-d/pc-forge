@@ -27,12 +27,13 @@ const mapApiProduct = (apiProduct) => {
     stockQuantity: Number(apiProduct.stockQuantity) || 0,
     imageUrl: apiProduct.imageUrl || null,
     description: apiProduct.description || '',
-    status: apiProduct.status || (Number(apiProduct.stockQuantity) > 0 ? 'Active' : 'Inactive'),
+    status: apiProduct.status || 'Active',
     specifications: specs,
     socket: apiProduct.socket || specs.socket || null,
     memoryType: apiProduct.memoryType || specs.memory_type || specs.ddr_type || null,
     powerWattage: apiProduct.powerWattage || (specs.wattage ? parseInt(specs.wattage, 10) : null),
     formFactor: apiProduct.formFactor || specs.form_factor || null,
+    warrantyMonths: Number(apiProduct.warrantyMonths) || 36,
     createdAt: apiProduct.createdAt || new Date().toISOString(),
     createdDate: apiProduct.createdAt ? apiProduct.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
   };
@@ -185,8 +186,8 @@ export const productService = {
     // Build specifications dictionary from filter values
     const specifications = {};
     filterValues.forEach((fv) => {
-      if (fv.filterKey && fv.rawValue) {
-        specifications[fv.filterKey] = fv.rawValue;
+      if (fv && fv.filterKey && fv.rawValue !== undefined && fv.rawValue !== null && String(fv.rawValue).trim() !== '') {
+        specifications[fv.filterKey.trim().toLowerCase()] = String(fv.rawValue).trim();
       }
     });
 
@@ -198,6 +199,8 @@ export const productService = {
         model: (productData.model || '').trim() || null,
         price,
         stockQuantity,
+        warrantyMonths: Number(productData.warrantyMonths) || 36,
+        status: (productData.status || 'Active').trim(),
         imageUrl: (productData.imageUrl || '').trim() || null,
         description: (productData.description || '').trim() || null,
         specifications: JSON.stringify(specifications),
@@ -243,8 +246,8 @@ export const productService = {
 
     const specifications = {};
     filterValues.forEach((fv) => {
-      if (fv.filterKey && fv.rawValue) {
-        specifications[fv.filterKey] = fv.rawValue;
+      if (fv && fv.filterKey && fv.rawValue !== undefined && fv.rawValue !== null && String(fv.rawValue).trim() !== '') {
+        specifications[fv.filterKey.trim().toLowerCase()] = String(fv.rawValue).trim();
       }
     });
 
@@ -256,6 +259,8 @@ export const productService = {
         model: (productData.model || '').trim() || null,
         price,
         stockQuantity,
+        warrantyMonths: productData.warrantyMonths ? Number(productData.warrantyMonths) : undefined,
+        status: productData.status ? String(productData.status).trim() : undefined,
         imageUrl: (productData.imageUrl || '').trim() || null,
         description: (productData.description || '').trim() || null,
         specifications: JSON.stringify(specifications),
@@ -343,6 +348,28 @@ export const productService = {
           : err.response?.status === 403
           ? 'Forbidden (403). Only Admin and Staff accounts can adjust stock.'
           : err.message || 'Failed to adjust stock on backend database.');
+      throw new Error(backendMessage);
+    }
+  },
+
+  // Toggle Product active/inactive status (PATCH /api/products/{id}/status)
+  async toggleProductStatus(productId, targetStatus = null) {
+    const id = Number(productId);
+    if (!id || isNaN(id)) throw new Error('Invalid product ID for status toggle.');
+
+    try {
+      const payload = targetStatus ? { status: targetStatus } : {};
+      const response = await api.patch(`/products/${id}/status`, payload);
+      return mapApiProduct(response.data);
+    } catch (err) {
+      const backendMessage =
+        err.response?.data?.message ||
+        err.response?.data?.title ||
+        (err.response?.status === 401
+          ? 'Authentication required (401). Please log in with a valid Admin or Staff account.'
+          : err.response?.status === 403
+          ? 'Forbidden (403). Only Admin and Staff accounts can toggle product status.'
+          : err.message || 'Failed to toggle product status.');
       throw new Error(backendMessage);
     }
   },

@@ -77,27 +77,12 @@ export const BuildWorkbenchModal = ({
           {/* Bill of Materials (BOM) Table */}
           <BuildBomTable components={build.components} />
 
-          {/* Staff Technician Review Action Box */}
-          <div className="review-action-box">
+          {/* Technical Clearance & Review Notes Card */}
+          <div className="card" style={{ padding: '1rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div style={{ display: 'flex', borderBottom: 'none', justifyContent: 'space-between', alignItems: 'center' }}>
               <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <PenLineIcon size={16} /> Technician Workbench Clearance & Notes
+                <PenLineIcon size={16} /> Technical Clearance & Review Notes
               </h4>
-              {build.assignedStaffName && build.assignedStaffName !== 'Unassigned' ? (
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Assigned to: <strong style={{ color: '#93c5fd' }}>{build.assignedStaffName}</strong>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onAssignToMe}
-                  disabled={actionLoading}
-                  className="btn btn-outline-sm"
-                  id="assign-to-me-btn"
-                >
-                  Assign to My Workbench
-                </button>
-              )}
             </div>
 
             <textarea

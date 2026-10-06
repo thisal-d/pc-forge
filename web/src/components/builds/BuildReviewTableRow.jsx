@@ -78,18 +78,6 @@ export const BuildReviewTableRow = ({ build, onInspect }) => {
           )}
         </div>
       </td>
-      <td>
-        {build.assignedStaffName && build.assignedStaffName !== 'Unassigned' ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span className="avatar-circle" style={{ width: '26px', height: '26px', fontSize: '0.75rem' }}>
-              {build.assignedStaffName.charAt(0)}
-            </span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: 500 }}>{build.assignedStaffName}</span>
-          </div>
-        ) : (
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Unassigned</span>
-        )}
-      </td>
       <td><BuildStatusBadge status={build.status} /></td>
       <td style={{ textAlign: 'right' }}>
         <button

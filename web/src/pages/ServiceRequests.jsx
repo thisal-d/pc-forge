@@ -1,26 +1,20 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { serviceRequestService } from '../services/serviceRequestService.js';
-import { staffService } from '../services/staffService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Pagination } from '../components/common/Pagination.jsx';
 import { TableSkeleton } from '../components/common/TableSkeleton.jsx';
 import { SearchIcon, RefreshCwIcon, CloseIcon } from '../components/icons/index.js';
 
 export const ServiceRequests = () => {
-  const { user, role } = useAuth();
+  const { role } = useAuth();
 
   // Master state
   const [requests, setRequests] = useState([]);
-  const [technicians, setTechnicians] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [technicianFilter, setTechnicianFilter] = useState('all');
-  const [warrantyFilter, setWarrantyFilter] = useState('all');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
 
@@ -31,23 +25,13 @@ export const ServiceRequests = () => {
   // Selected Service Request for detailed inspection
   const [activeSrId, setActiveSrId] = useState(null);
 
-  // Staff confidential internal notes form
-  const [internalNotesText, setInternalNotesText] = useState('');
-  const [savingNotes, setSavingNotes] = useState(false);
-
   // Create Service Request modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createData, setCreateData] = useState({
     title: '',
     description: '',
-    orderId: '',
-    productId: '',
-    problemDescription: '',
-    problemCategory: 'General',
-    warrantyStatus: 'Active',
     preferredDate: '',
     preferredTime: '10:00 AM',
-    priority: 'Normal',
   });
   const [creatingRequest, setCreatingRequest] = useState(false);
   const [dateAvailability, setDateAvailability] = useState(null);
@@ -66,12 +50,8 @@ export const ServiceRequests = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [srList, staffList] = await Promise.all([
-        serviceRequestService.fetchServiceRequests(),
-        staffService.fetchStaffFromApi().catch(() => []),
-      ]);
+      const srList = await serviceRequestService.fetchServiceRequests();
       setRequests(Array.isArray(srList) ? srList : []);
-      setTechnicians(Array.isArray(staffList) ? staffList : []);
     } catch {
       showNotification('error', 'Failed to load service requests from server.');
     } finally {
@@ -89,92 +69,67 @@ export const ServiceRequests = () => {
   // Selected request
   const selectedRequest = useMemo(() => {
     if (!activeSrId) return null;
-    return requests.find(
-      (r) => r.serviceRequestId === activeSrId || r.serviceRequestNumber === activeSrId
-    ) || null;
+    return (
+      requests.find(
+        (r) => r.serviceRequestId === activeSrId || r.serviceRequestNumber === activeSrId
+      ) || null
+    );
   }, [requests, activeSrId]);
 
-  // Sync selected request internal notes to form
-  useEffect(() => {
-    if (selectedRequest) {
-      setInternalNotesText(selectedRequest.internalNotes || '');
-    } else {
-      setInternalNotesText('');
-    }
-  }, [selectedRequest]);
-
-  // Filtered requests
+  // Filter pipeline
   const filteredRequests = useMemo(() => {
     return requests.filter((r) => {
-      // Status
+      // 1. Status Filter
       if (statusFilter !== 'all') {
-        const norm = (s) => (s || '').toUpperCase().replace(/_/g, ' ');
-        const fNorm = statusFilter.toUpperCase().replace(/_/g, ' ');
-        const rNorm = norm(r.status);
-        if (fNorm === 'IN PROGRESS') {
-          if (rNorm !== 'IN PROGRESS' && rNorm !== 'IN SERVICE' && rNorm !== 'UNDER REVIEW' && rNorm !== 'SCHEDULED') return false;
-        } else if (fNorm === 'COMPLETED') {
-          if (rNorm !== 'COMPLETED' && rNorm !== 'RESOLVED') return false;
-        } else if (fNorm === 'NO SHOW') {
-          if (rNorm !== 'NO SHOW') return false;
-        } else if (fNorm === 'CANCELLED') {
-          if (rNorm !== 'CANCELLED' && rNorm !== 'CANCELED') return false;
-        } else if (rNorm !== fNorm) {
+        const target = statusFilter.toLowerCase().replace(/_/g, ' ');
+        const current = (r.status || '').toLowerCase().replace(/_/g, ' ');
+        if (target === 'in progress') {
+          if (
+            current !== 'in progress' &&
+            current !== 'in service' &&
+            current !== 'under review' &&
+            current !== 'scheduled'
+          )
+            return false;
+        } else if (target === 'completed') {
+          if (current !== 'completed' && current !== 'resolved') return false;
+        } else if (target === 'cancelled') {
+          if (current !== 'cancelled' && current !== 'canceled') return false;
+        } else if (target === 'no show') {
+          if (current !== 'no show' && current !== 'noshow') return false;
+        } else if (current !== target) {
           return false;
         }
       }
-      // Priority
-      if (priorityFilter !== 'all' && r.priority?.toLowerCase() !== priorityFilter.toLowerCase()) {
-        return false;
-      }
-      // Category
-      if (categoryFilter !== 'all' && r.problemCategory?.toLowerCase() !== categoryFilter.toLowerCase()) {
-        return false;
-      }
-      // Technician
-      if (technicianFilter !== 'all') {
-        if (technicianFilter === 'unassigned') {
-          if (r.assignedStaffId) return false;
-        } else if (Number(r.assignedStaffId) !== Number(technicianFilter)) {
-          return false;
-        }
-      }
-      // Warranty Status
-      if (warrantyFilter !== 'all' && (r.warrantyStatus || '').toLowerCase() !== warrantyFilter.toLowerCase()) {
-        return false;
-      }
-      // Date Range Filter (Preferred Appointment Date or CreatedAt)
+
+      // 2. Date Range Filter
       if (startDateFilter) {
-        const sDate = new Date(startDateFilter);
-        const rDate = r.preferredDate ? new Date(r.preferredDate) : new Date(r.createdAt);
-        if (rDate < sDate) return false;
+        const itemDate = r.preferredDate || r.createdAt?.split('T')[0];
+        if (itemDate && itemDate < startDateFilter) return false;
       }
       if (endDateFilter) {
-        const eDate = new Date(endDateFilter);
-        eDate.setHours(23, 59, 59, 999);
-        const rDate = r.preferredDate ? new Date(r.preferredDate) : new Date(r.createdAt);
-        if (rDate > eDate) return false;
+        const itemDate = r.preferredDate || r.createdAt?.split('T')[0];
+        if (itemDate && itemDate > endDateFilter) return false;
       }
-      // Search
+
+      // 3. Search Query
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const num = (r.serviceRequestNumber || '').toLowerCase();
-        const title = (r.title || '').toLowerCase();
-        const desc = (r.problemDescription || r.description || '').toLowerCase();
-        const cust = (r.customerName || '').toLowerCase();
-        const email = (r.customerEmail || '').toLowerCase();
-        const prod = (r.productName || '').toLowerCase();
-        return num.includes(q) || title.includes(q) || desc.includes(q) || cust.includes(q) || email.includes(q) || prod.includes(q);
+        const q = searchQuery.trim().toLowerCase();
+        const matchNumber = (r.serviceRequestNumber || '').toLowerCase().includes(q);
+        const matchTitle = (r.title || '').toLowerCase().includes(q);
+        const matchDesc = (r.description || '').toLowerCase().includes(q);
+        const matchCustomer = (r.customerName || '').toLowerCase().includes(q);
+        const matchEmail = (r.customerEmail || '').toLowerCase().includes(q);
+        if (!matchNumber && !matchTitle && !matchDesc && !matchCustomer && !matchEmail) {
+          return false;
+        }
       }
+
       return true;
     });
-  }, [requests, statusFilter, priorityFilter, categoryFilter, technicianFilter, warrantyFilter, startDateFilter, endDateFilter, searchQuery]);
+  }, [requests, statusFilter, startDateFilter, endDateFilter, searchQuery]);
 
-  // Reset pagination on filter or search change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [statusFilter, priorityFilter, categoryFilter, technicianFilter, warrantyFilter, startDateFilter, endDateFilter, searchQuery]);
-
+  // Pagination calculation
   const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
   const paginatedRequests = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -182,71 +137,19 @@ export const ServiceRequests = () => {
   }, [filteredRequests, currentPage, pageSize]);
 
   // Handle status update
-  const handleUpdateStatus = async (id, newStatus) => {
+  const handleUpdateStatus = async (srId, newStatus) => {
     try {
-      const updated = await serviceRequestService.updateServiceRequestStatus(
-        id,
-        newStatus,
-        undefined,
-        undefined,
-        internalNotesText || undefined
-      );
+      const updated = await serviceRequestService.updateServiceRequestStatus(srId, newStatus);
       setRequests((prev) =>
-        prev.map((r) => (r.serviceRequestId === id ? { ...r, ...updated } : r))
+        prev.map((r) =>
+          r.serviceRequestId === srId || r.serviceRequestNumber === srId
+            ? { ...r, status: updated.status }
+            : r
+        )
       );
-      showNotification('success', `Service Request #${updated.serviceRequestNumber} marked as ${newStatus}.`);
+      showNotification('success', `Status updated to ${newStatus}.`);
     } catch (err) {
       showNotification('error', err.message || 'Failed to update status.');
-    }
-  };
-
-  // Handle saving staff internal notes
-  const handleSaveNotes = async (e) => {
-    e.preventDefault();
-    if (!selectedRequest) return;
-    setSavingNotes(true);
-    try {
-      const updated = await serviceRequestService.updateServiceRequestStatus(
-        selectedRequest.serviceRequestId,
-        selectedRequest.status,
-        undefined,
-        undefined,
-        internalNotesText
-      );
-      setRequests((prev) =>
-        prev.map((r) => (r.serviceRequestId === selectedRequest.serviceRequestId ? { ...r, ...updated } : r))
-      );
-      showNotification('success', 'Internal notes saved successfully.');
-    } catch (err) {
-      showNotification('error', err.message || 'Failed to save notes.');
-    } finally {
-      setSavingNotes(false);
-    }
-  };
-
-  // Handle technician assignment
-  const handleAssignTechnician = async (srId, staffId) => {
-    try {
-      const updated = await serviceRequestService.assignTechnician(srId, staffId);
-      setRequests((prev) =>
-        prev.map((r) => (r.serviceRequestId === srId ? { ...r, ...updated } : r))
-      );
-      showNotification('success', `Technician assigned to ${updated.serviceRequestNumber}.`);
-    } catch (err) {
-      showNotification('error', err.message || 'Failed to assign technician.');
-    }
-  };
-
-  // Handle priority update
-  const handleUpdatePriority = async (srId, newPriority) => {
-    try {
-      const updated = await serviceRequestService.updatePriority(srId, newPriority);
-      setRequests((prev) =>
-        prev.map((r) => (r.serviceRequestId === srId ? { ...r, ...updated } : r))
-      );
-      showNotification('success', `Priority updated to ${newPriority}.`);
-    } catch (err) {
-      showNotification('error', err.message || 'Failed to update priority.');
     }
   };
 
@@ -268,41 +171,33 @@ export const ServiceRequests = () => {
     }
   };
 
-  // Handle manual Service Request creation
+  // Handle manual Service Request creation (Simple & optional)
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    const title = (createData.title || '').trim();
-    if (!title) {
-      showNotification('error', 'Title is required for service request.');
-      return;
-    }
 
     if (dateAvailability && !dateAvailability.isAvailable) {
-      showNotification('error', 'The selected date has reached its maximum capacity of 10 service appointments. Please choose another date.');
+      showNotification(
+        'error',
+        'The selected date has reached its maximum capacity of 10 service appointments. Please choose another date.'
+      );
       return;
     }
 
     setCreatingRequest(true);
     try {
       const created = await serviceRequestService.createServiceRequest({
-        ...createData,
-        title: title,
-        problemDescription: createData.description || title,
+        title: createData.title || null,
         description: createData.description || null,
+        preferredDate: createData.preferredDate || null,
+        preferredTime: createData.preferredTime || null,
       });
       setRequests((prev) => [created, ...prev]);
       setIsCreateModalOpen(false);
       setCreateData({
         title: '',
         description: '',
-        orderId: '',
-        productId: '',
-        problemDescription: '',
-        problemCategory: 'General',
-        warrantyStatus: 'Active',
         preferredDate: '',
         preferredTime: '10:00 AM',
-        priority: 'Normal',
       });
       setDateAvailability(null);
       showNotification('success', `Service Request ${created.serviceRequestNumber} created successfully.`);
@@ -322,12 +217,20 @@ export const ServiceRequests = () => {
       case 'IN SERVICE':
       case 'UNDER REVIEW':
       case 'SCHEDULED':
-        return <span className="badge badge-secondary" style={{ backgroundColor: '#6366f1', color: '#fff' }}>In Progress</span>;
+        return (
+          <span className="badge badge-secondary" style={{ backgroundColor: '#6366f1', color: '#fff' }}>
+            In Progress
+          </span>
+        );
       case 'COMPLETED':
       case 'RESOLVED':
         return <span className="badge badge-success">Completed</span>;
       case 'NO SHOW':
-        return <span className="badge badge-neutral" style={{ backgroundColor: '#f97316', color: '#fff' }}>No Show</span>;
+        return (
+          <span className="badge badge-neutral" style={{ backgroundColor: '#f97316', color: '#fff' }}>
+            No Show
+          </span>
+        );
       case 'CANCELLED':
       case 'CANCELED':
         return <span className="badge badge-error">Cancelled</span>;
@@ -336,34 +239,19 @@ export const ServiceRequests = () => {
     }
   };
 
-  const getPriorityBadge = (p) => {
-    switch ((p || '').toLowerCase()) {
-      case 'urgent':
-        return <span className="badge badge-error">Urgent</span>;
-      case 'high':
-        return <span className="badge badge-warning">High</span>;
-      case 'normal':
-        return <span className="badge badge-info">Normal</span>;
-      case 'low':
-        return <span className="badge badge-neutral">Low</span>;
-      default:
-        return <span className="badge badge-neutral">{p}</span>;
-    }
-  };
-
   return (
     <div className="page-container">
       {/* Page Header */}
       <div className="dashboard-header">
         <div>
-          <h1>After-Sales Service Requests</h1>
+          <h1>Service Requests</h1>
           <p className="subtitle">
-            Technician inspection workbench, service request details, and appointment lifecycle.
+            After-sales customer repair, diagnostics, and appointment queue.
           </p>
         </div>
         <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span className="badge badge-lg badge-admin">
-            {role === 'Admin' ? 'ADMIN OVERSIGHT' : 'TECHNICIAN WORKBENCH'}
+            {role === 'Admin' ? 'ADMIN OVERSIGHT' : 'STAFF WORKBENCH'}
           </span>
           <button
             onClick={() => setIsCreateModalOpen(true)}
@@ -390,7 +278,14 @@ export const ServiceRequests = () => {
           <button
             type="button"
             onClick={() => setNotification(null)}
-            style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'inherit',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+            }}
             title="Dismiss"
           >
             <CloseIcon size={14} />
@@ -406,29 +301,32 @@ export const ServiceRequests = () => {
           <span className="stat-subtext">All recorded requests</span>
         </div>
         <div className="stat-card stat-card-inactive">
-          <span className="stat-label">Pending Intake</span>
-          <span className="stat-value" style={{ color: '#fbbf24' }}>{stats.pending}</span>
-          <span className="stat-subtext">Awaiting PC drop-off</span>
+          <span className="stat-label">Pending</span>
+          <span className="stat-value" style={{ color: '#fbbf24' }}>
+            {stats.pending}
+          </span>
+          <span className="stat-subtext">Awaiting intake / drop-off</span>
         </div>
         <div className="stat-card stat-card-tech">
           <span className="stat-label">In Progress</span>
-          <span className="stat-value" style={{ color: '#6366f1' }}>{stats.inProgress}</span>
-          <span className="stat-subtext">PC at store / On bench</span>
+          <span className="stat-value" style={{ color: '#6366f1' }}>
+            {stats.inProgress}
+          </span>
+          <span className="stat-subtext">Under diagnostic or repair</span>
         </div>
         <div className="stat-card stat-card-active">
           <span className="stat-label">Completed</span>
-          <span className="stat-value" style={{ color: '#10b981' }}>{stats.completed}</span>
-          <span className="stat-subtext">Requests completed</span>
-        </div>
-        <div className="stat-card stat-card-inactive">
-          <span className="stat-label">No Show</span>
-          <span className="stat-value" style={{ color: '#f97316' }}>{stats.noShow}</span>
-          <span className="stat-subtext">Missed appointment</span>
+          <span className="stat-value" style={{ color: '#10b981' }}>
+            {stats.completed}
+          </span>
+          <span className="stat-subtext">Successfully resolved</span>
         </div>
         <div className="stat-card stat-card-inactive">
           <span className="stat-label">Cancelled</span>
-          <span className="stat-value" style={{ color: '#ef4444' }}>{stats.cancelled}</span>
-          <span className="stat-subtext">Customer / staff cancelled</span>
+          <span className="stat-value" style={{ color: '#ef4444' }}>
+            {stats.cancelled}
+          </span>
+          <span className="stat-subtext">Cancelled requests</span>
         </div>
       </div>
 
@@ -442,7 +340,7 @@ export const ServiceRequests = () => {
             </span>
             <input
               type="text"
-              placeholder="Search by Title, SR#, Customer, or Order..."
+              placeholder="Search by Title, Description, SR#, or Customer..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               id="service-request-search-input"
@@ -500,36 +398,13 @@ export const ServiceRequests = () => {
             />
           </div>
 
-          {/* Technician Filter */}
-          <div className="filter-item">
-            <label htmlFor="sr-filter-technician">Technician:</label>
-            <select
-              id="sr-filter-technician"
-              className="filter-select"
-              value={technicianFilter}
-              onChange={(e) => setTechnicianFilter(e.target.value)}
-            >
-              <option value="all">All Technicians</option>
-              <option value="unassigned">Unassigned Only</option>
-              {technicians.map((t) => (
-                <option key={t.staffId || t.id || t.userId} value={t.staffId || t.userId}>
-                  {t.firstName ? `${t.firstName} ${t.lastName}` : (t.user ? `${t.user.firstName} ${t.user.lastName}` : `Technician #${t.staffId}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Action buttons */}
-          {(searchQuery || statusFilter !== 'all' || priorityFilter !== 'all' || categoryFilter !== 'all' || technicianFilter !== 'all' || warrantyFilter !== 'all' || startDateFilter || endDateFilter) && (
+          {/* Reset Filters */}
+          {(searchQuery || statusFilter !== 'all' || startDateFilter || endDateFilter) && (
             <button
               type="button"
               onClick={() => {
                 setSearchQuery('');
                 setStatusFilter('all');
-                setPriorityFilter('all');
-                setCategoryFilter('all');
-                setTechnicianFilter('all');
-                setWarrantyFilter('all');
                 setStartDateFilter('');
                 setEndDateFilter('');
                 setCurrentPage(1);
@@ -567,24 +442,29 @@ export const ServiceRequests = () => {
             <thead>
               <tr>
                 <th>SR Number</th>
-                <th>Request Title & Issue</th>
+                <th>Title & Description</th>
                 <th>Customer</th>
-                <th>Hardware / Order</th>
                 <th>Appointment</th>
                 <th>Status</th>
-                <th>Assigned Tech</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             {loading ? (
-              <TableSkeleton rows={pageSize} columns={8} />
+              <TableSkeleton rows={pageSize} columns={6} />
             ) : paginatedRequests.length === 0 ? (
               <tbody>
                 <tr>
-                  <td colSpan={8} style={{ padding: 0 }}>
+                  <td colSpan={6} style={{ padding: 0 }}>
                     <div className="empty-state">
                       <div className="empty-state-icon">
-                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <svg
+                          width="36"
+                          height="36"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                        >
                           <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                         </svg>
                       </div>
@@ -596,10 +476,6 @@ export const ServiceRequests = () => {
                         onClick={() => {
                           setSearchQuery('');
                           setStatusFilter('all');
-                          setPriorityFilter('all');
-                          setCategoryFilter('all');
-                          setTechnicianFilter('all');
-                          setWarrantyFilter('all');
                           setStartDateFilter('');
                           setEndDateFilter('');
                           setCurrentPage(1);
@@ -624,55 +500,55 @@ export const ServiceRequests = () => {
                       {r.serviceRequestNumber}
                     </td>
                     <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{r.title || r.problemDescription}</div>
-                      {r.description && r.title && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                        {r.title || 'Service Request'}
+                      </div>
+                      {r.description && (
+                        <div
+                          style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--text-muted)',
+                            maxWidth: '320px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           {r.description}
                         </div>
                       )}
                     </td>
                     <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{r.customerName || `Customer #${r.userId}`}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.customerEmail}</div>
-                    </td>
-                    <td>
-                      <div style={{ color: 'var(--text-main)', fontWeight: 500 }}>{r.productName || 'Hardware Component'}</div>
-                      {r.orderId && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Order #ORD-{r.orderId}</span>
-                      )}
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                        {r.customerName || `Customer #${r.userId}`}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {r.customerEmail}
+                      </div>
                     </td>
                     <td>
                       {r.preferredDate ? (
                         <div>
-                          <div style={{ fontWeight: 500 }}>{r.preferredDate}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.preferredTime || '10:00 AM'}</div>
+                          <div style={{ fontWeight: 500 }}>
+                            {typeof r.preferredDate === 'string'
+                              ? r.preferredDate.split('T')[0]
+                              : r.preferredDate}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {r.preferredTime || '10:00 AM'}
+                          </div>
                         </div>
                       ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Unscheduled</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Flexible</span>
                       )}
                     </td>
                     <td>{getStatusBadge(r.status)}</td>
-                    <td>
-                      <select
-                        className="filter-select"
-                        style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem', width: '150px' }}
-                        value={r.assignedStaffId || ''}
-                        onChange={(e) => handleAssignTechnician(r.serviceRequestId, e.target.value || null)}
-                      >
-                        <option value="">Unassigned</option>
-                        {technicians.map((t) => (
-                          <option key={t.staffId || t.id || t.userId} value={t.staffId || t.userId}>
-                            {t.firstName ? `${t.firstName} ${t.lastName}` : (t.user ? `${t.user.firstName} ${t.user.lastName}` : `Tech #${t.staffId}`)}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
                     <td style={{ textAlign: 'right' }}>
                       <button
                         onClick={() => setActiveSrId(r.serviceRequestId)}
                         className="btn btn-outline-sm"
                       >
-                        Inspect & Diagnose →
+                        View Details →
                       </button>
                     </td>
                   </tr>
@@ -699,12 +575,12 @@ export const ServiceRequests = () => {
         )}
       </div>
 
-      {/* INSPECTION MODAL */}
+      {/* INSPECTION / DETAIL MODAL */}
       {selectedRequest && (
         <div className="modal-backdrop" onClick={() => setActiveSrId(null)}>
           <div
             className="modal-dialog"
-            style={{ maxWidth: '900px' }}
+            style={{ maxWidth: '750px' }}
             onClick={(e) => e.stopPropagation()}
             id="service-request-detail-modal"
           >
@@ -716,7 +592,6 @@ export const ServiceRequests = () => {
                     Service Request {selectedRequest.serviceRequestNumber}
                   </h3>
                   {getStatusBadge(selectedRequest.status)}
-                  {getPriorityBadge(selectedRequest.priority)}
                 </div>
                 <p className="modal-subtitle">
                   Created on {new Date(selectedRequest.createdAt).toLocaleString()}
@@ -735,8 +610,22 @@ export const ServiceRequests = () => {
             {/* Modal Body */}
             <div className="modal-body" style={{ maxHeight: 'calc(85vh - 70px)', overflowY: 'auto' }}>
               {/* Quick Status Transition Bar */}
-              <div style={{ padding: '0.85rem 1.15rem', backgroundColor: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Update Lifecycle Status:</span>
+              <div
+                style={{
+                  padding: '0.85rem 1.15rem',
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-lg)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                }}
+              >
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                  Change Status:
+                </span>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
@@ -750,9 +639,14 @@ export const ServiceRequests = () => {
                     type="button"
                     onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'In Progress')}
                     className="btn btn-outline-sm"
-                    style={{ backgroundColor: '#e0e7ff', borderColor: '#6366f1', color: '#4338ca', fontWeight: 600 }}
+                    style={{
+                      backgroundColor: '#e0e7ff',
+                      borderColor: '#6366f1',
+                      color: '#4338ca',
+                      fontWeight: 600,
+                    }}
                   >
-                    In Progress (PC Received)
+                    In Progress
                   </button>
                   <button
                     type="button"
@@ -761,14 +655,6 @@ export const ServiceRequests = () => {
                     style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
                   >
                     Completed
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateStatus(selectedRequest.serviceRequestId, 'No Show')}
-                    className="btn btn-outline-sm"
-                    style={{ borderColor: '#ea580c', color: '#c2410c' }}
-                  >
-                    No Show
                   </button>
                   <button
                     type="button"
@@ -781,107 +667,133 @@ export const ServiceRequests = () => {
                 </div>
               </div>
 
-              {/* Title & Description Banner */}
-              <div style={{ padding: '1rem', backgroundColor: '#f8fafc', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                <h4 style={{ margin: '0 0 0.35rem 0', color: 'var(--primary)', fontSize: '1rem', fontWeight: 700 }}>
-                  {selectedRequest.title || 'Untitled Request'}
-                </h4>
-                <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.875rem', lineHeight: 1.5 }}>
-                  {selectedRequest.description || selectedRequest.problemDescription || 'No description provided.'}
+              {/* Title & Description */}
+              <div
+                style={{
+                  padding: '1.25rem',
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-lg)',
+                }}
+              >
+                <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.35rem' }}>
+                  Request Title
+                </div>
+                <h3 style={{ margin: '0 0 1rem 0', color: 'var(--text-main)', fontSize: '1.15rem', fontWeight: 700 }}>
+                  {selectedRequest.title || 'Service Request'}
+                </h3>
+                <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '0.35rem' }}>
+                  Problem Description
+                </div>
+                <p
+                  style={{
+                    margin: 0,
+                    color: 'var(--text-main)',
+                    fontSize: '0.925rem',
+                    lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {selectedRequest.description || 'No additional description provided.'}
                 </p>
               </div>
 
               {/* Info Cards Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '1rem',
+                }}
+              >
                 {/* Customer Card */}
-                <div style={{ padding: '1rem', backgroundColor: '#ffffff', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)', fontSize: '0.875rem', fontWeight: 600 }}>Customer Information</h4>
-                  <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{selectedRequest.customerName || `User #${selectedRequest.userId}`}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{selectedRequest.customerEmail || 'No email on record'}</div>
-                  {selectedRequest.customerPhone && (
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{selectedRequest.customerPhone}</div>
-                  )}
-                </div>
-
-                {/* Order & Product Card */}
-                <div style={{ padding: '1rem', backgroundColor: '#ffffff', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)', fontSize: '0.875rem', fontWeight: 600 }}>Hardware & Linked Order</h4>
-                  <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{selectedRequest.productName || 'Hardware Component'}</div>
-                  {selectedRequest.orderId ? (
-                    <div style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '0.85rem' }}>
-                      Linked Order: #{selectedRequest.orderId}
-                      {selectedRequest.orderNumber && ` (${selectedRequest.orderNumber})`}
-                    </div>
-                  ) : (
-                    <div style={{ color: 'var(--text-subtle)', fontSize: '0.85rem' }}>Direct / External Hardware</div>
-                  )}
-                </div>
-
-                {/* Warranty & Appointment Card */}
-                <div style={{ padding: '1rem', backgroundColor: '#ffffff', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)', fontSize: '0.875rem', fontWeight: 600 }}>Service Slot & Warranty</h4>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>
-                    {selectedRequest.preferredDate || 'Date Not Set'}{' '}
-                    {selectedRequest.preferredTime && `(${selectedRequest.preferredTime})`}
+                <div
+                  style={{
+                    padding: '1rem',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-lg)',
+                  }}
+                >
+                  <h4
+                    style={{
+                      margin: '0 0 0.5rem 0',
+                      color: 'var(--primary)',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Customer Details
+                  </h4>
+                  <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                    {selectedRequest.customerName || `User #${selectedRequest.userId}`}
                   </div>
-                  <div style={{ marginTop: '0.35rem' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Store hours: 9:00 AM - 6:00 PM</span>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    {selectedRequest.customerEmail || 'No email on record'}
+                  </div>
+                </div>
+
+                {/* Appointment Card */}
+                <div
+                  style={{
+                    padding: '1rem',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-lg)',
+                  }}
+                >
+                  <h4
+                    style={{
+                      margin: '0 0 0.5rem 0',
+                      color: 'var(--primary)',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Appointment Slot
+                  </h4>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>
+                    {selectedRequest.preferredDate
+                      ? `${typeof selectedRequest.preferredDate === 'string' ? selectedRequest.preferredDate.split('T')[0] : selectedRequest.preferredDate} (${selectedRequest.preferredTime || '10:00 AM'})`
+                      : 'Flexible / Unscheduled'}
+                  </div>
+                  <div style={{ marginTop: '0.35rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Store hours: 9:00 AM - 6:00 PM
                   </div>
                 </div>
               </div>
 
-              {/* Internal Notes & Diagnostics Editor */}
-              <form onSubmit={handleSaveNotes} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {/* Internal Notes - Hidden from Customer */}
-                <div style={{ padding: '1rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.875rem', fontWeight: 700, color: '#92400e', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    Staff / Admin Internal Notes (Confidential):
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="filter-select"
-                    style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical', backgroundImage: 'none', padding: '0.65rem 0.85rem', backgroundColor: '#fff', borderColor: '#f59e0b' }}
-                    placeholder="Enter confidential notes, preliminary diagnosis, customer interaction history, or internal remarks..."
-                    value={internalNotesText}
-                    onChange={(e) => setInternalNotesText(e.target.value)}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSrId(null)}
-                    className="btn btn-outline"
-                  >
-                    Close
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingNotes}
-                    className="btn btn-primary"
-                  >
-                    {savingNotes ? 'Saving...' : 'Save Internal Notes'}
-                  </button>
-                </div>
-              </form>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveSrId(null)}
+                  className="btn btn-outline"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* CREATE SERVICE REQUEST MODAL */}
+      {/* CREATE SERVICE REQUEST MODAL (Simple & Optional Form) */}
       {isCreateModalOpen && (
         <div className="modal-backdrop" onClick={() => setIsCreateModalOpen(false)}>
           <div
             className="modal-dialog"
-            style={{ maxWidth: '600px' }}
+            style={{ maxWidth: '580px' }}
             onClick={(e) => e.stopPropagation()}
             id="create-service-request-modal"
           >
             <div className="modal-header">
               <div>
-                <h3 className="modal-title" style={{ margin: 0 }}>Create New Service Request</h3>
-                <p className="modal-subtitle">Submit customer ticket (Hours: 9:00 AM - 6:00 PM, Max 10 per day)</p>
+                <h3 className="modal-title" style={{ margin: 0 }}>
+                  Create Service Request
+                </h3>
+                <p className="modal-subtitle">
+                  Simple form — fill what you know, leave the rest optional.
+                </p>
               </div>
               <button
                 type="button"
@@ -894,77 +806,124 @@ export const ServiceRequests = () => {
             </div>
 
             <div className="modal-body">
+              {/* Friendly helper banner */}
+              <div
+                style={{
+                  padding: '0.75rem 1rem',
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  marginBottom: '1rem',
+                  fontSize: '0.85rem',
+                  color: 'var(--text-muted)',
+                  lineHeight: 1.5,
+                }}
+              >
+                💡 <strong>Non-technical friendly:</strong> You don't need to know PC specifications. Just describe what is happening and our staff will handle the rest.
+              </div>
+
               <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
-                    Title * :
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      color: 'var(--text-main)',
+                      marginBottom: '0.35rem',
+                    }}
+                  >
+                    Title (Optional):
                   </label>
                   <input
                     type="text"
-                    required
                     className="filter-select"
                     style={{ width: '100%', backgroundImage: 'none', padding: '0.55rem 0.85rem' }}
-                    placeholder="e.g. PC won't boot / GPU display issue"
+                    placeholder="e.g. Computer won't start, Loud noise, Screen flickering"
                     value={createData.title}
                     onChange={(e) => setCreateData({ ...createData, title: e.target.value })}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      color: 'var(--text-main)',
+                      marginBottom: '0.35rem',
+                    }}
+                  >
                     Description (Optional):
                   </label>
                   <textarea
-                    rows={3}
+                    rows={4}
                     className="filter-select"
-                    style={{ width: '100%', backgroundImage: 'none', padding: '0.65rem 0.85rem', resize: 'vertical', fontFamily: 'inherit' }}
-                    placeholder="Provide any additional details or symptoms..."
+                    style={{
+                      width: '100%',
+                      backgroundImage: 'none',
+                      padding: '0.65rem 0.85rem',
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                    }}
+                    placeholder="Describe what happened or what problem you are seeing..."
                     value={createData.description}
                     onChange={(e) => setCreateData({ ...createData, description: e.target.value })}
                   />
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
-                    Linked Order ID (Optional - if bought from this store):
-                  </label>
-                  <input
-                    type="number"
-                    className="filter-select"
-                    style={{ width: '100%', backgroundImage: 'none', padding: '0.55rem 0.85rem' }}
-                    placeholder="e.g. 101"
-                    value={createData.orderId}
-                    onChange={(e) => setCreateData({ ...createData, orderId: e.target.value })}
-                  />
-                </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
-                      Preferred Date *:
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        color: 'var(--text-main)',
+                        marginBottom: '0.35rem',
+                      }}
+                    >
+                      Preferred Date (Optional):
                     </label>
                     <input
                       type="date"
-                      required
                       className="filter-select"
                       style={{ width: '100%', backgroundImage: 'none', padding: '0.55rem 0.85rem' }}
                       value={createData.preferredDate}
                       onChange={(e) => handleDateChange(e.target.value)}
                     />
                     {checkingAvailability && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Checking capacity...</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Checking capacity...
+                      </span>
                     )}
                     {dateAvailability && (
-                      <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', fontWeight: 600, color: dateAvailability.isAvailable ? '#059669' : '#dc2626' }}>
+                      <div
+                        style={{
+                          marginTop: '0.25rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: dateAvailability.isAvailable ? '#059669' : '#dc2626',
+                        }}
+                      >
                         {dateAvailability.isAvailable
-                          ? `Available (${dateAvailability.remainingSlots} of 10 slots left)`
-                          : `Fully booked (${dateAvailability.bookedCount} of 10 slots used)`}
+                          ? `Available (${dateAvailability.remainingSlots} slots remaining)`
+                          : `Date full (Max 10 per day)`}
                       </div>
                     )}
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.35rem' }}>
-                      Preferred Time Slot (9 AM - 6 PM) *:
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        color: 'var(--text-main)',
+                        marginBottom: '0.35rem',
+                      }}
+                    >
+                      Time Slot (Optional):
                     </label>
                     <select
                       className="filter-select"
@@ -986,7 +945,13 @@ export const ServiceRequests = () => {
                   </div>
                 </div>
 
-                <div className="modal-footer" style={{ margin: '0.5rem -1.5rem -1.5rem', borderRadius: '0 0 var(--radius-xl) var(--radius-xl)' }}>
+                <div
+                  className="modal-footer"
+                  style={{
+                    margin: '0.5rem -1.5rem -1.5rem',
+                    borderRadius: '0 0 var(--radius-xl) var(--radius-xl)',
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => setIsCreateModalOpen(false)}
@@ -999,7 +964,7 @@ export const ServiceRequests = () => {
                     disabled={creatingRequest || (dateAvailability && !dateAvailability.isAvailable)}
                     className="btn btn-primary"
                   >
-                    {creatingRequest ? 'Creating...' : 'Create Service Request'}
+                    {creatingRequest ? 'Submitting...' : 'Submit Service Request'}
                   </button>
                 </div>
               </form>

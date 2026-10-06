@@ -13,7 +13,7 @@ import { Unauthorized } from './pages/Unauthorized';
 import { StaffManagement } from './pages/StaffManagement';
 import { CategoryManagement } from './pages/CategoryManagement';
 import { ProductManagement } from './pages/ProductManagement';
-import { SupportTickets } from './pages/SupportTickets';
+import { ServiceRequests } from './pages/ServiceRequests';
 import { BuildReviews } from './pages/BuildReviews';
 import { OrderManagement } from './pages/OrderManagement';
 import { CouponManagement } from './pages/CouponManagement';
@@ -73,7 +73,7 @@ const AppLayout = () => {
               path="/support"
               element={
                 <ProtectedRoute allowedRoles={['Admin', 'Staff']}>
-                  <SupportTickets />
+                  <ServiceRequests />
                 </ProtectedRoute>
               }
             />
@@ -81,7 +81,7 @@ const AppLayout = () => {
               path="/service-requests"
               element={
                 <ProtectedRoute allowedRoles={['Admin', 'Staff']}>
-                  <SupportTickets />
+                  <ServiceRequests />
                 </ProtectedRoute>
               }
             />

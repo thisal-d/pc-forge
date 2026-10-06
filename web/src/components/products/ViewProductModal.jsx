@@ -97,6 +97,14 @@ export const ViewProductModal = ({
               <span className="detail-item-value">{product.model || '—'}</span>
             </div>
             <div className="detail-item">
+              <span className="detail-item-label">Warranty</span>
+              <span className="detail-item-value" style={{ color: '#10b981', fontWeight: 600 }}>
+                {product.warrantyMonths >= 12
+                  ? `${Math.floor(product.warrantyMonths / 12)} Year${Math.floor(product.warrantyMonths / 12) > 1 ? 's' : ''}${product.warrantyMonths % 12 > 0 ? ` ${product.warrantyMonths % 12} Mos` : ''}`
+                  : `${product.warrantyMonths || 36} Months`}
+              </span>
+            </div>
+            <div className="detail-item">
               <span className="detail-item-label">Stock Status</span>
               <span className="detail-item-value">
                 {product.stockQuantity <= 0 ? 'Out of Stock' : product.stockQuantity <= 5 ? 'Low Stock' : 'In Stock'}
@@ -135,7 +143,7 @@ export const ViewProductModal = ({
             ) : (
               <div className="details-grid">
                 {viewingFilterValues.map((fv) => {
-                  const matchedFilter = viewingFilters.find((f) => f.filterId === fv.filterId);
+                  const matchedFilter = viewingFilters.find((f) => f.filterKey === fv.filterKey || f.filterId === fv.filterId);
                   const label = matchedFilter?.displayName || fv.filterKey || `Filter #${fv.filterId}`;
                   const unit = matchedFilter?.unit;
                   return (

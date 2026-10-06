@@ -1,13 +1,12 @@
 import api from '../api/axiosInstance.js';
 
 export const buildReviewService = {
-  // Fetch all custom builds from backend API with optional search, status, and staff filters
-  async fetchBuilds({ status = 'all', search = '', staffId = 'all' } = {}) {
+  // Fetch all custom builds from backend API with optional search and status filters
+  async fetchBuilds({ status = 'all', search = '' } = {}) {
     try {
       const params = {};
       if (status !== 'all') params.status = status;
       if (search.trim()) params.search = search.trim();
-      if (staffId !== 'all') params.staffId = staffId;
 
       const response = await api.get('/custombuilds', { params });
       if (Array.isArray(response.data)) {
@@ -35,13 +34,12 @@ export const buildReviewService = {
   },
 
   // Update build review status and technician notes (PATCH /api/custombuilds/{id}/review)
-  async updateBuildReview(buildId, { status, staffNotes, assignedStaffId }) {
+  async updateBuildReview(buildId, { status, staffNotes }) {
     const id = Number(buildId);
     try {
       const response = await api.patch(`/custombuilds/${id}/review`, {
         status,
         staffNotes,
-        assignedStaffId,
       });
       return response.data;
     } catch (err) {

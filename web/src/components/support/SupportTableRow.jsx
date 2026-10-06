@@ -68,24 +68,6 @@ export const SupportTableRow = ({
       </td>
 
       <td>
-        <div style={{ fontSize: '0.85rem', color: '#93c5fd' }}>
-          {ticket.orderId ? `Order #${ticket.orderId}` : '—'}
-        </div>
-        <div
-          style={{
-            fontSize: '0.75rem',
-            color: 'var(--text-muted)',
-            maxWidth: '160px',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {ticket.productName || 'General Inquiry'}
-        </div>
-      </td>
-
-      <td>
         <div
           style={{
             fontWeight: 500,
@@ -129,18 +111,6 @@ export const SupportTableRow = ({
       <td>
         <span className={getStatusBadgeClass(ticket.status)}>
           {ticket.status}
-        </span>
-      </td>
-
-      <td>
-        <span
-          style={{
-            fontSize: '0.85rem',
-            color: ticket.assignedStaffName ? 'var(--text-main)' : 'var(--text-muted)',
-            fontStyle: ticket.assignedStaffName ? 'normal' : 'italic',
-          }}
-        >
-          {ticket.assignedStaffName || 'Unassigned'}
         </span>
       </td>
 

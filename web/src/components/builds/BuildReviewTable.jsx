@@ -38,17 +38,16 @@ export const BuildReviewTable = ({
               <th>Total Cost</th>
               <th>Estimated Power</th>
               <th>Compatibility</th>
-              <th>Workbench Staff</th>
               <th>Status</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           {loading ? (
-            <TableSkeleton rows={pageSize} columns={8} />
+            <TableSkeleton rows={pageSize} columns={7} />
           ) : displayedItems.length === 0 ? (
             <tbody>
               <tr>
-                <td colSpan="8" style={{ padding: 0 }}>
+                <td colSpan="7" style={{ padding: 0 }}>
                   <div className="empty-state">
                     <div className="empty-state-icon">
                       <ClipboardListIcon size={40} />
