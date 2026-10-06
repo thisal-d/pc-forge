@@ -128,7 +128,7 @@ class SupportService extends ChangeNotifier {
     int? orderId,
     int? productId,
     String? productName,
-    required String problemDescription,
+    String problemDescription = '',
     String problemCategory = 'General',
     String? troubleshootingSummary,
     int attemptCount = 0,
@@ -141,12 +141,15 @@ class SupportService extends ChangeNotifier {
   }) async {
     final finalTitle = (title != null && title.trim().isNotEmpty)
         ? title.trim()
-        : (problemDescription.isNotEmpty ? problemDescription : 'Service Request');
+        : (description != null && description.trim().isNotEmpty
+            ? description.trim()
+            : (problemDescription.isNotEmpty ? problemDescription : 'Service Request'));
     final apiRes = await _apiService.createServiceRequest(
       title: finalTitle,
       description: description,
       orderId: orderId,
       productId: productId,
+      productName: productName,
       problemDescription: problemDescription,
       problemCategory: problemCategory,
       troubleshootingSummary: troubleshootingSummary,

@@ -122,15 +122,15 @@ class _SupportScreenState extends State<SupportScreen> {
 
   bool _isCancellable(String status) {
     final s = status.toUpperCase().replaceAll('_', ' ');
-    return s != 'COMPLETED' && s != 'RESOLVED' && s != 'CANCELLED' && s != 'CANCELED' && s != 'NO SHOW';
+    return s == 'PENDING';
   }
 
   Future<void> _confirmCancelRequest(ServiceRequestModel sr) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel Service Request?'),
-        content: Text('Are you sure you want to cancel request ${sr.serviceRequestNumber}? This action cannot be undone.'),
+        title: const Text('Cancel Service Request'),
+        content: const Text('Are you sure you want to cancel this service request?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -142,7 +142,7 @@ class _SupportScreenState extends State<SupportScreen> {
               backgroundColor: AppColors.alertRed,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Yes, Cancel Request'),
+            child: const Text('Cancel Service Request'),
           ),
         ],
       ),
@@ -161,9 +161,10 @@ class _SupportScreenState extends State<SupportScreen> {
         }
       } catch (e) {
         if (mounted) {
+          final errorMsg = e.toString().replaceAll('ApiException: ', '').replaceAll('Exception: ', '');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to cancel request: $e'),
+              content: Text('Failed to cancel request: $errorMsg'),
               backgroundColor: AppColors.alertRed,
             ),
           );
@@ -431,62 +432,7 @@ class _SupportScreenState extends State<SupportScreen> {
 
               const SizedBox(height: 16),
 
-              // Problem & Category
-              Text(
-                'Problem Category: ${sr.problemCategory}',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primaryDark,
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              if (sr.orderId != null) ...[
-                Row(
-                  children: [
-                    const Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.secondaryText),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Linked Order: #ORD-${sr.orderId}',
-                      style: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-              ],
-
-              if (sr.productName != null) ...[
-                Row(
-                  children: [
-                    const Icon(Icons.memory_rounded, size: 16, color: AppColors.secondaryText),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Hardware: ${sr.productName}',
-                      style: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-              ],
-
-              Row(
-                children: [
-                  const Icon(Icons.verified_user_outlined, size: 16, color: AppColors.secondaryText),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Warranty: ${sr.warrantyStatus}',
-                    style: TextStyle(
-                      color: sr.warrantyStatus == 'Active' ? AppColors.stockGreen : AppColors.alertRed,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-
               if (sr.preferredDate != null) ...[
-                const SizedBox(height: 4),
                 Row(
                   children: [
                     const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.secondaryText),
@@ -497,81 +443,31 @@ class _SupportScreenState extends State<SupportScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
               ],
+
+              Row(
+                children: [
+                  const Icon(Icons.access_time_rounded, size: 16, color: AppColors.secondaryText),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Submitted: ${sr.createdAt.day}/${sr.createdAt.month}/${sr.createdAt.year}',
+                    style: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
+                  ),
+                ],
+              ),
 
               const Divider(height: 24),
 
-              const Text(
-                'Customer Description',
-                style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primaryDark),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                sr.problemDescription,
-                style: const TextStyle(color: AppColors.primaryDark, fontSize: 14, height: 1.4),
-              ),
-
-              if (sr.troubleshootingSummary != null && sr.troubleshootingSummary!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFC7D2FE)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.smart_toy_outlined, size: 16, color: Color(0xFF4338CA)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'AI Troubleshooting Summary (${sr.attemptCount} Attempts)',
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF4338CA)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        sr.troubleshootingSummary!,
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B), height: 1.4),
-                      ),
-                    ],
-                  ),
+              if (sr.description != null && sr.description!.isNotEmpty) ...[
+                const Text(
+                  'Details',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primaryDark),
                 ),
-              ],
-
-              if (sr.technicianNotes != null && sr.technicianNotes!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFBBF7D0)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.build_circle_outlined, size: 16, color: Color(0xFF166534)),
-                          SizedBox(width: 6),
-                          Text(
-                            'Technician Notes & Diagnostics',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF166534)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        sr.technicianNotes!,
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF14532D), height: 1.4),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 6),
+                Text(
+                  sr.description!,
+                  style: const TextStyle(color: AppColors.primaryDark, fontSize: 14, height: 1.4),
                 ),
               ],
 
@@ -584,7 +480,7 @@ class _SupportScreenState extends State<SupportScreen> {
                     _confirmCancelRequest(sr);
                   },
                   icon: const Icon(Icons.cancel_outlined, color: AppColors.alertRed),
-                  label: const Text('Cancel This Service Request', style: TextStyle(color: AppColors.alertRed, fontWeight: FontWeight.bold)),
+                  label: const Text('Cancel Service Request', style: TextStyle(color: AppColors.alertRed, fontWeight: FontWeight.bold)),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.alertRed),
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -685,6 +581,17 @@ class _SupportScreenState extends State<SupportScreen> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AiSupportChatScreen()),
+              );
+              _loadRequests();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primaryBlue),
+            tooltip: 'Create Service Request',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreateServiceRequestScreen()),
               );
               _loadRequests();
             },
@@ -1095,8 +1002,10 @@ class _SupportScreenState extends State<SupportScreen> {
                                                   const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.secondaryText),
                                                   const SizedBox(width: 4),
                                                   Text(
-                                                    '${sr.preferredDate}',
-                                                    style: const TextStyle(fontSize: 11, color: AppColors.secondaryText),
+                                                    sr.preferredTime != null && sr.preferredTime!.isNotEmpty
+                                                        ? '${sr.preferredDate} at ${sr.preferredTime}'
+                                                        : '${sr.preferredDate}',
+                                                    style: const TextStyle(fontSize: 11, color: AppColors.secondaryText, fontWeight: FontWeight.w500),
                                                   ),
                                                   const SizedBox(width: 8),
                                                 ],
@@ -1116,7 +1025,7 @@ class _SupportScreenState extends State<SupportScreen> {
                                                     onPressed: () => _confirmCancelRequest(sr),
                                                     icon: const Icon(Icons.cancel_outlined, size: 14, color: AppColors.alertRed),
                                                     label: const Text(
-                                                      'Cancel Request',
+                                                      'Cancel Service Request',
                                                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.alertRed),
                                                     ),
                                                     style: TextButton.styleFrom(

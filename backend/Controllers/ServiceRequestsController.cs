@@ -29,7 +29,7 @@ public class ServiceRequestsController : ControllerBase
     }
 
     /// <summary>
-    /// Executes Member 05 AI After-Sales Service Agent for troubleshooting and service requests.
+    /// Executes AI After-Sales Service Agent for troubleshooting and service requests.
     /// </summary>
     [AllowAnonymous]
     [HttpPost("ai-chat")]
@@ -59,16 +59,18 @@ public class ServiceRequestsController : ControllerBase
             return BadRequest(new { message = "Date parameter is required." });
         }
 
-        var targetDate = date.Value.Date;
+        var targetDateUtc = DateTime.SpecifyKind(date.Value.Date, DateTimeKind.Utc);
+        var nextDateUtc = targetDateUtc.AddDays(1);
         var count = await _context.ServiceRequests.CountAsync(sr =>
             sr.PreferredDate.HasValue &&
-            sr.PreferredDate.Value.Date == targetDate &&
+            sr.PreferredDate.Value >= targetDateUtc &&
+            sr.PreferredDate.Value < nextDateUtc &&
             sr.Status.ToLower() != "cancelled" &&
             sr.Status.ToLower() != "canceled");
 
         return Ok(new ServiceAvailabilityDto
         {
-            Date = targetDate.ToString("yyyy-MM-dd"),
+            Date = targetDateUtc.ToString("yyyy-MM-dd"),
             BookedCount = count,
             MaxCapacity = 10,
             RemainingSlots = Math.Max(0, 10 - count),
@@ -77,30 +79,29 @@ public class ServiceRequestsController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieve customer's service requests or storewide list for staff/admin with optional status and date range filters.
+    /// Retrieve customer's service requests or storewide list for staff/admin with optional status, search, and date range filters.
     /// </summary>
-    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<List<ServiceRequestSummaryDto>>> GetServiceRequests(
         [FromQuery] string? status = null,
         [FromQuery] string? search = null,
-        [FromQuery] string? priority = null,
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
     {
-        var currentUserId = GetCurrentUserId() ?? 1;
+        var currentUserId = GetCurrentUserId();
         var isStaffOrAdmin = User.Identity?.IsAuthenticated == true && (User.IsInRole("Admin") || User.IsInRole("Staff"));
         var query = _context.ServiceRequests
             .AsNoTracking()
-            .Include(sr => sr.Product)
             .Include(sr => sr.User)
-            .Include(sr => sr.AssignedStaff)
-                .ThenInclude(s => s!.User)
             .AsQueryable();
 
         if (!isStaffOrAdmin)
         {
-            query = query.Where(sr => sr.UserId == currentUserId);
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized(new { message = "You must be logged in to view your service requests." });
+            }
+            query = query.Where(sr => sr.UserId == currentUserId.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(status) && status.ToLower() != "all")
@@ -140,20 +141,13 @@ public class ServiceRequestsController : ControllerBase
             query = query.Where(sr => (sr.PreferredDate.HasValue && sr.PreferredDate.Value.Date <= endDate.Value.Date) || (!sr.PreferredDate.HasValue && sr.CreatedAt <= end));
         }
 
-        if (!string.IsNullOrWhiteSpace(priority) && priority.ToLower() != "all")
-        {
-            var cleanPriority = priority.Trim();
-            query = query.Where(sr => sr.Priority.ToLower() == cleanPriority.ToLower());
-        }
-
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToLower();
             query = query.Where(sr =>
                 sr.ServiceRequestNumber.ToLower().Contains(term) ||
                 (sr.Title != null && sr.Title.ToLower().Contains(term)) ||
-                sr.ProblemDescription.ToLower().Contains(term) ||
-                (sr.Product != null && sr.Product.Name.ToLower().Contains(term)) ||
+                (sr.Description != null && sr.Description.ToLower().Contains(term)) ||
                 (sr.User != null && ((sr.User.FirstName != null && sr.User.FirstName.ToLower().Contains(term)) || (sr.User.LastName != null && sr.User.LastName.ToLower().Contains(term)) || sr.User.Email.ToLower().Contains(term))));
         }
 
@@ -166,27 +160,11 @@ public class ServiceRequestsController : ControllerBase
                 UserId = sr.UserId,
                 CustomerName = sr.User != null ? $"{sr.User.FirstName} {sr.User.LastName}".Trim() : null,
                 CustomerEmail = sr.User != null ? sr.User.Email : null,
-                OrderId = sr.OrderId,
-                ProductId = sr.ProductId,
-                ProductName = sr.Product != null ? sr.Product.Name : null,
-                Title = !string.IsNullOrEmpty(sr.Title) ? sr.Title : (!string.IsNullOrEmpty(sr.TroubleshootingSummary) ? sr.TroubleshootingSummary : sr.ProblemDescription),
-                Description = !string.IsNullOrEmpty(sr.Description) ? sr.Description : sr.ProblemDescription,
-                ProblemDescription = sr.ProblemDescription,
-                ProblemCategory = sr.ProblemCategory,
-                TroubleshootingSummary = sr.TroubleshootingSummary,
-                AttemptCount = sr.AttemptCount,
-                WarrantyStatus = sr.WarrantyStatus,
-                WarrantyExpiryDate = sr.WarrantyExpiryDate,
+                Title = !string.IsNullOrWhiteSpace(sr.Title) ? sr.Title : "Service Request",
+                Description = sr.Description,
                 PreferredDate = sr.PreferredDate,
                 PreferredTime = sr.PreferredTime,
                 Status = sr.Status,
-                Priority = sr.Priority,
-                AssignedStaffId = sr.AssignedStaffId,
-                AssignedStaffName = sr.AssignedStaff != null && sr.AssignedStaff.User != null
-                    ? $"{sr.AssignedStaff.User.FirstName} {sr.AssignedStaff.User.LastName}".Trim()
-                    : null,
-                InternalNotes = isStaffOrAdmin ? sr.InternalNotes : null,
-                AttachmentUrl = sr.AttachmentUrl,
                 CreatedAt = sr.CreatedAt
             })
             .ToListAsync();
@@ -209,11 +187,7 @@ public class ServiceRequestsController : ControllerBase
         {
             request = await _context.ServiceRequests
                 .AsNoTracking()
-                .Include(sr => sr.Product)
                 .Include(sr => sr.User)
-                .Include(sr => sr.Order)
-                .Include(sr => sr.AssignedStaff)
-                    .ThenInclude(s => s!.User)
                 .FirstOrDefaultAsync(sr => sr.ServiceRequestId == numericId);
         }
         else
@@ -221,11 +195,7 @@ public class ServiceRequestsController : ControllerBase
             var cleanSrNumber = id.Trim().ToUpper();
             request = await _context.ServiceRequests
                 .AsNoTracking()
-                .Include(sr => sr.Product)
                 .Include(sr => sr.User)
-                .Include(sr => sr.Order)
-                .Include(sr => sr.AssignedStaff)
-                    .ThenInclude(s => s!.User)
                 .FirstOrDefaultAsync(sr => sr.ServiceRequestNumber.ToUpper() == cleanSrNumber);
         }
 
@@ -246,30 +216,12 @@ public class ServiceRequestsController : ControllerBase
             UserId = request.UserId,
             CustomerName = request.User != null ? $"{request.User.FirstName} {request.User.LastName}".Trim() : null,
             CustomerEmail = request.User != null ? request.User.Email : null,
-            OrderId = request.OrderId,
-            OrderDate = request.Order?.CreatedAt,
-            ProductId = request.ProductId,
-            ProductName = request.Product?.Name,
-            Title = !string.IsNullOrEmpty(request.Title) ? request.Title : (!string.IsNullOrEmpty(request.TroubleshootingSummary) ? request.TroubleshootingSummary : request.ProblemDescription),
-            Description = !string.IsNullOrEmpty(request.Description) ? request.Description : request.ProblemDescription,
-            ProblemDescription = request.ProblemDescription,
-            ProblemCategory = request.ProblemCategory,
-            TroubleshootingSummary = request.TroubleshootingSummary,
-            AttemptCount = request.AttemptCount,
-            WarrantyStatus = request.WarrantyStatus,
-            WarrantyExpiryDate = request.WarrantyExpiryDate,
+            CustomerPhone = null,
+            Title = !string.IsNullOrWhiteSpace(request.Title) ? request.Title : "Service Request",
+            Description = request.Description,
             PreferredDate = request.PreferredDate,
             PreferredTime = request.PreferredTime,
             Status = request.Status,
-            Priority = request.Priority,
-            AssignedStaffId = request.AssignedStaffId,
-            AssignedStaffName = request.AssignedStaff != null && request.AssignedStaff.User != null
-                ? $"{request.AssignedStaff.User.FirstName} {request.AssignedStaff.User.LastName}".Trim()
-                : null,
-            TechnicianNotes = request.TechnicianNotes,
-            Resolution = request.Resolution,
-            InternalNotes = isStaffOrAdmin ? request.InternalNotes : null,
-            AttachmentUrl = request.AttachmentUrl,
             CreatedAt = request.CreatedAt,
             UpdatedAt = request.UpdatedAt
         });
@@ -277,91 +229,48 @@ public class ServiceRequestsController : ControllerBase
 
     /// <summary>
     /// Create a new Service Request (Customer or Staff).
+    /// All form items are optional and simple.
     /// </summary>
-    [AllowAnonymous]
     [HttpPost]
     public async Task<ActionResult<ServiceRequestDetailDto>> CreateServiceRequest([FromBody] CreateServiceRequestDto dto)
     {
-        if (!ModelState.IsValid)
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
         {
-            return BadRequest(ModelState);
+            return Unauthorized(new { message = "You must be logged in to create a service request." });
         }
+        int userId = currentUserId.Value;
 
-        var currentUserId = GetCurrentUserId() ?? 1;
-        int userId = currentUserId;
-
-        // Resolve Title and Description
+        // Resolve Title and Description (optional, graceful defaults)
         var resolvedTitle = !string.IsNullOrWhiteSpace(dto.Title)
             ? dto.Title.Trim()
-            : (!string.IsNullOrWhiteSpace(dto.ProblemDescription)
-                ? dto.ProblemDescription.Trim()
-                : (!string.IsNullOrWhiteSpace(dto.TroubleshootingSummary) ? dto.TroubleshootingSummary.Trim() : "Hardware Service Request"));
+            : (!string.IsNullOrWhiteSpace(dto.Description) 
+                ? (dto.Description.Length > 50 ? dto.Description.Substring(0, 50) + "..." : dto.Description.Trim())
+                : "Service Request");
 
         var resolvedDescription = !string.IsNullOrWhiteSpace(dto.Description)
             ? dto.Description.Trim()
-            : (!string.IsNullOrWhiteSpace(dto.ProblemDescription) ? dto.ProblemDescription.Trim() : null);
+            : null;
 
-        if (string.IsNullOrWhiteSpace(resolvedTitle))
-        {
-            return BadRequest(new { message = "Title is required for service request." });
-        }
-
-        // Validate appointment time (9 AM to 6 PM)
-        if (!ValidateAppointmentTime(dto.PreferredTime, out var timeError))
+        // Validate appointment time (9 AM to 6 PM) if provided
+        if (!string.IsNullOrWhiteSpace(dto.PreferredTime) && !ValidateAppointmentTime(dto.PreferredTime, out var timeError))
         {
             return BadRequest(new { message = timeError });
         }
 
-        // Validate capacity limit (Max 10 service appointments per date for all customers)
+        // Validate capacity limit (Max 10 service appointments per date for all customers) if date provided
         if (dto.PreferredDate.HasValue)
         {
-            if (dto.PreferredDate.Value.Date < DateTime.UtcNow.Date)
+            var prefDateUtc = DateTime.SpecifyKind(dto.PreferredDate.Value.Date, DateTimeKind.Utc);
+            dto.PreferredDate = prefDateUtc;
+            if (prefDateUtc < DateTime.UtcNow.Date)
             {
                 return BadRequest(new { message = "Appointment date cannot be in the past. Please select a future date." });
             }
-            if (await IsDateOverCapacityAsync(dto.PreferredDate.Value))
+            if (await IsDateOverCapacityAsync(prefDateUtc))
             {
-                return BadRequest(new { message = $"The selected date ({dto.PreferredDate.Value:yyyy-MM-dd}) has reached its maximum capacity of 10 service appointments. Please choose another date." });
+                return BadRequest(new { message = $"The selected date ({prefDateUtc:yyyy-MM-dd}) has reached its maximum capacity of 10 service appointments. Please choose another date." });
             }
-        }
-
-        // Verify linked order & product if provided
-        Product? linkedProduct = null;
-        DateTime? verifiedExpiryDate = dto.WarrantyExpiryDate;
-        string calculatedWarrantyStatus = dto.WarrantyStatus;
-
-        if (dto.OrderId.HasValue && dto.OrderId.Value > 0)
-        {
-            var order = await _context.Orders
-                .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                    .ThenInclude(p => p!.Category)
-                .FirstOrDefaultAsync(o => o.OrderId == dto.OrderId.Value);
-
-            if (order != null)
-            {
-                if (dto.ProductId.HasValue && dto.ProductId.Value > 0)
-                {
-                    linkedProduct = order.Items.FirstOrDefault(i => i.ProductId == dto.ProductId.Value)?.Product;
-                }
-                else if (order.Items.Count > 0)
-                {
-                    linkedProduct = order.Items.First().Product;
-                }
-
-                if (linkedProduct != null)
-                {
-                    var warrantyMonths = linkedProduct.WarrantyMonths > 0 
-                        ? linkedProduct.WarrantyMonths 
-                        : GetWarrantyMonths(linkedProduct.Category?.Name, linkedProduct.Specifications);
-                    verifiedExpiryDate = order.CreatedAt.AddMonths(warrantyMonths);
-                    calculatedWarrantyStatus = verifiedExpiryDate >= DateTime.UtcNow ? "Active" : "Expired";
-                }
-            }
-        }
-        else if (dto.ProductId.HasValue && dto.ProductId.Value > 0)
-        {
-            linkedProduct = await _context.Products.Include(p => p.Category).FirstOrDefaultAsync(p => p.ProductId == dto.ProductId.Value);
         }
 
         // Generate next Service Request Number
@@ -372,21 +281,11 @@ public class ServiceRequestsController : ControllerBase
         {
             ServiceRequestNumber = srNumber,
             UserId = userId,
-            OrderId = dto.OrderId,
-            ProductId = linkedProduct?.ProductId ?? dto.ProductId,
             Title = resolvedTitle,
             Description = resolvedDescription,
-            ProblemDescription = !string.IsNullOrWhiteSpace(resolvedDescription) ? resolvedDescription : resolvedTitle,
-            ProblemCategory = string.IsNullOrWhiteSpace(dto.ProblemCategory) ? "General" : dto.ProblemCategory.Trim(),
-            TroubleshootingSummary = dto.TroubleshootingSummary ?? resolvedTitle,
-            AttemptCount = dto.AttemptCount,
-            WarrantyStatus = calculatedWarrantyStatus,
-            WarrantyExpiryDate = verifiedExpiryDate,
             PreferredDate = dto.PreferredDate,
             PreferredTime = dto.PreferredTime,
             Status = "Pending",
-            Priority = !string.IsNullOrWhiteSpace(dto.Priority) ? dto.Priority : "Normal",
-            AttachmentUrl = dto.AttachmentUrl,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -402,21 +301,11 @@ public class ServiceRequestsController : ControllerBase
             ServiceRequestId = request.ServiceRequestId,
             ServiceRequestNumber = request.ServiceRequestNumber,
             UserId = request.UserId,
-            OrderId = request.OrderId,
-            ProductId = request.ProductId,
-            ProductName = linkedProduct?.Name,
             Title = request.Title,
             Description = request.Description,
-            ProblemDescription = request.ProblemDescription,
-            ProblemCategory = request.ProblemCategory,
-            TroubleshootingSummary = request.TroubleshootingSummary,
-            AttemptCount = request.AttemptCount,
-            WarrantyStatus = request.WarrantyStatus,
-            WarrantyExpiryDate = request.WarrantyExpiryDate,
             PreferredDate = request.PreferredDate,
             PreferredTime = request.PreferredTime,
             Status = request.Status,
-            Priority = request.Priority,
             CreatedAt = request.CreatedAt,
             UpdatedAt = request.UpdatedAt
         });
@@ -425,33 +314,29 @@ public class ServiceRequestsController : ControllerBase
     /// <summary>
     /// Cancel a service request (Customer can cancel their own request, staff/admin can cancel any).
     /// </summary>
-    [AllowAnonymous]
     [HttpPost("{id}/cancel")]
     public async Task<ActionResult<ServiceRequestDetailDto>> CancelServiceRequest(string id)
     {
-        var currentUserId = GetCurrentUserId() ?? 1;
+        var currentUserId = GetCurrentUserId();
         var isStaffOrAdmin = User.Identity?.IsAuthenticated == true && (User.IsInRole("Admin") || User.IsInRole("Staff"));
+
+        if (!isStaffOrAdmin && !currentUserId.HasValue)
+        {
+            return Unauthorized(new { message = "You must be logged in to cancel a service request." });
+        }
 
         ServiceRequest? request = null;
         if (int.TryParse(id, out int numericId))
         {
             request = await _context.ServiceRequests
-                .Include(sr => sr.Product)
                 .Include(sr => sr.User)
-                .Include(sr => sr.Order)
-                .Include(sr => sr.AssignedStaff)
-                    .ThenInclude(s => s!.User)
                 .FirstOrDefaultAsync(sr => sr.ServiceRequestId == numericId);
         }
         else
         {
             var cleanSrNumber = id.Trim().ToUpper();
             request = await _context.ServiceRequests
-                .Include(sr => sr.Product)
                 .Include(sr => sr.User)
-                .Include(sr => sr.Order)
-                .Include(sr => sr.AssignedStaff)
-                    .ThenInclude(s => s!.User)
                 .FirstOrDefaultAsync(sr => sr.ServiceRequestNumber.ToUpper() == cleanSrNumber);
         }
 
@@ -460,7 +345,7 @@ public class ServiceRequestsController : ControllerBase
             return NotFound(new { message = $"Service Request '{id}' not found." });
         }
 
-        if (!isStaffOrAdmin && request.UserId != currentUserId)
+        if (!isStaffOrAdmin && request.UserId != currentUserId.Value)
         {
             return Forbid();
         }
@@ -489,37 +374,19 @@ public class ServiceRequestsController : ControllerBase
             UserId = request.UserId,
             CustomerName = request.User != null ? $"{request.User.FirstName} {request.User.LastName}".Trim() : null,
             CustomerEmail = request.User != null ? request.User.Email : null,
-            OrderId = request.OrderId,
-            OrderDate = request.Order?.CreatedAt,
-            ProductId = request.ProductId,
-            ProductName = request.Product?.Name,
-            Title = !string.IsNullOrEmpty(request.Title) ? request.Title : (!string.IsNullOrEmpty(request.TroubleshootingSummary) ? request.TroubleshootingSummary : request.ProblemDescription),
-            Description = !string.IsNullOrEmpty(request.Description) ? request.Description : request.ProblemDescription,
-            ProblemDescription = request.ProblemDescription,
-            ProblemCategory = request.ProblemCategory,
-            TroubleshootingSummary = request.TroubleshootingSummary,
-            AttemptCount = request.AttemptCount,
-            WarrantyStatus = request.WarrantyStatus,
-            WarrantyExpiryDate = request.WarrantyExpiryDate,
+            Title = !string.IsNullOrWhiteSpace(request.Title) ? request.Title : "Service Request",
+            Description = request.Description,
             PreferredDate = request.PreferredDate,
             PreferredTime = request.PreferredTime,
             Status = request.Status,
-            Priority = request.Priority,
-            AssignedStaffId = request.AssignedStaffId,
-            AssignedStaffName = request.AssignedStaff != null && request.AssignedStaff.User != null
-                ? $"{request.AssignedStaff.User.FirstName} {request.AssignedStaff.User.LastName}".Trim()
-                : null,
-            TechnicianNotes = request.TechnicianNotes,
-            Resolution = request.Resolution,
-            InternalNotes = isStaffOrAdmin ? request.InternalNotes : null,
-            AttachmentUrl = request.AttachmentUrl,
             CreatedAt = request.CreatedAt,
             UpdatedAt = request.UpdatedAt
         });
     }
 
     /// <summary>
-    /// Update service request status, diagnosis, internal notes, or assigned technician (Technician/Staff only).
+    /// Update service request status and appointment date/time (Technician/Staff only).
+    /// No technician assignment or resolution notes.
     /// </summary>
     [Authorize(Policy = "StaffOnly")]
     [HttpPut("{id}")]
@@ -529,22 +396,14 @@ public class ServiceRequestsController : ControllerBase
         if (int.TryParse(id, out int numericId))
         {
             request = await _context.ServiceRequests
-                .Include(sr => sr.Product)
                 .Include(sr => sr.User)
-                .Include(sr => sr.Order)
-                .Include(sr => sr.AssignedStaff)
-                    .ThenInclude(s => s!.User)
                 .FirstOrDefaultAsync(sr => sr.ServiceRequestId == numericId);
         }
         else
         {
             var clean = id.Trim().ToUpper();
             request = await _context.ServiceRequests
-                .Include(sr => sr.Product)
                 .Include(sr => sr.User)
-                .Include(sr => sr.Order)
-                .Include(sr => sr.AssignedStaff)
-                    .ThenInclude(s => s!.User)
                 .FirstOrDefaultAsync(sr => sr.ServiceRequestNumber.ToUpper() == clean);
         }
 
@@ -558,38 +417,17 @@ public class ServiceRequestsController : ControllerBase
             request.Status = NormalizeStatus(dto.Status);
         }
 
-        if (!string.IsNullOrWhiteSpace(dto.Priority))
+        if (dto.PreferredDate.HasValue)
         {
-            request.Priority = dto.Priority.Trim();
-        }
-
-        if (dto.AssignedStaffId.HasValue)
-        {
-            request.AssignedStaffId = dto.AssignedStaffId.Value > 0 ? dto.AssignedStaffId.Value : null;
-        }
-
-        if (dto.TechnicianNotes != null)
-        {
-            request.TechnicianNotes = dto.TechnicianNotes.Trim();
-        }
-
-        if (dto.Resolution != null)
-        {
-            request.Resolution = dto.Resolution.Trim();
-        }
-
-        if (dto.InternalNotes != null)
-        {
-            request.InternalNotes = dto.InternalNotes.Trim();
-        }
-
-        if (dto.PreferredDate.HasValue && dto.PreferredDate.Value.Date != request.PreferredDate?.Date)
-        {
-            if (await IsDateOverCapacityAsync(dto.PreferredDate.Value, request.ServiceRequestId))
+            var updateDateUtc = DateTime.SpecifyKind(dto.PreferredDate.Value.Date, DateTimeKind.Utc);
+            if (updateDateUtc != request.PreferredDate?.Date)
             {
-                return BadRequest(new { message = $"The selected date ({dto.PreferredDate.Value:yyyy-MM-dd}) has reached its maximum capacity of 10 service appointments. Please choose another date." });
+                if (await IsDateOverCapacityAsync(updateDateUtc, request.ServiceRequestId))
+                {
+                    return BadRequest(new { message = $"The selected date ({updateDateUtc:yyyy-MM-dd}) has reached its maximum capacity of 10 service appointments. Please choose another date." });
+                }
+                request.PreferredDate = updateDateUtc;
             }
-            request.PreferredDate = dto.PreferredDate;
         }
 
         if (!string.IsNullOrWhiteSpace(dto.PreferredTime))
@@ -604,8 +442,8 @@ public class ServiceRequestsController : ControllerBase
         request.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Service Request {SrNumber} updated by staff: Status={Status}, Priority={Priority}",
-            request.ServiceRequestNumber, request.Status, request.Priority);
+        _logger.LogInformation("Service Request {SrNumber} updated: Status={Status}",
+            request.ServiceRequestNumber, request.Status);
 
         return Ok(new ServiceRequestDetailDto
         {
@@ -614,30 +452,11 @@ public class ServiceRequestsController : ControllerBase
             UserId = request.UserId,
             CustomerName = request.User != null ? $"{request.User.FirstName} {request.User.LastName}".Trim() : null,
             CustomerEmail = request.User != null ? request.User.Email : null,
-            OrderId = request.OrderId,
-            OrderDate = request.Order?.CreatedAt,
-            ProductId = request.ProductId,
-            ProductName = request.Product?.Name,
-            Title = !string.IsNullOrEmpty(request.Title) ? request.Title : (!string.IsNullOrEmpty(request.TroubleshootingSummary) ? request.TroubleshootingSummary : request.ProblemDescription),
-            Description = !string.IsNullOrEmpty(request.Description) ? request.Description : request.ProblemDescription,
-            ProblemDescription = request.ProblemDescription,
-            ProblemCategory = request.ProblemCategory,
-            TroubleshootingSummary = request.TroubleshootingSummary,
-            AttemptCount = request.AttemptCount,
-            WarrantyStatus = request.WarrantyStatus,
-            WarrantyExpiryDate = request.WarrantyExpiryDate,
+            Title = !string.IsNullOrWhiteSpace(request.Title) ? request.Title : "Service Request",
+            Description = request.Description,
             PreferredDate = request.PreferredDate,
             PreferredTime = request.PreferredTime,
             Status = request.Status,
-            Priority = request.Priority,
-            AssignedStaffId = request.AssignedStaffId,
-            AssignedStaffName = request.AssignedStaff != null && request.AssignedStaff.User != null
-                ? $"{request.AssignedStaff.User.FirstName} {request.AssignedStaff.User.LastName}".Trim()
-                : null,
-            TechnicianNotes = request.TechnicianNotes,
-            Resolution = request.Resolution,
-            InternalNotes = request.InternalNotes,
-            AttachmentUrl = request.AttachmentUrl,
             CreatedAt = request.CreatedAt,
             UpdatedAt = request.UpdatedAt
         });
@@ -682,10 +501,12 @@ public class ServiceRequestsController : ControllerBase
 
     private async Task<bool> IsDateOverCapacityAsync(DateTime targetDate, int? currentSrId = null)
     {
-        var dateOnly = targetDate.Date;
+        var targetDateUtc = DateTime.SpecifyKind(targetDate.Date, DateTimeKind.Utc);
+        var nextDateUtc = targetDateUtc.AddDays(1);
         var query = _context.ServiceRequests.Where(sr =>
             sr.PreferredDate.HasValue &&
-            sr.PreferredDate.Value.Date == dateOnly &&
+            sr.PreferredDate.Value >= targetDateUtc &&
+            sr.PreferredDate.Value < nextDateUtc &&
             sr.Status.ToLower() != "cancelled" &&
             sr.Status.ToLower() != "canceled");
 

@@ -295,7 +295,10 @@ def check_warranty(order_id: int, product_name_or_id: Optional[str] = None) -> s
 
 
 @tool
-def validate_service_appointment(preferred_date: str, preferred_time: Optional[str] = None) -> str:
+def validate_service_appointment(
+    preferred_date: Optional[str] = None,
+    preferred_time: Optional[str] = None
+) -> str:
     """Validate that customer's requested service date and time slot conforms to PCForge service center rules.
     Business rules:
       - Both date AND time must be specified by the customer.
@@ -303,124 +306,163 @@ def validate_service_appointment(preferred_date: str, preferred_time: Optional[s
       - Service Center is open Monday through Saturday (closed on Sundays).
       - Working hours: 09:00 AM to 06:00 PM.
     Args:
-        preferred_date: Date string (e.g. '2026-10-02' or 'Tomorrow').
-        preferred_time: Optional time string (e.g. '10:00 AM', '02:30 PM').
+        preferred_date: Optional date string (e.g. '2026-10-02', 'Tomorrow', 'next Monday').
+        preferred_time: Optional time string (e.g. '10:00 AM', '02:30 PM', '2 PM').
     Returns:
         JSON string indicating whether appointment is valid, or if time/date is missing.
     """
     now = datetime.now()
-    parsed_date = None
+    ctx = after_sales_context_var.get() if isinstance(after_sales_context_var.get(), dict) else {}
 
+    # Merge previously preserved date/time if not supplied in this turn
     date_str = (preferred_date or "").strip()
-    if not date_str:
-        return json.dumps({
-            "valid": False,
-            "missing": "date",
-            "message": "Appointment date was not provided. Please ask the customer for their preferred date (Monday to Saturday)."
-        })
-
-    date_lower = date_str.lower()
-    if "tomorrow" in date_lower:
-        parsed_date = (now + timedelta(days=1)).date()
-    elif "today" in date_lower:
-        parsed_date = now.date()
-    else:
-        for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%B %d, %Y", "%b %d, %Y", "%d-%m-%Y"]:
-            try:
-                parsed_date = datetime.strptime(date_str, fmt).date()
-                break
-            except Exception:
-                pass
-
-    if not parsed_date:
-        return json.dumps({
-            "valid": False,
-            "error": "invalid_date",
-            "message": f"Could not recognize the date '{date_str}'. Please ask the customer for a valid date (Monday to Saturday)."
-        })
-
-    if parsed_date < now.date():
-        return json.dumps({
-            "valid": False,
-            "error": "past_date",
-            "message": f"The selected date ({parsed_date.strftime('%Y-%m-%d')}) has already passed. Please explain that the date has already passed and ask for another date."
-        })
-
-    if parsed_date.weekday() == 6:  # Sunday
-        return json.dumps({
-            "valid": False,
-            "error": "sunday_closed",
-            "message": f"The service center is closed on Sundays ({parsed_date.strftime('%Y-%m-%d')}). Please ask the customer to choose another date between Monday and Saturday."
-        })
-
-    # Check storewide maximum 10 service request capacity per date
-    ctx = after_sales_context_var.get()
-    existing_list = ctx.get("service_requests") if isinstance(ctx, dict) else None
-    if existing_list and isinstance(existing_list, list) and parsed_date:
-        d_str = parsed_date.strftime("%Y-%m-%d")
-        booked_same_date = sum(
-            1 for sr in existing_list
-            if str(sr.get("preferred_date") or "").startswith(d_str)
-            and str(sr.get("status") or "").upper() not in ("CANCELLED", "CANCELED")
-        )
-        if booked_same_date >= 10:
-            return json.dumps({
-                "valid": False,
-                "error": "capacity_exceeded",
-                "message": f"The selected date ({d_str}) has reached its maximum capacity of 10 service appointments (already has 10 requests booked). Please inform the customer and ask them to choose another date."
-            })
+    if not date_str and ctx.get("preferred_date"):
+        date_str = str(ctx.get("preferred_date")).strip()
 
     time_str = (preferred_time or "").strip()
-    if not time_str or time_str.lower() in ["none", "null", ""]:
+    if not time_str and ctx.get("preferred_time"):
+        time_str = str(ctx.get("preferred_time")).strip()
+
+    parsed_date = None
+    if date_str:
+        date_lower = date_str.lower()
+        if "tomorrow" in date_lower:
+            parsed_date = (now + timedelta(days=1)).date()
+        elif "today" in date_lower:
+            parsed_date = now.date()
+        else:
+            # Check day of week names
+            matched_day = False
+            for idx, d_name in enumerate(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]):
+                if d_name in date_lower:
+                    days_ahead = (idx - now.weekday()) % 7
+                    if days_ahead <= 0 or "next" in date_lower:
+                        days_ahead += 7
+                    parsed_date = (now + timedelta(days=days_ahead)).date()
+                    matched_day = True
+                    break
+            if not matched_day:
+                for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%B %d, %Y", "%b %d, %Y", "%d-%m-%Y"]:
+                    try:
+                        parsed_date = datetime.strptime(date_str, fmt).date()
+                        break
+                    except Exception:
+                        pass
+
+        if not parsed_date:
+            return json.dumps({
+                "valid": False,
+                "error": "invalid_date",
+                "message": f"Could not recognize the date '{date_str}'. Please ask the customer for a valid date (Monday to Saturday)."
+            })
+
+        if parsed_date < now.date():
+            return json.dumps({
+                "valid": False,
+                "error": "past_date",
+                "message": f"The selected date ({parsed_date.strftime('%Y-%m-%d')}) has already passed. Please explain that the date has already passed and ask for another date."
+            })
+
+        if parsed_date.weekday() == 6:  # Sunday
+            return json.dumps({
+                "valid": False,
+                "error": "sunday_closed",
+                "message": f"The service center is closed on Sundays ({parsed_date.strftime('%Y-%m-%d')}). Please ask the customer to choose another date between Monday and Saturday."
+            })
+
+        # Check storewide maximum 10 service request capacity per date
+        existing_list = ctx.get("service_requests") if isinstance(ctx, dict) else None
+        if existing_list and isinstance(existing_list, list) and parsed_date:
+            d_str = parsed_date.strftime("%Y-%m-%d")
+            booked_same_date = sum(
+                1 for sr in existing_list
+                if str(sr.get("preferred_date") or "").startswith(d_str)
+                and str(sr.get("status") or "").upper() not in ("CANCELLED", "CANCELED")
+            )
+            if booked_same_date >= 10:
+                return json.dumps({
+                    "valid": False,
+                    "error": "capacity_exceeded",
+                    "message": f"The selected date ({d_str}) has reached its maximum capacity of 10 service appointments (already has 10 requests booked). Please inform the customer and ask them to choose another date."
+                })
+
+        # Cache valid date into context
+        ctx["preferred_date"] = parsed_date.strftime("%Y-%m-%d")
+
+    formatted_time = None
+    if time_str and time_str.lower() not in ["none", "null", ""]:
+        time_clean = time_str.upper()
+        hour = -1
+        minute = 0
+        match_12 = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(AM|PM)', time_clean)
+        if match_12:
+            h = int(match_12.group(1))
+            minute = int(match_12.group(2) or 0)
+            ampm = match_12.group(3)
+            if ampm == "PM" and h < 12:
+                h += 12
+            elif ampm == "AM" and h == 12:
+                h = 0
+            hour = h
+        elif "AFTERNOON" in time_clean:
+            hour = 14
+            minute = 0
+        elif "MORNING" in time_clean:
+            hour = 10
+            minute = 0
+        else:
+            match_24 = re.search(r'(\d{1,2}):(\d{2})', time_clean)
+            if match_24:
+                hour = int(match_24.group(1))
+                minute = int(match_24.group(2))
+            else:
+                match_h = re.search(r'\b(\d{1,2})\b', time_clean)
+                if match_h:
+                    hour = int(match_h.group(1))
+                    if hour < 7:  # e.g. "2" means 2 PM
+                        hour += 12
+
+        if hour < 9 or hour > 18 or (hour == 18 and minute > 0):
+            return json.dumps({
+                "valid": False,
+                "error": "outside_hours",
+                "message": f"The service time must be between 9:00 AM and 6:00 PM. Requested time '{time_str}' is outside working hours. Please explain that the service time must be between 9:00 AM and 6:00 PM and ask for another time."
+            })
+
+        formatted_time = f"{((hour - 1) % 12) + 1:02d}:{minute:02d} {'PM' if hour >= 12 else 'AM'}"
+        # Cache valid time into context
+        ctx["preferred_time"] = formatted_time
+
+    # Determine state of completion
+    if parsed_date and formatted_time:
+        return json.dumps({
+            "valid": True,
+            "date": parsed_date.strftime("%Y-%m-%d"),
+            "date_display": parsed_date.strftime("%A, %B %d, %Y"),
+            "time": formatted_time,
+            "message": f"Service appointment confirmed for {parsed_date.strftime('%A, %B %d, %Y')} at {formatted_time}."
+        })
+    elif parsed_date and not formatted_time:
         return json.dumps({
             "valid": False,
             "missing": "time",
             "date": parsed_date.strftime("%Y-%m-%d"),
             "date_display": parsed_date.strftime("%A, %B %d, %Y"),
-            "message": f"Appointment date {parsed_date.strftime('%A, %B %d, %Y')} is noted, but preferred time was not provided. Do not create the Service Request yet. Please ask the customer for a preferred time between 9:00 AM and 6:00 PM."
+            "message": f"Appointment date {parsed_date.strftime('%A, %B %d, %Y')} is noted, but preferred time was not provided. Please ask the customer only for their preferred time between 9:00 AM and 6:00 PM."
         })
-
-    time_clean = time_str.upper()
-    hour = -1
-    minute = 0
-    match_12 = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(AM|PM)', time_clean)
-    if match_12:
-        h = int(match_12.group(1))
-        minute = int(match_12.group(2) or 0)
-        ampm = match_12.group(3)
-        if ampm == "PM" and h < 12:
-            h += 12
-        elif ampm == "AM" and h == 12:
-            h = 0
-        hour = h
-    else:
-        match_24 = re.search(r'(\d{1,2}):(\d{2})', time_clean)
-        if match_24:
-            hour = int(match_24.group(1))
-            minute = int(match_24.group(2))
-        else:
-            match_h = re.search(r'\b(\d{1,2})\b', time_clean)
-            if match_h:
-                hour = int(match_h.group(1))
-                if hour < 7:  # e.g. "2" means 2 PM
-                    hour += 12
-
-    if hour < 9 or hour > 18 or (hour == 18 and minute > 0):
+    elif formatted_time and not parsed_date:
         return json.dumps({
             "valid": False,
-            "error": "outside_hours",
-            "message": f"The service time must be between 9:00 AM and 6:00 PM. Requested time '{preferred_time}' is outside working hours. Please explain that the service time must be between 9:00 AM and 6:00 PM and ask for another time."
+            "missing": "date",
+            "time": formatted_time,
+            "message": f"Preferred time {formatted_time} is noted, but appointment date was not provided. Please ask the customer only for their preferred date (Monday to Saturday)."
         })
-
-    formatted_time = f"{((hour - 1) % 12) + 1:02d}:{minute:02d} {'PM' if hour >= 12 else 'AM'}"
-
-    return json.dumps({
-        "valid": True,
-        "date": parsed_date.strftime("%Y-%m-%d"),
-        "date_display": parsed_date.strftime("%A, %B %d, %Y"),
-        "time": formatted_time,
-        "message": f"Service appointment confirmed for {parsed_date.strftime('%A, %B %d, %Y')} at {formatted_time}."
-    })
+    else:
+        return json.dumps({
+            "valid": False,
+            "missing": "both",
+            "message": "Appointment date and time were not provided. Please ask the customer for their preferred date (Monday to Saturday) and time between 9:00 AM and 6:00 PM."
+        })
 
 
 

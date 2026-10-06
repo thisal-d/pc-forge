@@ -271,31 +271,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             color: AppColors.secondaryText,
                           ),
                         ),
-                      const Spacer(),
-                      // Official Warranty Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.stockGreen.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.stockGreen.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.verified_user_rounded, color: AppColors.stockGreen, size: 15),
-                            const SizedBox(width: 4),
-                            Text(
-                              product.warrantyDisplay,
-                              style: const TextStyle(
-                                color: AppColors.stockGreen,
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
 
@@ -379,23 +354,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                         const Divider(height: 20),
 
-                        // Warranty & Trust Badge
-                        Row(
+                        // Authenticity & Trust Badge
+                        const Row(
                           children: [
-                            const Icon(Icons.verified_user_rounded, color: AppColors.primaryBlue, size: 18),
-                            const SizedBox(width: 8),
+                            Icon(Icons.verified_rounded, color: AppColors.primaryBlue, size: 18),
+                            SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                product.warranty,
-                                style: const TextStyle(
+                                '100% Genuine Hardware',
+                                style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.primaryDark,
                                 ),
                               ),
                             ),
-                            const Text(
-                              'Genuine Parts',
+                            Text(
+                              'Authorized Dealer',
                               style: TextStyle(fontSize: 12, color: AppColors.secondaryText),
                             ),
                           ],
@@ -464,7 +439,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         if (product.powerWattage != null) _specRow('Power / TDP', '${product.powerWattage} W'),
                         if (product.efficiencyRating != null) _specRow('Efficiency', product.efficiencyRating!),
                         if (product.formFactor != null) _specRow('Form Factor', product.formFactor!),
-                        _specRow('Warranty', product.warranty),
+                        _specRow('Manufacturer Warranty', product.warrantyDisplay, isHighlighted: true),
                         _specRow('Stock Units', '${product.stockQuantity} units available'),
                       ],
                     ),
@@ -622,7 +597,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _specRow(String label, String value) {
+  Widget _specRow(String label, String value, {bool isHighlighted = false}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: const BoxDecoration(
@@ -631,19 +606,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isHighlighted) ...[
+                const Icon(Icons.verified_user_rounded, color: AppColors.stockGreen, size: 15),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: isHighlighted ? AppColors.primaryDark : AppColors.secondaryText,
+                  fontWeight: isHighlighted ? FontWeight.w700 : FontWeight.normal,
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ),
           const SizedBox(width: 12),
           Flexible(
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
+              style: TextStyle(
+                fontWeight: isHighlighted ? FontWeight.w700 : FontWeight.w600,
                 fontSize: 13,
-                color: AppColors.primaryDark,
+                color: isHighlighted ? AppColors.stockGreen : AppColors.primaryDark,
               ),
             ),
           ),

@@ -35,8 +35,7 @@ public class CustomBuildsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<CustomBuildSummaryDto>>> GetBuilds(
         [FromQuery] string? status = null,
-        [FromQuery] string? search = null,
-        [FromQuery] int? staffId = null)
+        [FromQuery] string? search = null)
     {
         var currentUserId = GetCurrentUserId();
         if (!currentUserId.HasValue)
@@ -48,8 +47,6 @@ public class CustomBuildsController : ControllerBase
         var query = _context.CustomBuilds
             .AsNoTracking()
             .Include(cb => cb.User)
-            .Include(cb => cb.AssignedStaff)
-                .ThenInclude(s => s!.User)
             .Include(cb => cb.Items)
                 .ThenInclude(i => i.Product)
             .AsQueryable();
@@ -63,13 +60,6 @@ public class CustomBuildsController : ControllerBase
         if (!string.IsNullOrWhiteSpace(status) && !status.Equals("all", StringComparison.OrdinalIgnoreCase))
         {
             query = query.Where(cb => cb.Status.ToLower() == status.ToLower());
-        }
-
-        // Optional staff filter (supports filtering by StaffId or UserId)
-        if (staffId.HasValue && staffId.Value > 0)
-        {
-            query = query.Where(cb => cb.AssignedStaffId == staffId.Value ||
-                                      (cb.AssignedStaff != null && cb.AssignedStaff.UserId == staffId.Value));
         }
 
         // Optional search filter
@@ -98,10 +88,8 @@ public class CustomBuildsController : ControllerBase
                 Status = cb.Status,
                 CustomerNotes = cb.CustomerNotes,
                 StaffNotes = cb.StaffNotes,
-                AssignedStaffId = cb.AssignedStaffId,
-                AssignedStaffName = cb.AssignedStaff != null && cb.AssignedStaff.User != null
-                    ? $"{cb.AssignedStaff.User.FirstName} {cb.AssignedStaff.User.LastName}".Trim()
-                    : null,
+                AssignedStaffId = null,
+                AssignedStaffName = null,
                 ItemCount = cb.Items.Count,
                 CreatedAt = cb.CreatedAt,
                 UpdatedAt = cb.UpdatedAt,
@@ -133,8 +121,6 @@ public class CustomBuildsController : ControllerBase
         var build = await _context.CustomBuilds
             .AsNoTracking()
             .Include(cb => cb.User)
-            .Include(cb => cb.AssignedStaff)
-                .ThenInclude(s => s!.User)
             .Include(cb => cb.Items)
                 .ThenInclude(i => i.Product)
             .FirstOrDefaultAsync(cb => cb.BuildId == id);
@@ -209,10 +195,8 @@ public class CustomBuildsController : ControllerBase
             Status = build.Status,
             CustomerNotes = build.CustomerNotes,
             StaffNotes = build.StaffNotes,
-            AssignedStaffId = build.AssignedStaffId,
-            AssignedStaffName = build.AssignedStaff?.User != null
-                ? $"{build.AssignedStaff.User.FirstName} {build.AssignedStaff.User.LastName}".Trim()
-                : null,
+            AssignedStaffId = null,
+            AssignedStaffName = null,
             CreatedAt = build.CreatedAt,
             UpdatedAt = build.UpdatedAt,
             IsSocketCompatible = socketMatch,
@@ -412,28 +396,11 @@ public class CustomBuildsController : ControllerBase
             build.StaffNotes = dto.StaffNotes;
         }
 
-        if (dto.AssignedStaffId.HasValue)
-        {
-            if (dto.AssignedStaffId.Value > 0)
-            {
-                var staff = await _context.Staff
-                    .FirstOrDefaultAsync(s => s.StaffId == dto.AssignedStaffId.Value || s.UserId == dto.AssignedStaffId.Value);
-                if (staff != null)
-                {
-                    build.AssignedStaffId = staff.StaffId;
-                }
-            }
-            else
-            {
-                build.AssignedStaffId = null;
-            }
-        }
-
         build.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Custom Build #{BuildId} review status updated to '{Status}' by staff #{StaffId}",
-            build.BuildId, build.Status, build.AssignedStaffId);
+        _logger.LogInformation("Custom Build #{BuildId} review status updated to '{Status}'",
+            build.BuildId, build.Status);
 
         // Automatically dispatch email notification when review status changes to Approved or Changes Requested
         if (string.Equals(dto.Status, "Approved by Staff", StringComparison.OrdinalIgnoreCase) ||

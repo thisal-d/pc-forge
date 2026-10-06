@@ -79,6 +79,7 @@ CREATE TABLE Products (
     ImageUrl VARCHAR(500),
     Description TEXT,
     WarrantyMonths INT NOT NULL DEFAULT 36,
+    Status VARCHAR(20) NOT NULL DEFAULT 'Active',
     
     -- Extensible Hardware Specifications (JSONB with GIN index)
     -- Allows arbitrary attributes without altering the table structure
@@ -229,28 +230,17 @@ CREATE TABLE OrderItems (
 
 
 -- ============================================================================
--- 12. SERVICE REQUESTS TABLE (Member 05: After-Sales Service & Warranty)
+-- 12. SERVICE REQUESTS TABLE (Simplified After-Sales Service & Warranty)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS ServiceRequests (
     ServiceRequestId SERIAL PRIMARY KEY,
     ServiceRequestNumber VARCHAR(30) UNIQUE NOT NULL,
     UserId INT NOT NULL REFERENCES Users(UserId) ON DELETE CASCADE,
-    OrderId INT REFERENCES Orders(OrderId) ON DELETE SET NULL,
-    ProductId INT REFERENCES Products(ProductId) ON DELETE SET NULL,
-    ProblemDescription TEXT NOT NULL,
-    ProblemCategory VARCHAR(100) NOT NULL DEFAULT 'General',
-    TroubleshootingSummary TEXT,
-    AttemptCount INT NOT NULL DEFAULT 0,
-    WarrantyStatus VARCHAR(50) NOT NULL DEFAULT 'Active',
-    WarrantyExpiryDate TIMESTAMPTZ,
+    Title VARCHAR(200),
+    Description TEXT,
     PreferredDate DATE,
     PreferredTime VARCHAR(50),
-    Status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-    Priority VARCHAR(20) NOT NULL DEFAULT 'Normal',
-    AssignedStaffId INT REFERENCES Staff(StaffId) ON DELETE SET NULL,
-    TechnicianNotes TEXT,
-    Resolution TEXT,
-    AttachmentUrl VARCHAR(500),
+    Status VARCHAR(50) NOT NULL DEFAULT 'Pending',
     CreatedAt TIMESTAMPTZ DEFAULT NOW(),
     UpdatedAt TIMESTAMPTZ DEFAULT NOW()
 );
@@ -258,31 +248,7 @@ CREATE TABLE IF NOT EXISTS ServiceRequests (
 CREATE INDEX IF NOT EXISTS idx_servicerequests_user ON ServiceRequests(UserId);
 CREATE INDEX IF NOT EXISTS idx_servicerequests_order ON ServiceRequests(OrderId);
 CREATE INDEX IF NOT EXISTS idx_servicerequests_status ON ServiceRequests(Status);
-CREATE INDEX IF NOT EXISTS idx_servicerequests_staff ON ServiceRequests(AssignedStaffId);
 CREATE INDEX IF NOT EXISTS idx_servicerequests_number ON ServiceRequests(ServiceRequestNumber);
-
--- Legacy SupportTickets (Preserved for compatibility)
-CREATE TABLE IF NOT EXISTS SupportTickets (
-    TicketId SERIAL PRIMARY KEY,
-    UserId INT REFERENCES Users(UserId) ON DELETE CASCADE,
-    OrderId INT REFERENCES Orders(OrderId) ON DELETE SET NULL,
-    ProductId INT REFERENCES Products(ProductId) ON DELETE SET NULL,
-    IssueType VARCHAR(50) NOT NULL,
-    Subject VARCHAR(200) NOT NULL,
-    Description TEXT NOT NULL,
-    AttachmentUrl VARCHAR(500),
-    Status VARCHAR(50) NOT NULL DEFAULT 'Open',
-    Priority VARCHAR(20) NOT NULL DEFAULT 'Normal',
-    ResolutionNotes TEXT,
-    AssignedStaffId INT REFERENCES Staff(StaffId) ON DELETE SET NULL,
-    CreatedAt TIMESTAMPTZ DEFAULT NOW(),
-    UpdatedAt TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_supporttickets_user ON SupportTickets(UserId);
-CREATE INDEX IF NOT EXISTS idx_supporttickets_order ON SupportTickets(OrderId);
-CREATE INDEX IF NOT EXISTS idx_supporttickets_status ON SupportTickets(Status);
-CREATE INDEX IF NOT EXISTS idx_supporttickets_assigned_staff ON SupportTickets(AssignedStaffId);
 
 
 

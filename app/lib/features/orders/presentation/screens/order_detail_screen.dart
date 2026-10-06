@@ -411,7 +411,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => CreateServiceRequestScreen(initialOrderId: displayOrder.orderId),
+                      builder: (_) => const CreateServiceRequestScreen(),
                     ),
                   );
                 },

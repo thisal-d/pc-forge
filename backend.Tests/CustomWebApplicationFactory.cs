@@ -214,15 +214,11 @@ public class MockAiAgentService : PCForge.Api.Services.IAiAgentService
                     {
                         ServiceRequestNumber = srNumber,
                         UserId = r.UserId > 0 ? r.UserId : 1,
-                        OrderId = r.OrderId,
                         Title = title,
                         Description = msg,
-                        ProblemDescription = msg,
-                        ProblemCategory = "General",
                         PreferredDate = extractedDate,
                         PreferredTime = extractedTime,
                         Status = "Pending",
-                        Priority = "Normal",
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -240,14 +236,11 @@ public class MockAiAgentService : PCForge.Api.Services.IAiAgentService
                             Id = newSr.ServiceRequestId,
                             ServiceRequestId = newSr.ServiceRequestId,
                             ServiceRequestNumber = newSr.ServiceRequestNumber,
-                            OrderId = newSr.OrderId,
                             Title = newSr.Title,
                             Description = newSr.Description,
-                            ProblemDescription = newSr.ProblemDescription,
                             PreferredDate = newSr.PreferredDate?.ToString("yyyy-MM-dd"),
                             PreferredTime = newSr.PreferredTime,
                             Status = newSr.Status,
-                            Priority = newSr.Priority,
                             CreatedAt = newSr.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
                         }
                     };

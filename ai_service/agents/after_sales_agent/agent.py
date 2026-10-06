@@ -79,51 +79,48 @@ TWO MODES OF OPERATION:
 --- MODE 2: SERVICE REQUEST MODE ---
 Once in Service Request Mode, stop troubleshooting and follow these exact steps:
 
-1. Request Customer Information:
-   - Ask the customer for:
-     * Preferred date
-     * Preferred time (between 9:00 AM and 6:00 PM, Monday through Saturday)
-     * Order ID, if applicable (optional if not purchased from PCForge)
-   - If Order ID is provided, verify warranty using `check_warranty`.
-   - Explain warranty coverage clearly (Active or Expired).
+1. Request Appointment Information:
+   - Ask the customer for their preferred appointment date and time (between 9:00 AM and 6:00 PM, Monday through Saturday).
+   - Do NOT ask for an Order ID under any circumstances. There is no Order ID requirement.
+   - Understand the customer's natural language for dates and times (e.g., "Tomorrow at 2 PM", "2 PM", "Tomorrow", "Next Monday at 10", "Friday afternoon").
+   - NEVER ask for information that the customer has already provided!
+     * If the customer provides both date and time: recognize that both are available and proceed to validate and summarize.
+     * If the customer provides only the date: remember the date, do NOT ask for the date again, and ask ONLY for the missing time (e.g. "What time would you prefer?").
+     * If the customer provides only the time: remember the time, do NOT ask for the time again, and ask ONLY for the missing date (e.g. "What date would you prefer?").
+     * If the customer provides neither: ask for their preferred date and time.
 
-2. Validate Date and Time Strictly:
-   - Always call `validate_service_appointment(preferred_date=..., preferred_time=...)`.
-   - The date must NOT be in the past:
-     If the customer provides a past date, explain that the date has already passed and ask for another date.
-   - The time must be between 9:00 AM and 6:00 PM:
-     If the customer provides a time before 9:00 AM or after 6:00 PM, explain that the service time must be between 9:00 AM and 6:00 PM and ask for another time.
-   - Service Center operating days: Monday through Saturday (closed on Sundays). If Sunday is chosen, ask for a date from Monday to Saturday.
-   - Storewide booking limit: Maximum 10 Service Requests per date. If the date already has 10 requests, inform the customer that the date already has 10 requests booked and ask them to choose another date.
-   - CRITICAL: Do NOT create the Service Request until both date and time are valid!
+2. Validate Date and Time:
+   - Call `validate_service_appointment(preferred_date=..., preferred_time=...)`.
+   - The date must NOT be in the past.
+   - Operating hours are 9:00 AM to 6:00 PM. Closed on Sundays.
+   - Storewide booking limit: Maximum 10 Service Requests per date.
+   - Do NOT create the Service Request until both date and time are valid!
 
 3. Generate Title & Description and Request Customer Confirmation:
-   - Synthesize a concise, professional Title and a detailed Description directly from the troubleshooting conversation.
-   - Show the generated title and description to the customer and allow them to confirm or edit them before submission:
-     "Here are the details generated from our troubleshooting session:
+   - Synthesize a concise Title and detailed Description from the conversation.
+   - Show the generated details to the customer and ask for confirmation:
+     "Here are the details for your Service Request:
 
      Title: [Generated Title]
      Description: [Generated Description]
      Preferred Date: [Date]
      Preferred Time: [Time]
-     Order ID: [Order ID or N/A]
 
-     Please confirm if you would like to submit this Service Request, or let me know if you would like to edit the title or description."
+     Please confirm if you would like to submit this Service Request, or let me know if you would like to edit anything."
    - Do NOT call `create_service_request` until the customer confirms (e.g., "confirm", "yes", "looks good", "submit", "proceed")!
 
 4. Service Request Creation:
    - Once confirmed by the customer, create the Service Request using `create_service_request`.
-   - New requests must start with Pending status.
-   - Existing statuses: Pending, In Progress, Completed, No Show, Cancelled. Customers can cancel while Pending.
-   - Display the final confirmation details with the Service Request ID, title, appointment date/time, and Pending status.
+   - New requests start in Pending status.
+   - Display the confirmation with Service Request Number, title, date, time, and Pending status.
 
-5. Rescheduling & Changing Time/Date (STRICT DUPLICATE PREVENTION):
-   - NEVER create multiple Service Requests for the same customer issue!
-   - Once a Service Request has already been created (e.g., [SR-NUMBER]):
-     If the customer asks for a different time, a different date, or wants to reschedule:
-     * DO NOT call `create_service_request`!
-     * Call `update_service_appointment(service_request_id_or_number=[SR-NUMBER], preferred_date=..., preferred_time=...)`.
-     * Confirm to the customer that their appointment for [SR-NUMBER] has been rescheduled.
+5. Rescheduling (Duplicate Prevention):
+   - If the customer wants to change date/time after creation, call `update_service_appointment`.
+
+STYLE & FORMATTING (CRITICAL):
+- Write in a clean, natural conversational style.
+- Do NOT use Markdown bold (**text**), italics (*text*), stray asterisks (*), or raw markdown headers (###).
+- Output must be clean, readable plain text for a conversational chat UI.
 """
 
 
@@ -149,6 +146,30 @@ class AfterSalesState(TypedDict):
     service_request_data: Optional[Dict]
     agent_trace: List[str]
     iteration_count: int
+
+
+def clean_chat_formatting(text: str) -> str:
+    """Removes raw Markdown symbols (**bold**, *italics*, stray *, headers)
+    to produce clean, natural conversational chat text.
+    """
+    if not text:
+        return ""
+    # Strip markdown headers (e.g. "### Step 1" -> "Step 1")
+    cleaned = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+    # Strip bold markdown (**word** -> word or __word__ -> word)
+    cleaned = re.sub(r'\*\*(.*?)\*\*', r'\1', cleaned)
+    cleaned = re.sub(r'__(.*?)__', r'\1', cleaned)
+    # Strip italic markdown (*word* -> word or _word_ -> word)
+    cleaned = re.sub(r'(?<!\w)\*([^\*\n]+)\*(?!\w)', r'\1', cleaned)
+    cleaned = re.sub(r'(?<!\w)_([^_\n]+)_(?!\w)', r'\1', cleaned)
+    # Remove any stray asterisks
+    cleaned = re.sub(r'\*', '', cleaned)
+    # Remove markdown link formatting [text](url) -> text
+    cleaned = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', cleaned)
+    # Clean up double spaces or excessive newlines
+    cleaned = re.sub(r'[ \t]+', ' ', cleaned)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned.strip()
 
 
 def _extract_text(content: Any) -> str:
@@ -191,8 +212,27 @@ def agent_node(state: AfterSalesState) -> Dict:
     # If Service Request mode is active, inject a directive so the LLM stops troubleshooting and focuses on intake
     invocation_messages = messages
     if sr_mode:
+        ctx = after_sales_context_var.get() if isinstance(after_sales_context_var.get(), dict) else {}
+        known_date = state.get("preferred_date") or ctx.get("preferred_date")
+        known_time = state.get("preferred_time") or ctx.get("preferred_time")
+
+        date_info = f"Already collected preferred date: {known_date}." if known_date else "Preferred date: not yet provided."
+        time_info = f"Already collected preferred time: {known_time}." if known_time else "Preferred time: not yet provided."
+
         directive = SystemMessage(
-            content="[DIRECTIVE: Service Request Mode is ACTIVE. Do NOT provide troubleshooting steps or chatter. Proceed directly with Service Request intake: request or verify Order ID, check warranty using check_warranty, validate appointment using validate_service_appointment, and create the Service Request using create_service_request.]"
+            content=(
+                f"[DIRECTIVE: Service Request Mode is ACTIVE. Do NOT provide troubleshooting steps.\n"
+                f"RULES:\n"
+                f"1. No Order ID is needed - NEVER ask for an Order ID.\n"
+                f"2. Current Appointment State: {date_info} | {time_info}\n"
+                f"3. NEVER ask for information that the user has already provided!\n"
+                f"   - If the user provided only the date: remember the date and ask ONLY for the missing time (e.g. 'What time would you prefer?').\n"
+                f"   - If the user provided only the time: remember the time and ask ONLY for the missing date (e.g. 'What date would you prefer?').\n"
+                f"   - If both date and time are provided or known: validate using validate_service_appointment, show the summary, and ask for confirmation.\n"
+                f"   - If neither date nor time is known: ask for preferred date and time.\n"
+                f"4. Once the user confirms, call create_service_request.\n"
+                f"5. Write clean natural text without markdown symbols or bold asterisks.]"
+            )
         )
         invocation_messages = messages + [directive]
 
@@ -254,11 +294,18 @@ def tools_node(state: AfterSalesState) -> Dict:
                             order_id = parsed.get("order_id")
                     elif t_name == "validate_service_appointment":
                         if parsed.get("valid") is True:
-                            pref_date = parsed.get("date", pref_date)
-                            pref_time = parsed.get("time", pref_time)
+                            pref_date = parsed.get("date") or pref_date
+                            pref_time = parsed.get("time") or pref_time
                         elif parsed.get("missing") == "time":
-                            pref_date = parsed.get("date", pref_date)
-                            pref_time = None
+                            pref_date = parsed.get("date") or pref_date
+                        elif parsed.get("missing") == "date":
+                            pref_time = parsed.get("time") or pref_time
+                        ctx = after_sales_context_var.get()
+                        if isinstance(ctx, dict):
+                            if pref_date:
+                                ctx["preferred_date"] = pref_date
+                            if pref_time:
+                                ctx["preferred_time"] = pref_time
                     elif t_name == "update_service_appointment":
                         pref_date = parsed.get("preferred_date", pref_date)
                         pref_time = parsed.get("preferred_time", pref_time)
@@ -385,18 +432,32 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
     # Check previous session state
     state_history = CHECKPOINTER.get(config)
     prev_sr_mode = False
+    prev_pref_date = None
+    prev_pref_time = None
     if state_history and state_history.get("channel_values"):
         vals = state_history.get("channel_values", {})
         prev_sr_mode = vals.get("service_request_mode", False)
+        prev_pref_date = vals.get("preferred_date")
+        prev_pref_time = vals.get("preferred_time")
 
     is_sr_mode = prev_sr_mode or user_requested_sr
+
+    after_sales_context_var.set({
+        "customer": request.customer,
+        "orders": request.orders,
+        "service_requests": request.service_requests,
+        "preferred_date": prev_pref_date,
+        "preferred_time": prev_pref_time
+    })
 
     # Input message with iteration_count explicitly reset to 0 for this user turn
     inputs = {
         "messages": [HumanMessage(content=user_msg_clean)],
         "customer_id": request.user_id,
         "session_id": session_id,
-        "order_id": request.order_id,
+        "order_id": None,
+        "preferred_date": prev_pref_date,
+        "preferred_time": prev_pref_time,
         "service_request_mode": is_sr_mode,
         "iteration_count": 0
     }
@@ -454,7 +515,7 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
             step_desc = f"Step {step_num}"
             if step_desc not in attempted_steps:
                 attempted_steps.append(step_desc)
-        elif "service request" in reply_text.lower() and ("order id" in reply_text.lower() or "technician" in reply_text.lower()):
+        elif "service request" in reply_text.lower() and "technician" in reply_text.lower():
             is_sr_mode = True
 
         # Check if create_service_request, update_service_appointment, or create_rma_ticket tool was called in conversation
@@ -480,8 +541,8 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
                 service_request_id=num_id,
                 service_request_number=sr_num,
                 user_id=request.user_id,
-                order_id=sr_raw.get("order_id") or request.order_id or 1,
-                order_number=sr_raw.get("order_number") or f"PCF-10{(request.order_id or 1):03d}",
+                order_id=None,
+                order_number=None,
                 product_id=sr_raw.get("product_id") or 8,
                 product_name=sr_raw.get("product_name") or sr_raw.get("component") or "Hardware Component",
                 title=sr_raw.get("title") or (f"Service - {sr_raw.get('product_name')}" if sr_raw.get("product_name") else f"Service: {problem_category}"),
@@ -502,8 +563,8 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
             rma_legacy_model = RmaTicketDetails(
                 ticket_id=num_id,
                 rma_number=sr_num,
-                order_id=sr_model.order_id,
-                order_number=sr_model.order_number,
+                order_id=None,
+                order_number=None,
                 product_id=sr_model.product_id,
                 component_name=sr_model.product_name,
                 issue_type=problem_category,
@@ -516,13 +577,13 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
             is_sr_mode = True
 
         # If user explicitly requested service request on this turn and the LLM response is generic/step
-        if user_requested_sr and not sr_model and not any(k in reply_text.lower() for k in ["order id", "order #", "pcf-"]):
+        if user_requested_sr and not sr_model and not any(k in reply_text.lower() for k in ["appointment", "preferred date", "preferred time", "schedule", "monday", "tomorrow"]):
             if not reply_text or "step" in reply_text.lower():
                 reply_text = (
-                    "Understood! We'll stop the troubleshooting process here and get a Service Request set up "
+                    "Understood. We will stop troubleshooting here and set up a Service Request "
                     "for our technicians to inspect your system in person.\n\n"
-                    "Please provide your **Order ID** (e.g., Order #1 or PCF-10001) so I can verify your purchase "
-                    "and warranty coverage."
+                    "What date and time would you prefer for the service appointment? "
+                    "Our service center is open Monday through Saturday between 9:00 AM and 6:00 PM."
                 )
 
         # Suggest Service Request after 5 unsuccessful troubleshooting attempts
@@ -532,17 +593,16 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
                 reply_text += (
                     "\n\nWe have completed 5 troubleshooting steps and your PC issue is not resolved. "
                     "I suggest creating a Service Request so one of our service center technicians can inspect and repair your PC in person.\n\n"
-                    "To proceed, please provide your preferred appointment date (Monday - Saturday), "
-                    "preferred time between 9:00 AM and 6:00 PM, and your Order ID if applicable."
+                    "What date and time would you prefer for the appointment? "
+                    "Our service center is open Monday through Saturday between 9:00 AM and 6:00 PM."
                 )
 
         # While chatting during troubleshooting, prompt user to create a service request and stop chatting
         if not is_sr_mode and not is_resolved and not sr_model:
             if "service request" not in reply_text.lower():
                 reply_text += (
-                    "\n\n*Prefer to have a technician inspect it?* "
-                    "If you would like to stop chatting now and create a Service Request for our technicians to inspect your PC in person, "
-                    "just let me know or reply **\"Create Service Request\"**."
+                    "\n\nIf you prefer to have a technician inspect it in person, "
+                    "just let me know or say 'Create Service Request' at any time."
                 )
 
         if not reply_text:
@@ -553,8 +613,12 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
             else:
                 reply_text = "Let's check your PC setup. Please make sure all external cables are firmly connected, and let me know what happens."
 
-        # Persist updated attempt_count, attempted_steps, and service_request_mode into checkpointer
+        # Persist updated state into checkpointer
         is_sr_mode = is_sr_mode or (sr_model is not None) or (sr_raw is not None)
+        ctx = after_sales_context_var.get() if isinstance(after_sales_context_var.get(), dict) else {}
+        final_pref_date = final_state.get("preferred_date") or ctx.get("preferred_date") or prev_pref_date
+        final_pref_time = final_state.get("preferred_time") or ctx.get("preferred_time") or prev_pref_time
+
         try:
             AFTER_SALES_GRAPH.update_state(
                 config,
@@ -562,6 +626,8 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
                     "troubleshooting_attempt": attempt_count,
                     "attempted_steps": attempted_steps,
                     "problem_category": problem_category,
+                    "preferred_date": final_pref_date,
+                    "preferred_time": final_pref_time,
                     "service_request_required": sr_required or is_sr_mode,
                     "service_request_mode": is_sr_mode
                 }
@@ -571,7 +637,7 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
 
         return AfterSalesChatResponse(
             success=True,
-            reply=reply_text,
+            reply=clean_chat_formatting(reply_text),
             attempt_count=attempt_count,
             attempted_steps=attempted_steps,
             problem_category=problem_category,
@@ -589,11 +655,10 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
         if "step 5" in user_msg or "5 attempts" in user_msg or "5th attempt" in user_msg:
             return AfterSalesChatResponse(
                 success=True,
-                reply=(
+                reply=clean_chat_formatting(
                     "We have completed 5 troubleshooting steps and your PC issue is not resolved. "
                     "I suggest creating a Service Request so one of our service center technicians can inspect and repair your PC in person.\n\n"
-                    "To proceed, please provide your **Order ID** (or Order number) and your preferred date (Monday to Saturday) "
-                    "and appointment time between 09:00 AM and 06:00 PM."
+                    "What date and time would you prefer for the service appointment (Monday to Saturday, 9:00 AM to 6:00 PM)?"
                 ),
                 attempt_count=5,
                 service_request_mode=True,
@@ -603,10 +668,9 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
         if user_requested_sr or "service request" in user_msg or "appointment" in user_msg or "stop chatting" in user_msg:
             return AfterSalesChatResponse(
                 success=True,
-                reply=(
-                    "Understood! We'll stop chatting and set up a Service Request for our technicians to inspect your system.\n\n"
-                    "Please provide your **Order ID** (or Order number) and your preferred date (Monday to Saturday) "
-                    "and appointment time between 09:00 AM and 06:00 PM."
+                reply=clean_chat_formatting(
+                    "Understood. We will stop troubleshooting here and set up a Service Request for our technicians to inspect your system.\n\n"
+                    "What date and time would you prefer for the service appointment (Monday to Saturday, 9:00 AM to 6:00 PM)?"
                 ),
                 service_request_mode=True,
                 service_request_required=True,
@@ -614,9 +678,9 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
             )
         return AfterSalesChatResponse(
             success=True,
-            reply=(
+            reply=clean_chat_formatting(
                 "I am here to help troubleshoot your PC. Please check that all cables and power connections are securely seated.\n\n"
-                "*Prefer to have a technician inspect it?* Reply **\"Create Service Request\"** to schedule an in-person appointment."
+                "If you would like to schedule an in-person technician appointment instead, just let me know or say 'Create Service Request'."
             ),
             agent_trace=[f"[Fallback Mode - External LLM Error: {str(e)}"]
         )

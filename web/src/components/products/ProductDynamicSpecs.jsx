@@ -15,6 +15,13 @@ export const ProductDynamicSpecs = ({
 
     // 1. Select Dropdown if options exist
     if (hasOptions) {
+      const isCurrentValInOptions =
+        !currentVal ||
+        filter.options.some((o) => {
+          const optVal = typeof o === 'object' ? (o.value ?? o.optionValue ?? '') : String(o);
+          return optVal.toLowerCase() === String(currentVal).toLowerCase();
+        });
+
       return (
         <div className="form-group" key={filter.filterId}>
           <label htmlFor={`filter-${filter.filterId}`}>
@@ -25,23 +32,39 @@ export const ProductDynamicSpecs = ({
             id={`filter-${filter.filterId}`}
             value={currentVal}
             onChange={(e) => {
-              const selOpt = filter.options.find((o) => o.optionValue === e.target.value);
-              onChange(filter, e.target.value, selOpt?.filterOptionId || null);
+              const selVal = e.target.value;
+              const selOpt = filter.options.find(
+                (o) => (o.value ?? o.optionValue ?? (typeof o === 'string' ? o : '')) === selVal
+              );
+              onChange(
+                filter,
+                selVal,
+                selOpt?.optionId || selOpt?.filterOptionId || selOpt?.id || null
+              );
             }}
           >
             <option value="">-- Select {filter.displayName} --</option>
-            {filter.options.map((opt) => (
-              <option key={opt.filterOptionId || opt.id} value={opt.optionValue}>
-                {opt.optionValue}
-              </option>
-            ))}
+            {!isCurrentValInOptions && currentVal && (
+              <option value={currentVal}>{currentVal} (Current)</option>
+            )}
+            {filter.options.map((opt, idx) => {
+              const optVal = typeof opt === 'object' ? (opt.value ?? opt.optionValue ?? '') : String(opt);
+              const optKey = typeof opt === 'object' ? (opt.optionId || opt.filterOptionId || opt.id || idx) : idx;
+              return (
+                <option key={optKey} value={optVal}>
+                  {optVal}
+                </option>
+              );
+            })}
           </select>
         </div>
       );
     }
 
+    const typeLower = (filter.filterType || filter.dataType || '').toLowerCase();
+
     // 2. Boolean
-    if (filter.dataType === 'Boolean') {
+    if (typeLower === 'boolean') {
       return (
         <div className="form-group" key={filter.filterId}>
           <label htmlFor={`filter-${filter.filterId}`}>{filter.displayName}</label>
@@ -58,8 +81,8 @@ export const ProductDynamicSpecs = ({
       );
     }
 
-    // 3. Number
-    if (filter.dataType === 'Number') {
+    // 3. Number / Range
+    if (typeLower === 'number' || typeLower === 'range') {
       return (
         <div className="form-group" key={filter.filterId}>
           <label htmlFor={`filter-${filter.filterId}`}>

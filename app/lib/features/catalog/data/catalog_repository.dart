@@ -162,7 +162,10 @@ class CatalogRepository {
         efficiency: filter?.efficiencyRating,
         dynamicFilters: filter?.dynamicFilters,
       );
-      return apiProds.map((p) => ProductModel.fromJson(p)).toList();
+      return apiProds
+          .map((p) => ProductModel.fromJson(p))
+          .where((p) => p.isActive)
+          .toList();
     } catch (e) {
       return [];
     }

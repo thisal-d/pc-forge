@@ -14,6 +14,8 @@ BEGIN;
 
 -- 1. Schema Migration: Update Orders status default & Ensure Master Filters tables exist
 ALTER TABLE Orders ALTER COLUMN Status SET DEFAULT 'Order placed';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS warrantymonths INT NOT NULL DEFAULT 36;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'Active';
 
 CREATE TABLE IF NOT EXISTS filters (
     filterid SERIAL PRIMARY KEY,

@@ -155,6 +155,23 @@ export const EditProductModal = ({
                 />
                 {errors.stockQuantity && <span className="field-error-text">{errors.stockQuantity}</span>}
               </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-product-warranty">Warranty Coverage</label>
+                <select
+                  id="edit-product-warranty"
+                  name="warrantyMonths"
+                  value={formData.warrantyMonths || '36'}
+                  onChange={onFormChange}
+                >
+                  <option value="12">12 Months (1 Year)</option>
+                  <option value="24">24 Months (2 Years)</option>
+                  <option value="36">36 Months (3 Years)</option>
+                  <option value="60">60 Months (5 Years)</option>
+                  <option value="84">84 Months (7 Years)</option>
+                  <option value="120">120 Months (10 Years / Lifetime)</option>
+                </select>
+              </div>
             </div>
 
             <ProductImageUploader
