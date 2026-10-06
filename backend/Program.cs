@@ -27,7 +27,10 @@ if (!builder.Environment.IsEnvironment("Testing"))
 }
 
 // 1. Add Database Context (PostgreSQL via Npgsql)
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+var connectionString = NormalizePostgresConnectionString(rawConnectionString);
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
@@ -436,6 +439,35 @@ static void LoadDotEnvFiles()
             }
             break;
         }
+    }
+}
+
+static string? NormalizePostgresConnectionString(string? connStr)
+{
+    if (string.IsNullOrWhiteSpace(connStr))
+        return connStr;
+
+    if (!connStr.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) &&
+        !connStr.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        return connStr;
+    }
+
+    try
+    {
+        var uri = new Uri(connStr);
+        var userInfo = uri.UserInfo.Split(':');
+        var user = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "";
+        var pass = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+        var host = uri.Host;
+        var port = uri.Port > 0 ? uri.Port : 5432;
+        var database = uri.AbsolutePath.TrimStart('/');
+
+        return $"Host={host};Port={port};Database={database};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;";
+    }
+    catch
+    {
+        return connStr;
     }
 }
 
