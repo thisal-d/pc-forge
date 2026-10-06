@@ -246,7 +246,6 @@ CREATE TABLE IF NOT EXISTS ServiceRequests (
 );
 
 CREATE INDEX IF NOT EXISTS idx_servicerequests_user ON ServiceRequests(UserId);
-CREATE INDEX IF NOT EXISTS idx_servicerequests_order ON ServiceRequests(OrderId);
 CREATE INDEX IF NOT EXISTS idx_servicerequests_status ON ServiceRequests(Status);
 CREATE INDEX IF NOT EXISTS idx_servicerequests_number ON ServiceRequests(ServiceRequestNumber);
 
