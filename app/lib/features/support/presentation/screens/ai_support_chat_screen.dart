@@ -35,9 +35,9 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
   List<String> get _currentQuickPrompts {
     if (_isServiceRequestMode) {
       return [
-        "My Order ID is 1",
-        "Tomorrow at 10:00 AM",
-        "Next Monday at 11:00 AM",
+        "Tomorrow at 2:00 PM",
+        "Tomorrow",
+        "2:00 PM",
       ];
     }
     return _quickPrompts;
@@ -77,7 +77,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
 
   Future<void> _handleSendMessage(String text) async {
     final clean = text.trim();
-    if (clean.isEmpty) return;
+    if (clean.isEmpty || _isLoading) return;
 
     _textController.clear();
     setState(() {
@@ -86,33 +86,48 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
     });
     _scrollToBottom();
 
-    final result = await SupportService.instance.sendAfterSalesChatMessage(
-      clean,
-      orderId: widget.orderId,
-      sessionId: _sessionId,
-    );
-
-    if (!mounted) return;
-
-    final isSrModeNow = result.serviceRequestMode || _isServiceRequestMode || result.serviceRequest != null;
-
-    setState(() {
-      _isLoading = false;
-      _isServiceRequestMode = isSrModeNow;
-      _messages.add(
-        AiAfterSalesChatMessage(
-          text: result.reply,
-          isUser: false,
-          ticket: result.ticket,
-          serviceRequest: result.serviceRequest,
-          attemptCount: result.attemptCount,
-          problemCategory: result.problemCategory,
-          isError: !result.success,
-          serviceRequestMode: isSrModeNow,
-        ),
+    try {
+      final result = await SupportService.instance.sendAfterSalesChatMessage(
+        clean,
+        orderId: widget.orderId,
+        sessionId: _sessionId,
       );
-    });
-    _scrollToBottom();
+
+      if (!mounted) return;
+
+      final isSrModeNow = result.serviceRequestMode || _isServiceRequestMode || result.serviceRequest != null;
+
+      setState(() {
+        _isLoading = false;
+        _isServiceRequestMode = isSrModeNow;
+        _messages.add(
+          AiAfterSalesChatMessage(
+            text: result.reply,
+            isUser: false,
+            ticket: result.ticket,
+            serviceRequest: result.serviceRequest,
+            attemptCount: result.attemptCount,
+            problemCategory: result.problemCategory,
+            isError: !result.success,
+            serviceRequestMode: isSrModeNow,
+          ),
+        );
+      });
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _messages.add(
+          AiAfterSalesChatMessage(
+            text: "Sorry, I encountered an issue connecting to the service. Please try again.",
+            isUser: false,
+            isError: true,
+          ),
+        );
+      });
+      _scrollToBottom();
+    }
   }
 
   void _handleAttachPhoto(String srNumber) {
@@ -274,7 +289,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
             backgroundColor: const Color(0xFFEEF2FF),
             side: const BorderSide(color: Color(0xFFC7D2FE)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            onPressed: () => _handleSendMessage(prompt),
+            onPressed: _isLoading ? null : () => _handleSendMessage(prompt),
           );
         },
       ),
@@ -532,15 +547,6 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
             const SizedBox(height: 8),
           ],
 
-          if (sr.orderId != null) ...[
-            _buildServiceRequestRow(
-              label: 'Order Reference',
-              value: 'PCF-10${sr.orderId.toString().padLeft(3, '0')}',
-              isBold: true,
-            ),
-            const SizedBox(height: 8),
-          ],
-
           _buildServiceRequestRow(
             label: 'Initial Status',
             value: 'Pending',
@@ -688,15 +694,6 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
               ),
             ],
             const SizedBox(height: 12),
-          ],
-
-          if (sr.orderId != null) ...[
-            _buildServiceRequestRow(
-              label: 'Order ID',
-              value: 'PCF-10${sr.orderId.toString().padLeft(3, '0')}',
-              isBold: true,
-            ),
-            const SizedBox(height: 8),
           ],
 
           _buildServiceRequestRow(
@@ -878,7 +875,6 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
         problemDescription: (draft.description != null && draft.description!.isNotEmpty)
             ? draft.description!
             : draft.title,
-        orderId: draft.orderId,
         productName: draft.productName,
         problemCategory: draft.problemCategory,
         troubleshootingSummary: draft.title,
@@ -1097,10 +1093,13 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
           Expanded(
             child: TextField(
               controller: _textController,
+              enabled: !_isLoading,
               decoration: InputDecoration(
-                hintText: _isServiceRequestMode
-                    ? 'Enter Order ID (e.g. 1) or preferred appointment...'
-                    : 'Describe your issue (e.g. PC won\'t turn on)...',
+                hintText: _isLoading
+                    ? 'Waiting for agent response...'
+                    : (_isServiceRequestMode
+                        ? 'Enter preferred date and time (e.g. Tomorrow at 2 PM)...'
+                        : 'Describe your issue (e.g. PC won\'t turn on)...'),
                 hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
@@ -1108,13 +1107,16 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               ),
-              onSubmitted: _handleSendMessage,
+              onSubmitted: _isLoading ? null : _handleSendMessage,
             ),
           ),
           const SizedBox(width: 8),
           IconButton(
-            onPressed: () => _handleSendMessage(_textController.text),
-            icon: const Icon(Icons.send_rounded, color: Color(0xFF5B4DFF)),
+            onPressed: _isLoading ? null : () => _handleSendMessage(_textController.text),
+            icon: Icon(
+              Icons.send_rounded,
+              color: _isLoading ? Colors.grey.shade400 : const Color(0xFF5B4DFF),
+            ),
           ),
         ],
       ),

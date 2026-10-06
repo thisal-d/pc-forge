@@ -16,6 +16,7 @@ class AppRoutes {
   static const String scanner = '/scanner';
   static const String profile = '/profile';
   static const String support = '/support';
+  static const String serviceRequests = support;
   static const String createServiceRequest = '/create-service-request';
   static const String createTicket = createServiceRequest;
   static const String aiSupportChat = '/ai-support-chat';

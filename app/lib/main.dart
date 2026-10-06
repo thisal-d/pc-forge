@@ -54,7 +54,6 @@ class PCForgeApp extends StatelessWidget {
         AppRoutes.profile: (context) => const ProfileScreen(),
         AppRoutes.support: (context) => const SupportScreen(),
         AppRoutes.createServiceRequest: (context) => const CreateServiceRequestScreen(),
-        AppRoutes.createTicket: (context) => const CreateServiceRequestScreen(),
         AppRoutes.aiSupportChat: (context) => const AiSupportChatScreen(),
         AppRoutes.buildPc: (context) => const BuildPcHubScreen(),
         AppRoutes.manualBuilder: (context) => const ManualBuilderScreen(),

@@ -31,10 +31,27 @@ class ApiService {
   ///
   /// The runner.py automatically sets up the adb reverse tunnel on startup
   /// whenever an Android device is detected.
+  static String normalizeBaseUrl(String url) {
+    var trimmed = url.trim();
+    // Local dev ports and localhost/LAN IPs must use unencrypted http, not https
+    if (trimmed.startsWith('https://localhost') ||
+        trimmed.startsWith('https://127.0.0.1') ||
+        trimmed.startsWith('https://10.0.2.2') ||
+        trimmed.startsWith('https://192.168.') ||
+        trimmed.startsWith('https://10.')) {
+      trimmed = trimmed.replaceFirst('https://', 'http://');
+    }
+    // Remove any trailing slash
+    if (trimmed.endsWith('/')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    return trimmed;
+  }
+
   static String get defaultBaseUrl {
     const envUrl = String.fromEnvironment('API_BASE_URL');
     if (envUrl.isNotEmpty) {
-      return envUrl;
+      return normalizeBaseUrl(envUrl);
     }
     return 'http://localhost:5000/api';
   }
@@ -43,7 +60,7 @@ class ApiService {
   late final HttpClient _client;
 
   ApiService({String? baseUrl, HttpClient? client})
-      : baseUrl = baseUrl ?? defaultBaseUrl {
+      : baseUrl = normalizeBaseUrl(baseUrl ?? defaultBaseUrl) {
     _client = client ??
         (HttpClient()
           ..connectionTimeout = const Duration(seconds: 10)
@@ -325,11 +342,12 @@ class ApiService {
     Map<String, String>? dynamicFilters,
   }) async {
     final queryParams = <String, dynamic>{
+      'status': 'Active',
       if (categoryId != null && categoryId > 0) 'categoryId': categoryId,
       if (brand != null && brand.isNotEmpty) 'brand': brand,
       if (searchQuery != null && searchQuery.isNotEmpty) 'search': searchQuery,
-      'minPrice': ?minPrice,
-      'maxPrice': ?maxPrice,
+      if (minPrice != null) 'minPrice': minPrice,
+      if (maxPrice != null) 'maxPrice': maxPrice,
       if (inStockOnly) 'inStockOnly': inStockOnly,
       'sortBy': sortBy,
       if (socket != null && socket.isNotEmpty) 'socket': socket,
@@ -460,7 +478,8 @@ class ApiService {
     String? description,
     int? orderId,
     int? productId,
-    required String problemDescription,
+    String? productName,
+    String problemDescription = '',
     String problemCategory = 'General',
     String? troubleshootingSummary,
     int attemptCount = 0,
@@ -471,23 +490,20 @@ class ApiService {
     String? attachmentUrl,
     String? token,
   }) async {
+    final payload = <String, dynamic>{
+      'title': (title != null && title.trim().isNotEmpty)
+          ? title.trim()
+          : (description != null && description.trim().isNotEmpty
+              ? description.trim()
+              : (problemDescription.isNotEmpty ? problemDescription : 'Service Request')),
+      if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
+      if (orderId != null) 'orderId': orderId,
+      if (preferredDate != null) 'preferredDate': preferredDate,
+      if (preferredTime != null) 'preferredTime': preferredTime,
+    };
     return await post(
       '/ServiceRequests',
-      {
-        'title': (title != null && title.trim().isNotEmpty) ? title.trim() : (problemDescription.isNotEmpty ? problemDescription : 'Service Request'),
-        if (description != null) 'description': description,
-        'orderId': orderId,
-        'productId': productId,
-        'problemDescription': problemDescription,
-        'problemCategory': problemCategory,
-        'troubleshootingSummary': ?troubleshootingSummary,
-        'attemptCount': attemptCount,
-        'warrantyStatus': warrantyStatus,
-        'preferredDate': ?preferredDate,
-        'preferredTime': ?preferredTime,
-        'priority': priority,
-        if (attachmentUrl != null && attachmentUrl.isNotEmpty) 'attachmentUrl': attachmentUrl,
-      },
+      payload,
       token: token,
     );
   }
