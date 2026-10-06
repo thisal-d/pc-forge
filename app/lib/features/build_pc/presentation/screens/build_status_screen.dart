@@ -210,6 +210,8 @@ class _BuildStatusScreenState extends State<BuildStatusScreen> {
                   if (mounted) setState(() => _isLoadingDetails = false);
                 }
 
+                if (!mounted) return;
+
                 if (_customBuild.selectedComponents.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(

@@ -6,6 +6,7 @@ safe troubleshooting guidance, attempt tracking, and Service Request creation.
 """
 
 import json
+from datetime import datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
@@ -178,19 +179,21 @@ def test_validate_service_appointment_tool():
 def test_update_service_appointment_tool():
     """Validates rescheduling an existing service request appointment without duplicates."""
     from ai_service.agents.after_sales_agent.tools import update_service_appointment
+    target_date = (datetime.now() + timedelta(days=10)).strftime("%Y-%m-%d")
     res_raw = update_service_appointment.invoke({
         "service_request_id_or_number": "1",
-        "preferred_date": "2026-10-15",
+        "preferred_date": target_date,
         "preferred_time": "03:30 PM"
     })
     data = json.loads(res_raw)
     assert data["success"] is True
     assert "03:30 PM" in data["preferred_time"]
-    assert "2026-10-15" in data["preferred_date"]
+    assert target_date in data["preferred_date"]
 
 
 def test_create_service_request_tool():
     """Validates Service Request database insertion and SR-XXXXXX number generation."""
+    target_date = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
     sr_raw = create_service_request.invoke({
         "user_id": 1,
         "problem_description": "PC will not turn on after pressing power button",
@@ -200,7 +203,7 @@ def test_create_service_request_tool():
         "order_id": 1,
         "product_name": "GeForce RTX 4070 Ti",
         "warranty_status": "Active",
-        "preferred_date": "2026-10-05",
+        "preferred_date": target_date,
         "preferred_time": "11:00 AM",
         "priority": "Normal"
     })
@@ -217,13 +220,14 @@ def test_create_service_request_tool():
 
 def test_create_service_request_with_title_and_description():
     """Validates that title and optional description are stored properly in service request."""
+    target_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
     sr_raw = create_service_request.invoke({
         "user_id": 1,
         "title": "GPU Artifacting under load",
         "description": "Green squares and lines appear on screen during 3D gaming.",
         "problem_description": "Green squares and lines appear on screen during 3D gaming.",
         "problem_category": "Display / GPU",
-        "preferred_date": "2026-10-12",
+        "preferred_date": target_date,
         "preferred_time": "02:00 PM"
     })
     data = json.loads(sr_raw)
@@ -236,7 +240,7 @@ def test_create_service_request_with_title_and_description():
 def test_validate_and_create_service_request_max_capacity():
     """Validates that a date with 10 existing appointments triggers capacity limit error."""
     from ai_service.agents.after_sales_agent.tools import after_sales_context_var
-    target_date = "2026-10-26"  # Monday
+    target_date = (datetime.now() + timedelta(days=20)).strftime("%Y-%m-%d")
     # Populate context with 10 appointments on target_date
     fake_srs = [
         {"service_request_id": i, "service_request_number": f"SR-{i:06d}", "preferred_date": f"{target_date}T10:00:00Z", "status": "PENDING"}
