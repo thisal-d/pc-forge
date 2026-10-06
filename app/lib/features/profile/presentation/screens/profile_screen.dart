@@ -366,9 +366,9 @@ class ProfileScreen extends StatelessWidget {
           children: const [
             _GuaranteeItem(
               icon: Icons.shield_outlined,
-              title: '3-Year Official Warranty',
+              title: 'Official Manufacturer Warranty',
               description:
-                  'All CPUs, GPUs, motherboards and PSUs come with direct manufacturer RMA support.',
+                  'Every component includes authentic brand warranty coverage (up to 10 years on select parts) with direct RMA support.',
             ),
             SizedBox(height: 12),
             _GuaranteeItem(
@@ -531,10 +531,10 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 _buildCardGroup([
                   _MenuRowItem(
-                    icon: Icons.headset_mic_rounded,
+                    icon: Icons.assignment_outlined,
                     iconBgColor: const Color(0xFF8B5CF6),
                     title: 'Support & Warranty (RMA)',
-                    subtitle: 'Report hardware faults, thermals & claim warranty',
+                    subtitle: 'View service requests, appointments & track repair status',
                     onTap: () => Navigator.pushNamed(context, AppRoutes.support),
                   ),
                   _MenuRowItem(
@@ -548,7 +548,7 @@ class ProfileScreen extends StatelessWidget {
                     icon: Icons.verified_user_rounded,
                     iconBgColor: const Color(0xFF10B981),
                     title: 'PCForge Official Guarantee',
-                    subtitle: '3-Year manufacturer warranty & 30-day returns',
+                    subtitle: 'Genuine manufacturer warranty & direct RMA claims',
                     isLast: true,
                     onTap: () => _showGuaranteeDialog(context),
                   ),

@@ -16,6 +16,7 @@ vi.mock("../api/axiosInstance", () => ({
 }));
 
 import api from "../api/axiosInstance";
+import { productService } from "../services/productService.js";
 import { buildReviewService } from "../services/buildReviewService.js";
 import { orderService } from "../services/orderService.js";
 import { filterService } from "../services/filterService.js";
@@ -66,7 +67,36 @@ describe("Products – getProducts()", () => {
     expect(data.data).toHaveLength(0);
     expect(data.totalCount).toBe(0);
   });
+
+  it("toggleProductStatus() toggles Active to Inactive", async () => {
+    api.patch.mockResolvedValueOnce({
+      data: {
+        productId: 42,
+        name: "Test GPU",
+        status: "Inactive",
+        stockQuantity: 10,
+      },
+    });
+    const result = await productService.toggleProductStatus(42);
+    expect(api.patch).toHaveBeenCalledWith("/products/42/status", {});
+    expect(result.status).toBe("Inactive");
+  });
+
+  it("toggleProductStatus() sets explicit targetStatus", async () => {
+    api.patch.mockResolvedValueOnce({
+      data: {
+        productId: 42,
+        name: "Test GPU",
+        status: "Active",
+        stockQuantity: 10,
+      },
+    });
+    const result = await productService.toggleProductStatus(42, "Active");
+    expect(api.patch).toHaveBeenCalledWith("/products/42/status", { status: "Active" });
+    expect(result.status).toBe("Active");
+  });
 });
+
 
 // ── Coupon Service ────────────────────────────────────────────────────────────
 describe("Coupons – validation logic", () => {
@@ -170,20 +200,17 @@ describe("buildReviewService – updateBuildReview()", () => {
         buildId: 7,
         status: "Approved by Staff",
         staffNotes: "Verified all clearances and PSU headroom.",
-        assignedStaffId: 2,
       },
     });
 
     const result = await buildReviewService.updateBuildReview(7, {
       status: "Approved by Staff",
       staffNotes: "Verified all clearances and PSU headroom.",
-      assignedStaffId: 2,
     });
 
     expect(api.patch).toHaveBeenCalledWith("/custombuilds/7/review", {
       status: "Approved by Staff",
       staffNotes: "Verified all clearances and PSU headroom.",
-      assignedStaffId: 2,
     });
     expect(result.status).toBe("Approved by Staff");
   });
@@ -377,5 +404,35 @@ describe("filterService – Master filters DB management", () => {
     expect(typeMatch[0].filterKey).toBe("wattage");
   });
 });
+
+// ── Filter Management Option Formatting ───────────────────────────────────────
+import { formatOptionWithUnit } from "../pages/FilterManagement.jsx";
+
+describe("Filter Option Formatting – formatOptionWithUnit()", () => {
+  it("auto-appends unit of measure to numeric values (e.g. 100 -> 100GB)", () => {
+    expect(formatOptionWithUnit("100", "GB")).toBe("100GB");
+    expect(formatOptionWithUnit("200", "GB")).toBe("200GB");
+    expect(formatOptionWithUnit("650", "W")).toBe("650W");
+    expect(formatOptionWithUnit("3200", "MHz")).toBe("3200MHz");
+  });
+
+  it("does not duplicate unit if user already typed it", () => {
+    expect(formatOptionWithUnit("100GB", "GB")).toBe("100GB");
+    expect(formatOptionWithUnit("100gb", "GB")).toBe("100GB");
+    expect(formatOptionWithUnit("100 GB", "GB")).toBe("100GB");
+  });
+
+  it("preserves non-unit strings when no unit is defined", () => {
+    expect(formatOptionWithUnit("AM5", "")).toBe("AM5");
+    expect(formatOptionWithUnit("LGA1700", null)).toBe("LGA1700");
+    expect(formatOptionWithUnit("80+ Bronze", "")).toBe("80+ Bronze");
+  });
+
+  it("handles whitespace gracefully", () => {
+    expect(formatOptionWithUnit("  100  ", "  GB  ")).toBe("100GB");
+    expect(formatOptionWithUnit("", "GB")).toBe("");
+  });
+});
+
 
 

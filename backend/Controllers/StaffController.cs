@@ -7,7 +7,7 @@ using PCForge.Api.Models;
 
 namespace PCForge.Api.Controllers;
 
-[Authorize(Policy = "StaffOnly")]
+[Authorize(Policy = "AdminOnly")]
 [ApiController]
 [Route("api/[controller]")]
 public class StaffController : ControllerBase

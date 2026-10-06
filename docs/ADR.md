@@ -1,4 +1,4 @@
-﻿# Architecture Decision Records (ADR)
+# Architecture Decision Records (ADR)
 ## PCForge — SE3090 Group Assignment 2026
 
 > **Format:** Each ADR captures: Context → Options Considered → Decision → Consequences  
@@ -137,13 +137,13 @@ We needed a no-cost, reliable cloud platform to deploy the ASP.NET Core Web API 
 ### Options Considered
 | Option | Pros | Cons |
 |---|---|---|
-| **Render.com (API) + Neon PostgreSQL + Vercel (React)** | Free tier; supports .NET 8 Docker deployments; Neon has free Postgres with connection pooling | Cold-start latency on free tier (~30–50 s) |
+| **Render.com (API) + Neon PostgreSQL + Cloudflare Pages (React)** | Free tier; supports .NET 8 Docker deployments; Neon has free Postgres with connection pooling | Cold-start latency on free tier (~30–50 s) |
 | Railway | Simple .NET support | Free tier limits bandwidth |
 | Azure App Service | Enterprise-grade | Requires credit card; costly beyond free tier |
 | Heroku | Familiar | Eliminated free tier in 2022 |
 
 ### Decision
-**Render.com** for the ASP.NET Core API (Docker-based deployment), **Neon PostgreSQL** for the managed database, and **Vercel** for the React web application. The Python AI service runs locally during evaluation (Agentic AI is resource-intensive and free-tier cloud limits make it impractical to deploy alongside the API).
+**Render.com** for the ASP.NET Core API (Docker-based deployment), **Neon PostgreSQL** for the managed database, and local / static hosting for the React web application. The Python AI service runs locally during evaluation (Agentic AI is resource-intensive and free-tier cloud limits make it impractical to deploy alongside the API).
 
 ### Consequences
 - ✅ No cost; institution-provided free tier compliant

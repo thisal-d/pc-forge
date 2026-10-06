@@ -2,12 +2,11 @@ import api from '../api/axiosInstance.js';
 
 export const serviceRequestService = {
   // Fetch live service requests from backend API (GET /api/ServiceRequests)
-  async fetchServiceRequests({ status, search, priority, startDate, endDate } = {}) {
+  async fetchServiceRequests({ status, search, startDate, endDate } = {}) {
     try {
       const params = {};
       if (status && status !== 'all') params.status = status;
       if (search && search.trim()) params.search = search.trim();
-      if (priority && priority !== 'all') params.priority = priority;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
 
@@ -60,7 +59,7 @@ export const serviceRequestService = {
   // Compute live KPI analytics
   getStats(requestsList = []) {
     if (!Array.isArray(requestsList)) {
-      return { total: 0, pending: 0, inProgress: 0, completed: 0, noShow: 0, cancelled: 0, urgentOrHigh: 0 };
+      return { total: 0, pending: 0, inProgress: 0, completed: 0, noShow: 0, cancelled: 0 };
     }
 
     const norm = (s) => (s || '').toUpperCase().replace(/_/g, ' ');
@@ -76,22 +75,18 @@ export const serviceRequestService = {
     }).length;
     const noShow = requestsList.filter((r) => norm(r.status) === 'NO SHOW').length;
     const cancelled = requestsList.filter((r) => norm(r.status) === 'CANCELLED' || norm(r.status) === 'CANCELED').length;
-    const urgentOrHigh = requestsList.filter(
-      (r) => (r.priority === 'High' || r.priority === 'Urgent') && norm(r.status) !== 'COMPLETED' && norm(r.status) !== 'RESOLVED' && norm(r.status) !== 'CANCELLED'
-    ).length;
 
-    return { total, pending, inProgress, completed, noShow, cancelled, urgentOrHigh };
+    return { total, pending, inProgress, completed, noShow, cancelled };
   },
 
-  // Update service request status, diagnosis, internal notes, and resolution (PUT /api/ServiceRequests/{id})
-  async updateServiceRequestStatus(id, newStatus, technicianNotes = null, resolution = null, internalNotes = null) {
+  // Update service request status and optional appointment date/time (PUT /api/ServiceRequests/{id})
+  async updateServiceRequestStatus(id, newStatus, preferredDate = null, preferredTime = null) {
     try {
-      const response = await api.put(`/ServiceRequests/${id}`, {
-        status: newStatus,
-        technicianNotes: technicianNotes !== null ? technicianNotes : undefined,
-        resolution: resolution !== null ? resolution : undefined,
-        internalNotes: internalNotes !== null ? internalNotes : undefined,
-      });
+      const payload = { status: newStatus };
+      if (preferredDate) payload.preferredDate = preferredDate;
+      if (preferredTime) payload.preferredTime = preferredTime;
+
+      const response = await api.put(`/ServiceRequests/${id}`, payload);
       return response.data;
     } catch (err) {
       const backendMessage =
@@ -103,58 +98,16 @@ export const serviceRequestService = {
     }
   },
 
-  // Assign technician staff to service request (PUT /api/ServiceRequests/{id})
-  async assignTechnician(id, staffId) {
-    const parsedStaffId = staffId ? Number(String(staffId).replace(/^STF-/, '')) : null;
-
-    try {
-      const response = await api.put(`/ServiceRequests/${id}`, {
-        assignedStaffId: parsedStaffId,
-      });
-      return response.data;
-    } catch (err) {
-      const backendMessage =
-        err.response?.data?.message ||
-        err.response?.data?.title ||
-        err.message ||
-        'Failed to assign technician.';
-      throw new Error(backendMessage);
-    }
-  },
-
-  // Update priority (PUT /api/ServiceRequests/{id})
-  async updatePriority(id, newPriority) {
-    try {
-      const response = await api.put(`/ServiceRequests/${id}`, {
-        priority: newPriority,
-      });
-      return response.data;
-    } catch (err) {
-      const backendMessage =
-        err.response?.data?.message ||
-        err.response?.data?.title ||
-        err.message ||
-        'Failed to update priority.';
-      throw new Error(backendMessage);
-    }
-  },
-
   // Create new service request (POST /api/ServiceRequests)
+  // Non-technical friendly: all fields optional
   async createServiceRequest(requestData) {
     try {
       const response = await api.post('/ServiceRequests', {
+        title: requestData.title?.trim() || null,
+        description: requestData.description?.trim() || null,
         orderId: requestData.orderId ? Number(requestData.orderId) : null,
-        productId: requestData.productId ? Number(requestData.productId) : null,
-        problemDescription: requestData.problemDescription,
-        problemCategory: requestData.problemCategory || 'General',
-        troubleshootingSummary: requestData.troubleshootingSummary || null,
-        attemptCount: Number(requestData.attemptCount || 0),
-        warrantyStatus: requestData.warrantyStatus || 'Active',
-        warrantyExpiryDate: requestData.warrantyExpiryDate || null,
         preferredDate: requestData.preferredDate || null,
-        preferredTime: requestData.preferredTime || '10:00 AM',
-        priority: requestData.priority || 'Normal',
-        attachmentUrl: requestData.attachmentUrl || null,
+        preferredTime: requestData.preferredTime || null,
       });
       return response.data;
     } catch (err) {

@@ -15,7 +15,7 @@ Modeled on the Sri Lankan enthusiast computer retail industry (Nanotek, Redline 
 | ASP.NET Core Web API | .NET 8, EF Core, PostgreSQL | `https://pc-forge.onrender.com` |
 | Swagger / OpenAPI | Swashbuckle | `https://pc-forge.onrender.com/swagger` |
 | Health Check | ASP.NET Core health endpoint | `https://pc-forge.onrender.com/health` |
-| React Web Portal | Vite + React 19 | `https://pc-forge-web.vercel.app` |
+| React Web Portal | Vite + React 19 | `https://pc-forge-admin.pages.dev` |
 | Flutter Mobile App | Flutter 3.x (Material 3) | Release APK — see §Flutter APK below |
 | PostgreSQL Database | Neon Serverless Postgres (16 tables) | Managed — connection string via `DATABASE_URL` |
 | Python AI Microservice | FastAPI + LangGraph + Gemini 2.5 Flash | Local `:5050` / internal worker |
@@ -357,7 +357,7 @@ Detailed architectural justifications located in [`docs/ADR.md`](docs/ADR.md):
 - **ADR-002:** Flutter State Management (Provider + ChangeNotifier)
 - **ADR-003:** Agentic AI Framework (LangGraph + Google Gemini)
 - **ADR-004:** Database Schema Strategy for AI Workflow State
-- **ADR-005:** Cloud Deployment Strategy (Render + Neon + Vercel)
+- **ADR-005:** Deployment Strategy (Render + Neon)
 - **ADR-006:** Python AI Boundary (Stateless Internal Microservice)
 
 ---

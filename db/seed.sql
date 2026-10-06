@@ -190,20 +190,20 @@ INSERT INTO OrderItems (OrderId, ProductId, Quantity, UnitPrice) VALUES
 SELECT setval('orders_orderid_seq', (SELECT GREATEST(MAX(OrderId), 1001) FROM Orders));
 
 
--- 8. INITIAL SUPPORT TICKET (Scenario 3: Alex reports GPU overheating - Ticket #505)
-INSERT INTO SupportTickets (TicketId, UserId, OrderId, ProductId, IssueType, Subject, Description, AttachmentUrl, Status, Priority, AssignedStaffId) VALUES
-(505, 1, 1001, 4, 'Overheating', 'GPU is overheating', 'The RTX 4070 Ti reaches 95C under load and causes thermal throttling and black screen during gaming.', 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=600', 'Open', 'High', 1);
+-- 8. INITIAL SERVICE REQUEST (Scenario 3: Alex reports GPU overheating - Service Request #1)
+INSERT INTO ServiceRequests (ServiceRequestId, ServiceRequestNumber, UserId, Title, Description, PreferredDate, PreferredTime, Status) VALUES
+(1, 'SR-000001', 1, 'GPU is overheating', 'The RTX 4070 Ti reaches 95C under load and causes thermal throttling and black screen during gaming.', '2026-10-15', '03:30 PM', 'Pending');
 
--- Sync sequence for auto-incrementing support tickets
-SELECT setval('supporttickets_ticketid_seq', (SELECT GREATEST(MAX(TicketId), 505) FROM SupportTickets));
+-- Sync sequence for auto-incrementing service requests
+SELECT setval('servicerequests_servicerequestid_seq', (SELECT GREATEST(MAX(ServiceRequestId), 10) FROM ServiceRequests));
 
 
 -- 9. INITIAL CUSTOM PC BUILDS & REVIEWS
-INSERT INTO CustomBuilds (BuildId, UserId, BuildName, TotalPrice, EstimatedWattage, Status, CustomerNotes, StaffNotes, AssignedStaffId, CreatedAt) VALUES
-(1, 1, 'Alex''s Esports 1440p Battlestation', 1816.00, 490, 'Pending Staff Review', 'Please verify if the 750W PSU has adequate headroom for RTX 4070 Ti transient spikes, and check if the B650 motherboard will require a BIOS update.', NULL, NULL, NOW() - INTERVAL '2 hours'),
-(2, 1, 'AM5 Liquid Cooled Workstation', 2846.00, 620, 'In Review by Staff', 'Need high memory bandwidth for 3D simulation rendering. Please confirm top mount 360mm AIO clearance.', 'Under physical inspection by Kasun. Checking radiator clearances in Lian Li chassis.', 1, NOW() - INTERVAL '1 day'),
-(3, 1, 'Creator Pro 7950X / RTX 4090', 3895.00, 720, 'Approved by Staff', 'Will be used for 8K video editing and DaVinci Resolve.', 'Thermal profiling passed. 1000W PSU verified with +280W headroom. Cleared for checkout and workshop assembly.', 1, NOW() - INTERVAL '3 days'),
-(4, 1, 'Compact ITX Gaming Beast', 1450.00, 480, 'Changes Requested', 'Looking for quiet gaming operation.', 'The chosen 450W power supply is below the 650W manufacturer recommendation for the RTX 4070 Ti. Please adjust PSU to Corsair RM750e.', 1, NOW() - INTERVAL '4 days');
+INSERT INTO CustomBuilds (BuildId, UserId, BuildName, TotalPrice, EstimatedWattage, Status, CustomerNotes, StaffNotes, CreatedAt) VALUES
+(1, 1, 'Alex''s Esports 1440p Battlestation', 1816.00, 490, 'Pending Staff Review', 'Please verify if the 750W PSU has adequate headroom for RTX 4070 Ti transient spikes, and check if the B650 motherboard will require a BIOS update.', NULL, NOW() - INTERVAL '2 hours'),
+(2, 1, 'AM5 Liquid Cooled Workstation', 2846.00, 620, 'In Review by Staff', 'Need high memory bandwidth for 3D simulation rendering. Please confirm top mount 360mm AIO clearance.', 'Under physical inspection by Kasun. Checking radiator clearances in Lian Li chassis.', NOW() - INTERVAL '1 day'),
+(3, 1, 'Creator Pro 7950X / RTX 4090', 3895.00, 720, 'Approved by Staff', 'Will be used for 8K video editing and DaVinci Resolve.', 'Thermal profiling passed. 1000W PSU verified with +280W headroom. Cleared for checkout and workshop assembly.', NOW() - INTERVAL '3 days'),
+(4, 1, 'Compact ITX Gaming Beast', 1450.00, 480, 'Changes Requested', 'Looking for quiet gaming operation.', 'The chosen 450W power supply is below the 650W manufacturer recommendation for the RTX 4070 Ti. Please adjust PSU to Corsair RM750e.', NOW() - INTERVAL '4 days');
 
 INSERT INTO CustomBuildItems (BuildId, ProductId, SlotType, UnitPrice) VALUES
 (1, 6, 'cpu', 449.00),         -- Ryzen 7 7800X3D

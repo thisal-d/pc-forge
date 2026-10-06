@@ -249,36 +249,6 @@ export const TicketDetailModal = ({
                   </div>
                 </div>
               )}
-
-              {/* Technician Assignment Card */}
-              <div className="card" style={{ background: '#131d2e', padding: '1rem' }}>
-                <h4 style={{ fontSize: '0.9rem', marginBottom: '0.6rem', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <WrenchIcon size={16} /> Assigned Technician Staff
-                </h4>
-                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                  <select
-                    id="assign-tech-select"
-                    value={ticket.assignedStaffId || ''}
-                    onChange={(e) => onAssignTechnician(ticket.ticketId, e.target.value)}
-                    style={{
-                      flex: 1,
-                      background: '#ffffff',
-                      color: 'var(--text-main)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '6px',
-                      padding: '0.5rem',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    <option value="">-- Unassigned --</option>
-                    {technicians.map((t) => (
-                      <option key={t.id || t.staffId} value={t.staffId || t.userId || t.id}>
-                        {t.firstName} {t.lastName} ({t.department})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
             </div>
 
             {/* Right Column: Conversation, Timeline, & Internal Bench Notes */}

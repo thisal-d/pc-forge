@@ -21,11 +21,9 @@ export const SupportTable = ({
             <tr>
               <th style={{ width: '90px' }}>Ticket ID</th>
               <th>Customer</th>
-              <th>Order / Product</th>
               <th>Subject & Category</th>
               <th style={{ width: '100px' }}>Priority</th>
               <th style={{ width: '130px' }}>Status</th>
-              <th>Assigned Tech</th>
               <th style={{ width: '120px' }}>Date</th>
               <th style={{ width: '140px', textAlign: 'right' }}>Actions</th>
             </tr>
@@ -33,7 +31,7 @@ export const SupportTable = ({
           <tbody>
             {filteredTickets.length === 0 ? (
               <tr>
-                <td colSpan="9">
+                <td colSpan="7">
                   <div className="empty-state">
                     <div className="empty-state-icon">
                       <TicketIcon size={40} />

@@ -144,6 +144,13 @@ class ServiceRequestModel {
         json['problemDescription']?.toString() ??
         json['problem_description']?.toString();
 
+    final rawProductName = json['productName']?.toString() ?? json['product_name']?.toString();
+    final parsedSummary = json['troubleshootingSummary']?.toString() ?? json['troubleshooting_summary']?.toString();
+    String? resolvedProductName = rawProductName;
+    if ((resolvedProductName == null || resolvedProductName.isEmpty) && parsedSummary != null && parsedSummary.startsWith('Hardware: ')) {
+      resolvedProductName = parsedSummary.split('|').first.replaceFirst('Hardware: ', '').trim();
+    }
+
     return ServiceRequestModel(
       serviceRequestId: sId,
       serviceRequestNumber: sNum,
@@ -151,7 +158,7 @@ class ServiceRequestModel {
       customerName: json['customerName']?.toString() ?? json['customer_name']?.toString(),
       orderId: (json['orderId'] as num?)?.toInt() ?? (json['order_id'] as num?)?.toInt(),
       productId: (json['productId'] as num?)?.toInt() ?? (json['product_id'] as num?)?.toInt(),
-      productName: json['productName']?.toString() ?? json['product_name']?.toString(),
+      productName: resolvedProductName,
       title: parsedTitle,
       description: parsedDesc,
       problemDescription: probDesc.isNotEmpty ? probDesc : parsedTitle,
@@ -159,7 +166,7 @@ class ServiceRequestModel {
           json['problem_category']?.toString() ??
           json['issueType']?.toString() ??
           'General',
-      troubleshootingSummary: json['troubleshootingSummary']?.toString() ?? json['troubleshooting_summary']?.toString(),
+      troubleshootingSummary: parsedSummary,
       attemptCount: (json['attemptCount'] as num?)?.toInt() ??
           (json['attempt_count'] as num?)?.toInt() ??
           (json['troubleshootingAttemptCount'] as num?)?.toInt() ??

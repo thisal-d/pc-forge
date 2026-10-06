@@ -29,6 +29,7 @@ class ProductModel {
   final String? subSpec;          // e.g. "6 Cores 12 Threads | 3.7 GHz / 4.6 GHz"
   final List<String> images;      // Multi-image gallery URLs
   final String? customWarrantyText;
+  final String status;
 
   const ProductModel({
     required this.productId,
@@ -50,27 +51,36 @@ class ProductModel {
     this.powerWattage,
     this.efficiencyRating,
     this.formFactor,
-    this.warrantyMonths = 36,
+    this.warrantyMonths = 0,
     this.badge,
     this.subSpec,
     this.images = const [],
     this.customWarrantyText,
+    this.status = 'Active',
   });
+
+  bool get isActive => status.toLowerCase() == 'active';
 
   /// Human-readable manufacturer warranty string grounded in DB warrantyMonths
   String get warrantyDisplay {
     if (customWarrantyText != null && customWarrantyText!.isNotEmpty) {
       return customWarrantyText!;
     }
+    if (warrantyMonths >= 120) {
+      return '10 Years (Limited Lifetime)';
+    }
     if (warrantyMonths >= 12) {
       final years = warrantyMonths ~/ 12;
       final rem = warrantyMonths % 12;
       if (rem > 0) {
-        return '$years Year${years > 1 ? "s" : ""} $rem Month${rem > 1 ? "s" : ""} Manufacturer Warranty';
+        return '$years Year${years > 1 ? "s" : ""} $rem Month${rem > 1 ? "s" : ""}';
       }
-      return '$years Year${years > 1 ? "s" : ""} Manufacturer Warranty';
+      return '$years Year${years > 1 ? "s" : ""}';
     }
-    return '$warrantyMonths Months Manufacturer Warranty';
+    if (warrantyMonths > 0) {
+      return '$warrantyMonths Months';
+    }
+    return 'Official Manufacturer Warranty';
   }
 
   String get warranty => warrantyDisplay;
@@ -180,11 +190,12 @@ class ProductModel {
       warrantyMonths: (json['warrantyMonths'] as num?)?.toInt() ??
           (json['warranty_months'] as num?)?.toInt() ??
           (specs?['warranty_months'] as num?)?.toInt() ??
-          36,
+          0,
       badge: json['badge'] as String?,
       subSpec: json['subSpec'] as String?,
       images: gallery,
       customWarrantyText: (json['warranty'] as String?),
+      status: json['status'] as String? ?? 'Active',
     );
   }
 
@@ -198,6 +209,7 @@ class ProductModel {
       'model': model,
       'price': price,
       'stockQuantity': stockQuantity,
+      'status': status,
       'imageUrl': imageUrl,
       'description': description,
       'socket': socket,
@@ -216,4 +228,5 @@ class ProductModel {
       'warranty': warrantyDisplay,
     };
   }
+
 }

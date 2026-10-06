@@ -266,6 +266,7 @@ export const ProductManagement = () => {
       model: '',
       price: '',
       stockQuantity: '',
+      warrantyMonths: '36',
       imageUrl: '',
       description: '',
       status: 'Active',
@@ -294,16 +295,25 @@ export const ProductManagement = () => {
   };
 
   const handleDynamicFilterChange = (filter, value, optionId = null) => {
-    setAddFilterValues((prev) => ({
-      ...prev,
-      [filter.filterId]: {
+    const key = filter.filterKey || String(filter.filterId);
+    setAddFilterValues((prev) => {
+      const next = { ...prev };
+      if (filter.filterId !== undefined && filter.filterId !== null) {
+        delete next[filter.filterId];
+        delete next[String(filter.filterId)];
+      }
+      if (filter.filterKey) {
+        delete next[filter.filterKey];
+      }
+      next[key] = {
         filterId: filter.filterId,
         filterKey: filter.filterKey,
         displayName: filter.displayName,
         optionId: optionId,
         rawValue: value,
-      },
-    }));
+      };
+      return next;
+    });
     if (addErrors[`filter_${filter.filterId}`]) {
       setAddErrors((prev) => ({ ...prev, [`filter_${filter.filterId}`]: '' }));
     }
@@ -374,9 +384,16 @@ export const ProductManagement = () => {
       const selectedCategory = categories.find((c) => (c.categoryId || c.id) === Number(addFormData.categoryId));
       const categoryName = selectedCategory?.name || 'General';
 
-      const filterValuesArray = Object.values(addFilterValues).filter(
-        (fv) => fv.rawValue !== undefined && fv.rawValue !== null && String(fv.rawValue).trim() !== ''
-      );
+      const filterValuesMap = {};
+      Object.values(addFilterValues).forEach((fv) => {
+        if (fv && fv.filterKey && fv.rawValue !== undefined && fv.rawValue !== null && String(fv.rawValue).trim() !== '') {
+          const k = fv.filterKey.trim().toLowerCase();
+          if (!filterValuesMap[k] || fv.displayName || fv.filterId) {
+            filterValuesMap[k] = fv;
+          }
+        }
+      });
+      const filterValuesArray = Object.values(filterValuesMap);
 
       const createdProduct = await productService.addProduct(
         {
@@ -412,6 +429,7 @@ export const ProductManagement = () => {
       model: product.model || '',
       price: String(product.price),
       stockQuantity: String(product.stockQuantity),
+      warrantyMonths: String(product.warrantyMonths || 36),
       imageUrl: product.imageUrl || '',
       description: product.description || '',
       status: product.status || 'Active',
@@ -420,7 +438,8 @@ export const ProductManagement = () => {
     const existingValues = productService.getProductFilterValues(product.productId || product.id, product.specifications);
     const valuesMap = {};
     existingValues.forEach((fv) => {
-      valuesMap[fv.filterKey] = {
+      const key = fv.filterKey || fv.filterId;
+      valuesMap[key] = {
         filterKey: fv.filterKey,
         rawValue: fv.rawValue,
       };
@@ -449,16 +468,25 @@ export const ProductManagement = () => {
   };
 
   const handleEditDynamicFilterChange = (filter, value, optionId = null) => {
-    setEditFilterValues((prev) => ({
-      ...prev,
-      [filter.filterId]: {
+    const key = filter.filterKey || String(filter.filterId);
+    setEditFilterValues((prev) => {
+      const next = { ...prev };
+      if (filter.filterId !== undefined && filter.filterId !== null) {
+        delete next[filter.filterId];
+        delete next[String(filter.filterId)];
+      }
+      if (filter.filterKey) {
+        delete next[filter.filterKey];
+      }
+      next[key] = {
         filterId: filter.filterId,
         filterKey: filter.filterKey,
         displayName: filter.displayName,
         optionId: optionId,
         rawValue: value,
-      },
-    }));
+      };
+      return next;
+    });
     if (editErrors[`filter_${filter.filterId}`]) {
       setEditErrors((prev) => ({ ...prev, [`filter_${filter.filterId}`]: '' }));
     }
@@ -532,9 +560,16 @@ export const ProductManagement = () => {
       const selectedCategory = categories.find((c) => (c.categoryId || c.id) === Number(editFormData.categoryId));
       const categoryName = selectedCategory?.name || currentEditingProduct.categoryName;
 
-      const filterValuesArray = Object.values(editFilterValues).filter(
-        (fv) => fv.rawValue !== undefined && fv.rawValue !== null && String(fv.rawValue).trim() !== ''
-      );
+      const filterValuesMap = {};
+      Object.values(editFilterValues).forEach((fv) => {
+        if (fv && fv.filterKey && fv.rawValue !== undefined && fv.rawValue !== null && String(fv.rawValue).trim() !== '') {
+          const k = fv.filterKey.trim().toLowerCase();
+          if (!filterValuesMap[k] || fv.displayName || fv.filterId) {
+            filterValuesMap[k] = fv;
+          }
+        }
+      });
+      const filterValuesArray = Object.values(filterValuesMap);
 
       const updatedProduct = await productService.updateProduct(
         prodId,

@@ -14,7 +14,8 @@ class MockSupportApiService extends ApiService {
     String? description,
     int? orderId,
     int? productId,
-    required String problemDescription,
+    String? productName,
+    String problemDescription = '',
     String problemCategory = 'General',
     String? troubleshootingSummary,
     int attemptCount = 0,
@@ -32,7 +33,7 @@ class MockSupportApiService extends ApiService {
       'description': description ?? problemDescription,
       'orderId': orderId,
       'productId': productId ?? 4,
-      'productName': 'GeForce RTX 4070 Ti 12GB',
+      'productName': productName ?? 'GeForce RTX 4070 Ti 12GB',
       'problemDescription': problemDescription,
       'problemCategory': problemCategory,
       'troubleshootingSummary': troubleshootingSummary,
@@ -248,6 +249,26 @@ void main() {
       final updated = service.serviceRequests.firstWhere((r) => r.serviceRequestId == firstId);
       expect(updated.status, 'CANCELLED');
     });
+
+    test('SupportService creates a manual Service Request without order and custom product', () async {
+      final service = SupportService.instance;
+      final initialCount = service.serviceRequests.length;
+
+      final newRequest = await service.createServiceRequest(
+        title: 'Custom PC thermal throttling',
+        productName: 'Custom Rig (AMD Ryzen 7 7800X3D + RTX 4070)',
+        problemDescription: 'Reaches 98C under Blender render',
+        problemCategory: 'Overheating & Thermals',
+        preferredDate: '2026-10-02',
+        preferredTime: '11:00 AM',
+      );
+
+      expect(newRequest.title, 'Custom PC thermal throttling');
+      expect(newRequest.productName, 'Custom Rig (AMD Ryzen 7 7800X3D + RTX 4070)');
+      expect(newRequest.orderId, isNull);
+      expect(newRequest.status, 'PENDING');
+      expect(service.serviceRequests.length, initialCount + 1);
+    });
   });
 
   group('Service Request Widget Tests', () {
@@ -263,17 +284,18 @@ void main() {
       expect(find.text('After-Sales Support Assistant'), findsOneWidget);
     });
 
-    testWidgets('CreateServiceRequestScreen renders Service Request form inputs', (tester) async {
+    testWidgets('CreateServiceRequestScreen renders simplified Service Request form inputs', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: CreateServiceRequestScreen(initialOrderId: 1001),
+          home: CreateServiceRequestScreen(),
         ),
       );
       await tester.pumpAndSettle();
 
       expect(find.text('Submit Service Request'), findsWidgets);
-      expect(find.text('Issue Category'), findsOneWidget);
-      expect(find.text('Title *'), findsOneWidget);
+      expect(find.text('Title (Optional)'), findsOneWidget);
+      expect(find.text('Description (Optional)'), findsOneWidget);
+      expect(find.text('Preferred Appointment (Optional)'), findsOneWidget);
     });
 
     testWidgets('SupportScreen renders New Service Request manual action button', (tester) async {
@@ -285,6 +307,34 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('New Service Request'), findsOneWidget);
+    });
+
+    testWidgets('SupportScreen shows confirmation dialog and cancels request when confirmed', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: SupportScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Find the Cancel Service Request button
+      final cancelBtn = find.text('Cancel Service Request');
+      expect(cancelBtn, findsWidgets);
+
+      // Tap cancel button on the first card
+      await tester.tap(cancelBtn.first);
+      await tester.pumpAndSettle();
+
+      // Verify the confirmation dialog appears with exact prompt text
+      expect(find.text('Are you sure you want to cancel this service request?'), findsOneWidget);
+      expect(find.text('Keep Request'), findsOneWidget);
+
+      // Tap confirm button
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Cancel Service Request'));
+      await tester.pumpAndSettle();
+
+      // Verify cancel was processed
+      expect(find.textContaining('cancelled'), findsWidgets);
     });
   });
 }

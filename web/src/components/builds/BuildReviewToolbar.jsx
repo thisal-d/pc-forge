@@ -7,13 +7,10 @@ export const BuildReviewToolbar = ({
   onClearSearch,
   statusFilter,
   onStatusFilterChange,
-  staffFilter,
-  onStaffFilterChange,
-  technicians,
   metrics,
   onResetFilters,
 }) => {
-  const isFiltered = searchQuery || statusFilter !== 'all' || staffFilter !== 'all';
+  const isFiltered = searchQuery || statusFilter !== 'all';
 
   return (
     <div className="toolbar-card">
@@ -56,26 +53,6 @@ export const BuildReviewToolbar = ({
             <option value="In Review by Staff">In Review ({metrics.inReview})</option>
             <option value="Approved by Staff">Approved ({metrics.approved})</option>
             <option value="Changes Requested">Changes Requested ({metrics.changesRequested})</option>
-          </select>
-        </div>
-
-        {/* Technician Filter */}
-        <div className="filter-item">
-          <label htmlFor="filter-staff">Technician:</label>
-          <select
-            id="filter-staff"
-            className="filter-select"
-            value={staffFilter}
-            onChange={(e) => onStaffFilterChange(e.target.value)}
-          >
-            <option value="all">All Technicians</option>
-            <option value="my">My Workbench</option>
-            <option value="unassigned">Unassigned Only</option>
-            {technicians.map((t) => (
-              <option key={t.id || t.userId} value={t.userId}>
-                {t.firstName} {t.lastName}
-              </option>
-            ))}
           </select>
         </div>
 

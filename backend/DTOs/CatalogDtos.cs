@@ -91,6 +91,7 @@ public class ProductDto
     public string? ImageUrl { get; set; }
     public string? Description { get; set; }
     public int WarrantyMonths { get; set; } = 36;
+    public string Status { get; set; } = "Active";
 
     // Specifications & compatibility
     public object? Specifications { get; set; }
@@ -108,6 +109,11 @@ public class UpdateStockDto
     public int? Delta { get; set; }
 
     public string? Reason { get; set; }
+}
+
+public class UpdateProductStatusDto
+{
+    public string? Status { get; set; }
 }
 
 public class CreateProductDto
@@ -134,6 +140,8 @@ public class CreateProductDto
 
     public int WarrantyMonths { get; set; } = 36;
 
+    public string? Status { get; set; } = "Active";
+
     public string? ImageUrl { get; set; }
     public string? Description { get; set; }
     public string? Specifications { get; set; }
@@ -152,6 +160,7 @@ public class UpdateProductDto
     public decimal? Price { get; set; }
     public int? StockQuantity { get; set; }
     public int? WarrantyMonths { get; set; }
+    public string? Status { get; set; }
     public string? ImageUrl { get; set; }
     public string? Description { get; set; }
     public string? Specifications { get; set; }
@@ -160,3 +169,4 @@ public class UpdateProductDto
     public int? PowerWattage { get; set; }
     public string? FormFactor { get; set; }
 }
+

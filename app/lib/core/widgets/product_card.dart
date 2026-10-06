@@ -241,26 +241,6 @@ class ProductCard extends StatelessWidget {
                         const SizedBox(height: 6),
                       ],
 
-                      // Warranty Badge Row
-                      Row(
-                        children: [
-                          const Icon(Icons.verified_user_outlined, size: 14, color: AppColors.stockGreen),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              product.warrantyDisplay,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.secondaryText,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
                       const SizedBox(height: 8),
 
                       // Bottom Row: Price, Stock & Add to Cart

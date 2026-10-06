@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { buildReviewService } from '../services/buildReviewService.js';
-import { staffService } from '../services/staffService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   BuildReviewStats,
@@ -14,14 +13,12 @@ export const BuildReviews = () => {
   const { user } = useAuth();
 
   const [builds, setBuilds] = useState([]);
-  const [technicians, setTechnicians] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [staffFilter, setStaffFilter] = useState('all');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -45,28 +42,15 @@ export const BuildReviews = () => {
     }, 4500);
   };
 
-  // Load builds & staff
+  // Load builds
   const loadData = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
 
     try {
-      const [buildsResult, staffResult] = await Promise.allSettled([
-        buildReviewService.fetchBuilds(),
-        staffService.fetchStaffFromApi(),
-      ]);
-
-      if (buildsResult.status === 'fulfilled' && Array.isArray(buildsResult.value)) {
-        setBuilds(buildsResult.value);
-      } else if (buildsResult.status === 'rejected') {
-        console.error('Failed to load builds:', buildsResult.reason);
-        showNotification('Failed to fetch build reviews from backend.', 'error');
-      }
-
-      if (staffResult.status === 'fulfilled' && Array.isArray(staffResult.value)) {
-        setTechnicians(staffResult.value);
-      } else if (staffResult.status === 'rejected') {
-        console.warn('Could not load technicians directory:', staffResult.reason);
+      const buildsResult = await buildReviewService.fetchBuilds();
+      if (Array.isArray(buildsResult)) {
+        setBuilds(buildsResult);
       }
     } catch (err) {
       console.error('Error loading build review queue:', err);
@@ -84,39 +68,17 @@ export const BuildReviews = () => {
   // Reset pagination on filter change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, staffFilter]);
+  }, [searchQuery, statusFilter]);
 
   // Filtered builds
   const filteredBuilds = useMemo(() => {
-    const myStaff = technicians.find(
-      (t) => String(t.userId) === String(user?.userId) || String(t.staffId) === String(user?.userId)
-    );
-    const myStaffId = myStaff?.staffId;
-    const currentUserId = user?.userId;
-
     return builds.filter((b) => {
       // 1. Status Filter
       if (statusFilter !== 'all' && (b.status || '').toLowerCase() !== statusFilter.toLowerCase()) {
         return false;
       }
 
-      // 2. Staff Filter
-      if (staffFilter === 'unassigned' && b.assignedStaffId != null) {
-        return false;
-      }
-      if (staffFilter === 'my') {
-        const isAssignedToMe =
-          (myStaffId != null && String(b.assignedStaffId) === String(myStaffId)) ||
-          (currentUserId != null && String(b.assignedStaffId) === String(currentUserId));
-        if (!isAssignedToMe) {
-          return false;
-        }
-      }
-      if (staffFilter !== 'all' && staffFilter !== 'unassigned' && staffFilter !== 'my') {
-        if (String(b.assignedStaffId) !== String(staffFilter)) return false;
-      }
-
-      // 3. Search query
+      // 2. Search query
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
         const cleanId = q.replace(/^#/, '');
@@ -132,7 +94,7 @@ export const BuildReviews = () => {
 
       return true;
     });
-  }, [builds, statusFilter, staffFilter, searchQuery, user, technicians]);
+  }, [builds, statusFilter, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredBuilds.length / pageSize));
   const paginatedBuilds = useMemo(() => {
@@ -157,7 +119,6 @@ export const BuildReviews = () => {
     setTechnicianNotes(build.staffNotes || '');
     setValidationError('');
 
-    // Fetch freshest detail if available
     try {
       const detailed = await buildReviewService.getBuildById(build.buildId);
       if (detailed) {
@@ -173,31 +134,6 @@ export const BuildReviews = () => {
     setSelectedBuild(null);
     setTechnicianNotes('');
     setValidationError('');
-  };
-
-  // Review actions
-  const handleAssignToMe = async () => {
-    if (!selectedBuild) return;
-    setActionLoading(true);
-    try {
-      const myStaff = technicians.find(
-        (t) => String(t.userId) === String(user?.userId) || String(t.staffId) === String(user?.userId)
-      );
-      const myStaffId = myStaff?.staffId || user?.userId || 1;
-
-      const updated = await buildReviewService.updateBuildReview(selectedBuild.buildId, {
-        status: selectedBuild.status === 'Pending Staff Review' ? 'In Review by Staff' : selectedBuild.status,
-        assignedStaffId: myStaffId,
-        staffNotes: technicianNotes,
-      });
-      setSelectedBuild(updated);
-      await loadData();
-      showNotification(`Build #${selectedBuild.buildId} assigned to your workbench.`);
-    } catch (err) {
-      showNotification(`Failed to assign build: ${err?.message}`, 'error');
-    } finally {
-      setActionLoading(false);
-    }
   };
 
   const handleStatusTransition = async (newStatus) => {
@@ -220,18 +156,17 @@ export const BuildReviews = () => {
       const updated = await buildReviewService.updateBuildReview(selectedBuild.buildId, {
         status: newStatus,
         staffNotes: notesToSave,
-        assignedStaffId: selectedBuild.assignedStaffId || user?.userId || 1,
       });
 
       setSelectedBuild(updated);
       await loadData();
-      const notificationMsg = (newStatus === 'Approved by Staff' || newStatus === 'Changes Requested')
-        ? `Build #${selectedBuild.buildId} marked as "${newStatus}". Customer notification dispatched by server.`
-        : `Build #${selectedBuild.buildId} marked as "${newStatus}".`;
-      showNotification(notificationMsg);
-      handleCloseModal();
+      showNotification(`Build #${selectedBuild.buildId} status updated to '${newStatus}'.`);
+
+      if (newStatus === 'Approved by Staff') {
+        setTimeout(handleCloseModal, 1200);
+      }
     } catch (err) {
-      showNotification(`Failed to update review status: ${err?.message}`, 'error');
+      showNotification(`Failed to update build status: ${err?.message}`, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -240,32 +175,28 @@ export const BuildReviews = () => {
   const handleResetFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
-    setStaffFilter('all');
     setCurrentPage(1);
   };
 
   return (
-    <div className="page-container" id="build-reviews-page">
-      {/* Header */}
+    <div className="page-container">
+      {/* Page Header */}
       <div className="dashboard-header">
         <div>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-              <ToolsIcon size={24} /> Custom PC Build Reviews
-            </span>
-            <span className="badge badge-staff" style={{ fontSize: '0.75rem' }}>Staff & Admin Hub</span>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <ToolsIcon size={28} /> Custom Build Clearance
           </h1>
           <p className="subtitle">
-            Automated hardware clearance audit, PSU transient headroom validation, and manual technician assembly sign-off.
+            Validate component clearances, PSU headroom, and approve customer PC builds.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div className="header-actions">
           <button
             type="button"
             onClick={() => loadData(true)}
-            className="btn btn-outline"
-            id="refresh-build-queue-btn"
             disabled={refreshing}
+            className="btn btn-outline"
+            id="refresh-builds-btn"
           >
             {refreshing ? (
               'Refreshing...'
@@ -307,9 +238,6 @@ export const BuildReviews = () => {
         onClearSearch={() => setSearchQuery('')}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
-        staffFilter={staffFilter}
-        onStaffFilterChange={setStaffFilter}
-        technicians={technicians}
         metrics={metrics}
         onResetFilters={handleResetFilters}
       />
@@ -340,7 +268,6 @@ export const BuildReviews = () => {
         onNotesChange={setTechnicianNotes}
         validationError={validationError}
         actionLoading={actionLoading}
-        onAssignToMe={handleAssignToMe}
         onStatusTransition={handleStatusTransition}
       />
     </div>

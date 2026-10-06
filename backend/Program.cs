@@ -1,3 +1,4 @@
+// PCForge Backend API
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -98,6 +99,13 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "PCForge API", Version = "v1" });
 
+    // Handle any schema ID collisions and conflicting actions gracefully (never return null)
+    c.CustomSchemaIds(type => (type.FullName ?? type.Name).Replace("+", ".").Replace("`", "_"));
+    c.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
+
+    // Map IFormFile to binary string so multipart form uploads do not crash Swagger reflection
+    c.MapType<IFormFile>(() => new OpenApiSchema { Type = "string", Format = "binary" });
+
     // Add JWT Bearer definition to Swagger
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -126,6 +134,11 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
 if (!app.Environment.IsEnvironment("Testing"))
 {
     // Ensure requirement_sessions table exists in PostgreSQL
@@ -153,9 +166,48 @@ if (!app.Environment.IsEnvironment("Testing"))
                 );
 
                 ALTER TABLE products ADD COLUMN IF NOT EXISTS warrantymonths INT NOT NULL DEFAULT 36;
-                UPDATE products SET warrantymonths = 120 WHERE warrantymonths = 36 AND (LOWER(name) LIKE '%ram%' OR LOWER(name) LIKE '%trident%' OR LOWER(name) LIKE '%vengeance%');
-                UPDATE products SET warrantymonths = 60 WHERE warrantymonths = 36 AND (LOWER(name) LIKE '%psu%' OR LOWER(name) LIKE '%rm850%' OR LOWER(name) LIKE '%ssd%' OR LOWER(name) LIKE '%nvme%');
-                UPDATE products SET warrantymonths = 24 WHERE warrantymonths = 36 AND (LOWER(name) LIKE '%case%' OR LOWER(name) LIKE '%cooler%');
+                ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'Active';
+
+                -- 1. RAM / Desktop Memory Modules: 120 Months (10-Year / Limited Lifetime)
+                UPDATE products SET warrantymonths = 120 
+                WHERE categoryid = 4 
+                   OR LOWER(name) LIKE '%ram%' 
+                   OR LOWER(name) LIKE '%ddr5%' 
+                   OR LOWER(name) LIKE '%ddr4%' 
+                   OR LOWER(name) LIKE '%fury%' 
+                   OR LOWER(name) LIKE '%trident%' 
+                   OR LOWER(name) LIKE '%ripjaws%' 
+                   OR LOWER(name) LIKE '%vengeance%';
+
+                -- 2. Storage / NVMe PCIe 4.0 SSDs: 60 Months (5-Year Manufacturer Warranty)
+                UPDATE products SET warrantymonths = 60 
+                WHERE categoryid = 6 
+                   OR LOWER(name) LIKE '%ssd%' 
+                   OR LOWER(name) LIKE '%nvme%' 
+                   OR LOWER(name) LIKE '%990 pro%' 
+                   OR LOWER(name) LIKE '%p3 plus%';
+
+                -- 3. Power Supply Units (PSUs): Tiered warranties (Flagship RMx: 10-Yr, RMe: 7-Yr, Bronze: 5-Yr)
+                UPDATE products SET warrantymonths = 120 WHERE LOWER(name) LIKE '%rm850x%' OR LOWER(name) LIKE '%rm1000x%';
+                UPDATE products SET warrantymonths = 84 WHERE LOWER(name) LIKE '%rm750e%' OR LOWER(name) LIKE '%rm850e%';
+                UPDATE products SET warrantymonths = 60 WHERE categoryid = 5 AND warrantymonths NOT IN (120, 84);
+
+                -- 4. Coolers: 360mm Liquid AIO (60 Months / 5-Yr), Air Coolers (36 Months / 3-Yr)
+                UPDATE products SET warrantymonths = 60 WHERE LOWER(name) LIKE '%liquid%' OR LOWER(name) LIKE '%lt720%' OR LOWER(name) LIKE '%aio%';
+                UPDATE products SET warrantymonths = 36 WHERE categoryid = 8 AND warrantymonths != 60;
+
+                -- 5. Cases / Chassis: 24 Months (2-Year Manufacturer Warranty)
+                UPDATE products SET warrantymonths = 24 WHERE categoryid = 7 OR LOWER(name) LIKE '%case%' OR LOWER(name) LIKE '%tower%' OR LOWER(name) LIKE '%chassis%' OR LOWER(name) LIKE '%dynamic%';
+
+                -- 6. Gaming Mice / Peripherals: 24 Months (Logitech) / 12 Months (Generic)
+                UPDATE products SET warrantymonths = 24 WHERE LOWER(name) LIKE '%logitech%' OR LOWER(name) LIKE '%g102%';
+                UPDATE products SET warrantymonths = 12 WHERE categoryid = 9 AND LOWER(name) NOT LIKE '%logitech%';
+
+                -- 7. CPUs, Motherboards & Retail GPUs: 36 Months (3-Year Retail Warranty)
+                UPDATE products SET warrantymonths = 36 WHERE categoryid IN (1, 2, 3) AND LOWER(name) NOT LIKE '%gtx 660%' AND LOWER(name) NOT LIKE '%navid%';
+
+                -- 8. Entry / Refurbished / Legacy parts: 12 Months (1-Year Warranty)
+                UPDATE products SET warrantymonths = 12 WHERE LOWER(name) LIKE '%gtx 660%' OR LOWER(name) = 'navid';
 
                 -- Ensure any staff users previously saved with Customer role are elevated to Staff role
                 UPDATE users 
@@ -199,13 +251,73 @@ if (!app.Environment.IsEnvironment("Testing"))
                 JOIN filters f ON LOWER(f.filterkey) = LOWER(cf.filterkey)
                 ON CONFLICT (filterid, optionvalue) DO NOTHING;
 
-                -- Ensure servicerequests columns for Title, Description, and InternalNotes exist
+                -- Automatically format existing numeric options with unit if filter has unit defined
+                UPDATE master_filter_options mfo
+                SET optionvalue = mfo.optionvalue || f.unit
+                FROM filters f
+                WHERE mfo.filterid = f.filterid
+                  AND f.unit IS NOT NULL AND TRIM(f.unit) <> ''
+                  AND mfo.optionvalue ~ '^[0-9]+$'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM master_filter_options m2 
+                      WHERE m2.filterid = mfo.filterid AND m2.optionvalue = mfo.optionvalue || f.unit
+                  );
+
+                UPDATE filteroptions fo
+                SET optionvalue = fo.optionvalue || cf.unit
+                FROM categoryfilters cf
+                WHERE fo.filterid = cf.filterid
+                  AND cf.unit IS NOT NULL AND TRIM(cf.unit) <> ''
+                  AND fo.optionvalue ~ '^[0-9]+$'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM filteroptions fo2 
+                      WHERE fo2.filterid = fo.filterid AND fo2.optionvalue = fo.optionvalue || cf.unit
+                  );
+
+                -- Keep category filter options in sync with master filter options
+                INSERT INTO filteroptions (filterid, optionvalue, displayorder)
+                SELECT cf.filterid, mfo.optionvalue, mfo.displayorder
+                FROM master_filter_options mfo
+                JOIN categoryfilters cf ON (cf.masterfilterid = mfo.filterid OR LOWER(cf.filterkey) = (SELECT LOWER(f.filterkey) FROM filters f WHERE f.filterid = mfo.filterid))
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM filteroptions fo 
+                    WHERE fo.filterid = cf.filterid AND LOWER(fo.optionvalue) = LOWER(mfo.optionvalue)
+                );
+
+                -- Ensure servicerequests columns for Title and Description exist, and drop obsolete columns
                 ALTER TABLE servicerequests ADD COLUMN IF NOT EXISTS title VARCHAR(200);
                 ALTER TABLE servicerequests ADD COLUMN IF NOT EXISTS description TEXT;
-                ALTER TABLE servicerequests ADD COLUMN IF NOT EXISTS internalnotes TEXT;
-                UPDATE servicerequests 
-                SET title = COALESCE(troubleshootingsummary, SUBSTRING(problemdescription, 1, 100), 'Service Request') 
-                WHERE title IS NULL OR title = '';
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'servicerequests' AND column_name = 'problemdescription') THEN
+                        UPDATE servicerequests 
+                        SET title = COALESCE(title, 'Service Request') 
+                        WHERE title IS NULL OR title = '';
+                    END IF;
+                END $$;
+
+                DROP TABLE IF EXISTS supporttickets CASCADE;
+                ALTER TABLE servicerequests DROP CONSTRAINT IF EXISTS servicerequests_productid_fkey;
+                ALTER TABLE servicerequests DROP CONSTRAINT IF EXISTS servicerequests_assignedstaffid_fkey;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS productid;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS assignedstaffid;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS problemcategory;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS troubleshootingsummary;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS attemptcount;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS internalnotes;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS warrantystatus;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS warrantyexpirydate;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS priority;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS techniciannotes;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS resolution;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS attachmenturl;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS problemdescription;
+                ALTER TABLE servicerequests DROP CONSTRAINT IF EXISTS servicerequests_orderid_fkey;
+                ALTER TABLE servicerequests DROP COLUMN IF EXISTS orderid;
+
+                -- Remove staff assignment from custombuilds
+                ALTER TABLE custombuilds DROP CONSTRAINT IF EXISTS custombuilds_assignedstaffid_fkey;
+                ALTER TABLE custombuilds DROP COLUMN IF EXISTS assignedstaffid;
 
                 -- Synchronize primary key sequences with MAX(id) to prevent duplicate key constraint violations
                 DO $$
@@ -275,7 +387,7 @@ app.MapGet("/health", () => Results.Ok(new
     status = "Healthy",
     service = "PCForge API",
     timestamp = DateTime.UtcNow
-}));
+})).ExcludeFromDescription();
 
 app.MapControllers();
 

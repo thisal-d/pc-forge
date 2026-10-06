@@ -37,7 +37,6 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
         {
             Title = "PC won't boot into BIOS",
             Description = "Pressing power button turns fans on for 2 seconds then shuts down.",
-            ProblemCategory = "Power Issue",
             PreferredDate = DateTime.UtcNow.Date.AddDays(2),
             PreferredTime = "10:30 AM"
         };
@@ -94,7 +93,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
                     ServiceRequestNumber = $"SR-CAPTEST-{i}-{Guid.NewGuid().ToString("N")[..4]}",
                     UserId = 1,
                     Title = $"Existing Appointment {i}",
-                    ProblemDescription = "Issue",
+                    Description = "Issue",
                     PreferredDate = targetDate,
                     PreferredTime = "11:00 AM",
                     Status = "Pending"
@@ -157,7 +156,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task AdminCanUpdateStatus_AddInternalNotes_AndCustomerCannotSeeInternalNotes()
+    public async Task AdminCanUpdateStatus_LifecycleTransitionsWork()
     {
         var customerId = 4; // Seeded customer: bob@example.com
         var customerClient = CreateAuthenticatedClient(customerId, "bob@example.com", "Customer");
@@ -175,25 +174,23 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
         var created = await createRes.Content.ReadFromJsonAsync<ServiceRequestDetailDto>();
         Assert.NotNull(created);
 
-        // 2. Admin updates status to "In Progress" and adds InternalNotes
+        // 2. Admin updates status to "In Progress"
         var updatePayload = new UpdateServiceRequestDto
         {
-            Status = "In Progress",
-            InternalNotes = "Customer dropped off PC. Suspected VRAM failure on IC #3. Do not disclose replacement cost."
+            Status = "In Progress"
         };
         var updateRes = await adminClient.PutAsJsonAsync($"/api/ServiceRequests/{created.ServiceRequestId}", updatePayload);
         Assert.Equal(HttpStatusCode.OK, updateRes.StatusCode);
         var adminView = await updateRes.Content.ReadFromJsonAsync<ServiceRequestDetailDto>();
         Assert.NotNull(adminView);
         Assert.Equal("In Progress", adminView.Status);
-        Assert.Equal("Customer dropped off PC. Suspected VRAM failure on IC #3. Do not disclose replacement cost.", adminView.InternalNotes);
 
-        // 3. Customer views request -> InternalNotes MUST be hidden (null)
+        // 3. Customer views request
         var customerViewRes = await customerClient.GetAsync($"/api/ServiceRequests/{created.ServiceRequestId}");
         Assert.Equal(HttpStatusCode.OK, customerViewRes.StatusCode);
         var customerView = await customerViewRes.Content.ReadFromJsonAsync<ServiceRequestDetailDto>();
         Assert.NotNull(customerView);
-        Assert.Null(customerView.InternalNotes);
+        Assert.Equal("In Progress", customerView.Status);
 
         // 4. Admin updates status to "No Show"
         var noShowPayload = new UpdateServiceRequestDto { Status = "No Show" };
@@ -206,8 +203,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
         // 5. Admin updates status to "Completed"
         var completedPayload = new UpdateServiceRequestDto
         {
-            Status = "Completed",
-            Resolution = "Replaced GPU thermal pads and re-flowed solder."
+            Status = "Completed"
         };
         var completedRes = await adminClient.PutAsJsonAsync($"/api/ServiceRequests/{created.ServiceRequestId}", completedPayload);
         Assert.Equal(HttpStatusCode.OK, completedRes.StatusCode);
@@ -230,7 +226,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
                 ServiceRequestNumber = $"SR-FILTER-PENDING-{Guid.NewGuid().ToString("N")[..4]}",
                 UserId = 1,
                 Title = "Filter Test Pending",
-                ProblemDescription = "Filter test",
+                Description = "Filter test",
                 PreferredDate = baseDate,
                 PreferredTime = "10:00 AM",
                 Status = "Pending"
@@ -240,7 +236,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
                 ServiceRequestNumber = $"SR-FILTER-COMPLETED-{Guid.NewGuid().ToString("N")[..4]}",
                 UserId = 1,
                 Title = "Filter Test Completed",
-                ProblemDescription = "Filter test",
+                Description = "Filter test",
                 PreferredDate = baseDate.AddDays(5),
                 PreferredTime = "11:00 AM",
                 Status = "Completed"
@@ -313,7 +309,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
                     ServiceRequestNumber = $"SR-AGENTICCAP-{i}-{Guid.NewGuid().ToString("N")[..4]}",
                     UserId = 1,
                     Title = $"Filler Appointment {i}",
-                    ProblemDescription = "Issue",
+                    Description = "Issue",
                     PreferredDate = targetDate,
                     PreferredTime = "11:00 AM",
                     Status = "Pending"

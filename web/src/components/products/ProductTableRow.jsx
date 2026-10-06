@@ -1,5 +1,5 @@
 import React from 'react';
-import { ZapIcon } from '../icons/index.js';
+import { ZapIcon, ShieldCheckIcon } from '../icons/index.js';
 
 export const ProductTableRow = ({
   product,
@@ -57,11 +57,32 @@ export const ProductTableRow = ({
           )}
           <div>
             <strong style={{ color: 'var(--text-main)', fontSize: '0.95rem' }}>{product.name}</strong>
-            {product.model && (
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Model: {product.model}
-              </div>
-            )}
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '2px' }}>
+              {product.model && (
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Model: {product.model}
+                </span>
+              )}
+              <span
+                className="badge badge-success"
+                style={{
+                  fontSize: '0.72rem',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <ShieldCheckIcon size={12} />
+                <span>
+                  {product.warrantyMonths >= 12
+                    ? `${Math.floor(product.warrantyMonths / 12)} Yr Warranty`
+                    : `${product.warrantyMonths || 36} Mo Warranty`}
+                </span>
+              </span>
+            </div>
           </div>
         </div>
       </td>

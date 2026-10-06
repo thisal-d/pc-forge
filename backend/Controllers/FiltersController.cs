@@ -157,6 +157,11 @@ public class FiltersController : ControllerBase
             foreach (var opt in dto.Options.Where(o => !string.IsNullOrWhiteSpace(o)))
             {
                 var trimmed = opt.Trim();
+                if (!string.IsNullOrWhiteSpace(filter.Unit) && !trimmed.EndsWith(filter.Unit, StringComparison.OrdinalIgnoreCase) && double.TryParse(trimmed, out _))
+                {
+                    trimmed = $"{trimmed}{filter.Unit}";
+                }
+
                 if (!filter.Options.Any(o => o.OptionValue.Equals(trimmed, StringComparison.OrdinalIgnoreCase)))
                 {
                     filter.Options.Add(new MasterFilterOption
@@ -235,6 +240,11 @@ public class FiltersController : ControllerBase
             foreach (var opt in dto.Options.Where(o => !string.IsNullOrWhiteSpace(o)))
             {
                 var trimmed = opt.Trim();
+                if (!string.IsNullOrWhiteSpace(filter.Unit) && !trimmed.EndsWith(filter.Unit, StringComparison.OrdinalIgnoreCase) && double.TryParse(trimmed, out _))
+                {
+                    trimmed = $"{trimmed}{filter.Unit}";
+                }
+
                 if (!filter.Options.Any(o => o.OptionValue.Equals(trimmed, StringComparison.OrdinalIgnoreCase)))
                 {
                     filter.Options.Add(new MasterFilterOption
@@ -247,8 +257,9 @@ public class FiltersController : ControllerBase
             }
         }
 
-        // Keep assigned CategoryFilters in sync with updated display metadata
+        // Keep assigned CategoryFilters in sync with updated display metadata and options
         var linkedCategoryFilters = await _context.CategoryFilters
+            .Include(cf => cf.Options)
             .Where(cf => cf.MasterFilterId == id || cf.FilterKey.ToLower() == filter.FilterKey.ToLower())
             .ToListAsync();
 
@@ -260,6 +271,23 @@ public class FiltersController : ControllerBase
             if (cf.MasterFilterId == null)
             {
                 cf.MasterFilterId = filter.FilterId;
+            }
+
+            if (dto.Options != null)
+            {
+                _context.FilterOptions.RemoveRange(cf.Options);
+                cf.Options.Clear();
+
+                int catOptOrder = 1;
+                foreach (var opt in filter.Options.OrderBy(o => o.DisplayOrder))
+                {
+                    cf.Options.Add(new FilterOption
+                    {
+                        FilterId = cf.FilterId,
+                        OptionValue = opt.OptionValue,
+                        DisplayOrder = catOptOrder++
+                    });
+                }
             }
         }
 

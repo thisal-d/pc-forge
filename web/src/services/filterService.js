@@ -20,6 +20,7 @@ export const filterService = {
             ? f.options.map((o) => ({
                 optionId: o.optionId,
                 value: o.value,
+                optionValue: o.value,
                 displayOrder: o.displayOrder,
               }))
             : [],
@@ -51,6 +52,7 @@ export const filterService = {
         ? f.options.map((o) => ({
             optionId: o.optionId,
             value: o.value,
+            optionValue: o.value,
             displayOrder: o.displayOrder,
           }))
         : [],

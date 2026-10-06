@@ -146,13 +146,13 @@ public class SecurityTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task StaffController_StaffAccess_MustSucceed()
+    public async Task StaffController_StaffAccess_MustReturnForbidden()
     {
         var token = CustomWebApplicationFactory.GenerateToken(2, "staff@pcforge.com", "Staff");
         SetBearerToken(token);
 
         var response = await _client.GetAsync("/api/staff");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -366,16 +366,15 @@ public class SecurityTests : IClassFixture<CustomWebApplicationFactory>
     // 6. CUSTOM BUILD & SUPPORT TICKET FALLBACK REMOVAL TESTS
     // =========================================================================
     [Fact]
-    public async Task SupportTickets_AnonymousCreate_MustReturnUnauthorized()
+    public async Task ServiceRequests_AnonymousCreate_MustReturnUnauthorized()
     {
         ClearBearerToken();
         var payload = new
         {
-            subject = "Broken GPU",
-            issueType = "Defective Item",
+            title = "Broken GPU",
             description = "My GPU is not displaying video"
         };
-        var response = await _client.PostAsJsonAsync("/api/supporttickets", payload);
+        var response = await _client.PostAsJsonAsync("/api/ServiceRequests", payload);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -470,38 +469,37 @@ public class SecurityTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task SupportTickets_CustomerViewingAnotherCustomersTicket_MustReturnForbidden()
+    public async Task ServiceRequests_CustomerViewingAnotherCustomersRequest_MustReturnForbidden()
     {
-        int alexTicketId;
+        int alexRequestId;
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var ticket = new SupportTicket
+            var req = new ServiceRequest
             {
+                ServiceRequestNumber = $"SR-SEC-{Guid.NewGuid().ToString("N")[..4]}",
                 UserId = 3, // Alex
-                Subject = "Alex's Broken PSU",
-                IssueType = "Hardware Failure",
+                Title = "Alex's Broken PSU",
                 Description = "PSU sparks",
-                Status = "Open",
-                Priority = "High",
+                Status = "Pending",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            db.SupportTickets.Add(ticket);
+            db.ServiceRequests.Add(req);
             db.SaveChanges();
-            alexTicketId = ticket.TicketId;
+            alexRequestId = req.ServiceRequestId;
         }
 
         var bobToken = CustomWebApplicationFactory.GenerateToken(4, "bob@example.com", "Customer");
         SetBearerToken(bobToken);
 
-        var response = await _client.GetAsync($"/api/supporttickets/{alexTicketId}");
+        var response = await _client.GetAsync($"/api/ServiceRequests/{alexRequestId}");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
 
-        // Staff viewing Alex's ticket should succeed
+        // Staff viewing Alex's service request should succeed (staff can see everything)
         var staffToken = CustomWebApplicationFactory.GenerateToken(2, "sarah@pcforge.com", "Staff");
         SetBearerToken(staffToken);
-        var staffResponse = await _client.GetAsync($"/api/supporttickets/{alexTicketId}");
+        var staffResponse = await _client.GetAsync($"/api/ServiceRequests/{alexRequestId}");
         Assert.Equal(HttpStatusCode.OK, staffResponse.StatusCode);
     }
 
