@@ -289,7 +289,7 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
                   ),
                   Switch(
                     value: _includeAppointment,
-                    activeColor: AppColors.primaryBlue,
+                    activeThumbColor: AppColors.primaryBlue,
                     onChanged: (val) {
                       setState(() {
                         _includeAppointment = val;

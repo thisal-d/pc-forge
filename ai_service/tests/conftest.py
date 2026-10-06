@@ -20,6 +20,7 @@ def pytest_collection_modifyitems(config, items):
         live_test_names = {
             "test_api_after_sales_chat_troubleshooting",
             "test_api_after_sales_chat_switch_to_service_request_mode",
+            "test_after_sales_chat_suggest_service_request_after_5_attempts",
             "test_generate_compatible_build_gaming_1440p",
             "test_generate_compatible_build_high_end_4k",
             "test_post_build_generate_endpoint",
