@@ -4,32 +4,42 @@
 
 # PCForge — Computer Shop & Custom PC Builder Platform
 
-[![CI Pipeline](https://github.com/thisal-d/pc-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/thisal-d/pc-forge/actions/workflows/ci.yml)
-[![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![React 19](https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![Flutter 3](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-Agentic%20AI-FF6F00?logo=langchain&logoColor=white)](https://langchain.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon%20Serverless-4169E1?logo=postgresql&logoColor=white)](https://neon.tech/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<p align="center">
+  <a href="https://pc-forge-admin.pages.dev"><img src="https://img.shields.io/badge/Live_Web_Portal-pc--forge--admin.pages.dev-0052FF?style=for-the-badge&logo=react&logoColor=white" alt="Live Web Portal" /></a>
+  <a href="https://pc-forge.onrender.com/swagger"><img src="https://img.shields.io/badge/Backend_API-pc--forge.onrender.com-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt="Backend API" /></a>
+  <a href="https://pc-forge-ai-service.onrender.com/docs"><img src="https://img.shields.io/badge/AI_Service_API-pc--forge--ai--service.onrender.com-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="AI Service API" /></a>
+  <a href="https://github.com/thisal-d/pc-forge/releases"><img src="https://img.shields.io/badge/Download_App-Android_APK_v1.0-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/thisal-d/pc-forge/actions/workflows/ci.yml"><img src="https://github.com/thisal-d/pc-forge/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
+  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white" alt=".NET 8" /></a>
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=black" alt="React 19" /></a>
+  <a href="https://flutter.dev/"><img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white" alt="Flutter 3" /></a>
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white" alt="FastAPI" /></a>
+  <a href="https://langchain.com/"><img src="https://img.shields.io/badge/LangGraph-Agentic%20AI-FF6F00?logo=langchain&logoColor=white" alt="LangGraph" /></a>
+  <a href="https://neon.tech/"><img src="https://img.shields.io/badge/PostgreSQL-Neon%20Serverless-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+</p>
 
 A full-stack, cross-platform e-commerce and custom PC building ecosystem modeled on the enthusiast computer retail industry. Customers design custom rigs with real-time hardware compatibility validation, autonomous LangGraph AI agents recommend specifications and reserve inventory, store technicians review builds in dedicated assembly workbenches, and after-sales service workflows provide seamless RMA and appointment scheduling.
 
 ---
 
-## Live Deployments & Endpoints
+## 🌐 Live Deployments & Application Links
 
-| Tier / Component | Technology | Live URL / Deployment Target |
+| Application / Tier | Platform / Technology | Direct Access URL |
 |---|---|---|
-| **ASP.NET Core Web API** | .NET 8, EF Core, PostgreSQL | [`https://pc-forge.onrender.com`](https://pc-forge.onrender.com) |
-| **Interactive API Documentation** | Swagger / OpenAPI (Swashbuckle) | [`https://pc-forge.onrender.com/swagger`](https://pc-forge.onrender.com/swagger) |
-| **System Health Check** | ASP.NET Core Health Endpoint | [`https://pc-forge.onrender.com/health`](https://pc-forge.onrender.com/health) |
-| **React Web Admin Portal** | Vite + React 19 + Tailwind/CSS | [`https://pc-forge-admin.pages.dev`](https://pc-forge-admin.pages.dev) |
-| **Flutter Mobile Client** | Flutter 3.x (Material 3) | Release APK — see [Android Release APK](#flutter-android-release-apk) |
-| **Relational Database** | Neon Serverless PostgreSQL | Managed Cloud PostgreSQL (15 relational tables) |
-| **Python AI Microservice** | FastAPI + LangGraph + Google Gemini | Internal microservice gateway (`:5050`) |
+| 🌐 **React Web Admin Portal** | Cloudflare Pages (React 19 + Vite) | [`https://pc-forge-admin.pages.dev`](https://pc-forge-admin.pages.dev) |
+| ⚡ **ASP.NET Core Web API** | Render (.NET 8, EF Core, PostgreSQL) | [`https://pc-forge.onrender.com`](https://pc-forge.onrender.com) |
+| 📑 **Interactive API Docs (Swagger)** | Swashbuckle OpenAPI | [`https://pc-forge.onrender.com/swagger`](https://pc-forge.onrender.com/swagger) |
+| 🤖 **Python AI Microservice** | Render (FastAPI + LangGraph + Gemini) | [`https://pc-forge-ai-service.onrender.com`](https://pc-forge-ai-service.onrender.com) |
+| 📘 **AI Interactive API Docs** | FastAPI Swagger UI | [`https://pc-forge-ai-service.onrender.com/docs`](https://pc-forge-ai-service.onrender.com/docs) |
+| 📱 **Mobile App (Android APK)** | Flutter 3.x (Material 3) | [⬇️ Download Latest APK (GitHub Releases)](https://github.com/thisal-d/pc-forge/releases) |
+| 🗄️ **Relational Database** | Neon Serverless PostgreSQL | Managed Cloud Database (15 normalized tables) |
+| 🩺 **Backend Health Endpoint** | ASP.NET Core Health Checks | [`https://pc-forge.onrender.com/health`](https://pc-forge.onrender.com/health) |
 
-> ⚠️ **Render Free-Tier Notice:** If the Web API container has been idle for 15 minutes, Render puts it into sleep mode. If visiting for the first time, allow ~30 seconds for the container to complete cold start by opening the [Health Endpoint](https://pc-forge.onrender.com/health).
+> ⚠️ **Render Free-Tier Notice:** Render automatically spins down idle containers after 15 minutes of inactivity. When visiting the [Backend API](https://pc-forge.onrender.com/health) or [AI Service](https://pc-forge-ai-service.onrender.com/health) for the first time, allow ~30–45 seconds for instances to complete cold start.
 
 ---
 
@@ -312,20 +322,35 @@ flutter run
 
 ---
 
-## Flutter Android Release APK
+<a id="mobile-app-download"></a>
+## 📱 Mobile App Download & Installation (Android APK)
 
-To build a standalone production release APK for Android devices:
+The compiled PCForge customer mobile client is available for instant download:
 
-```powershell
-cd app
-flutter build apk --release
-# Generated binary location: app/build/app/outputs/flutter-apk/app-release.apk
-```
+<p align="center">
+  <a href="https://github.com/thisal-d/pc-forge/releases">
+    <img src="https://img.shields.io/badge/Download-PCForge_Android_APK_(Latest)-2ea44f?style=for-the-badge&logo=android&logoColor=white" alt="Download PCForge APK" />
+  </a>
+</p>
 
-Install directly via ADB:
-```powershell
-adb install app/build/app/outputs/flutter-apk/app-release.apk
-```
+### Installation Options:
+
+1. **Direct Download from GitHub Releases (Recommended):**
+   - Download the latest [`app-release.apk`](https://github.com/thisal-d/pc-forge/releases) directly to your Android device.
+   - Tap the downloaded file and select **Install** (allow *"Install unknown apps"* if prompted by your browser or file manager).
+
+2. **Install via ADB (Connected Device):**
+   ```powershell
+   adb install app/build/app/outputs/flutter-apk/app-release.apk
+   ```
+
+3. **Build APK from Source:**
+   ```powershell
+   cd app
+   flutter pub get
+   flutter build apk --release
+   # Output artifact: app/build/app/outputs/flutter-apk/app-release.apk
+   ```
 
 ---
 
