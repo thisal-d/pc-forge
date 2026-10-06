@@ -206,31 +206,29 @@ INSERT INTO CustomBuilds (BuildId, UserId, BuildName, TotalPrice, EstimatedWatta
 (4, 1, 'Compact ITX Gaming Beast', 1450.00, 480, 'Changes Requested', 'Looking for quiet gaming operation.', 'The chosen 450W power supply is below the 650W manufacturer recommendation for the RTX 4070 Ti. Please adjust PSU to Corsair RM750e.', NOW() - INTERVAL '4 days');
 
 INSERT INTO CustomBuildItems (BuildId, ProductId, SlotType, UnitPrice) VALUES
-(1, 6, 'cpu', 449.00),         -- Ryzen 7 7800X3D
-(1, 102, 'motherboard', 219.00), -- TUF Gaming B650-Plus WiFi
-(1, 201, 'ram', 149.00),         -- Trident Z5 RGB 32GB 6000MHz
-(1, 1, 'gpu', 749.00),           -- GeForce RTX 4070 Ti 12GB
-(1, 8, 'psu', 99.00),            -- Corsair RM750e 750W
-(1, 9, 'storage', 150.00),       -- Samsung 990 PRO 2TB
+(1, 1, 'cpu', 699.00),         -- AMD Ryzen 9 7950X
+(1, 7, 'motherboard', 219.00), -- MSI MAG B650 Tomahawk WiFi
+(1, 8, 'ram', 149.00),         -- G.Skill Trident Z5 RGB 32GB 6000MHz
+(1, 4, 'gpu', 749.00),         -- GeForce RTX 4070 Ti 12GB
+(1, 10, 'psu', 139.00),        -- Corsair RM850x 850W
 
-(2, 5, 'cpu', 699.00),           -- Ryzen 9 7950X
-(2, 101, 'motherboard', 699.00), -- ROG Crosshair X670E Hero
-(2, 201, 'ram', 149.00),         -- Trident Z5 RGB 32GB
-(2, 3, 'gpu', 999.00),           -- Radeon RX 7900 XTX 24GB
-(2, 8, 'psu', 150.00),           -- 850W PSU
-(2, 9, 'storage', 150.00),
+(2, 1, 'cpu', 699.00),         -- AMD Ryzen 9 7950X
+(2, 6, 'motherboard', 699.00), -- ASUS ROG Crosshair X670E Hero
+(2, 8, 'ram', 149.00),         -- G.Skill Trident Z5 RGB 32GB
+(2, 5, 'gpu', 999.00),         -- Radeon RX 7900 XTX 24GB
+(2, 10, 'psu', 139.00),        -- Corsair RM850x 850W
 
-(3, 5, 'cpu', 699.00),           -- Ryzen 9 7950X
-(3, 101, 'motherboard', 699.00), -- ROG Crosshair
-(3, 201, 'ram', 149.00),         -- Trident Z5
-(3, 2, 'gpu', 1599.00),          -- GeForce RTX 4090 24GB
-(3, 8, 'psu', 249.00),           -- Seasonic 1000W
-(3, 9, 'storage', 499.00),
+(3, 1, 'cpu', 699.00),         -- AMD Ryzen 9 7950X
+(3, 6, 'motherboard', 699.00), -- ASUS ROG Crosshair X670E Hero
+(3, 8, 'ram', 149.00),         -- G.Skill Trident Z5 RGB 32GB
+(3, 3, 'gpu', 1599.00),        -- ASUS ROG Strix RTX 4090 24GB
+(3, 10, 'psu', 139.00),        -- Corsair RM850x 850W
 
-(4, 7, 'cpu', 589.00),           -- Core i9-13900K
-(4, 103, 'motherboard', 199.00), -- MSI MAG B760
-(4, 203, 'ram', 49.00),          -- Corsair 16GB
-(4, 1, 'gpu', 749.00);           -- RTX 4070 Ti
+(4, 2, 'cpu', 589.00),         -- Intel Core i9-13900K
+(4, 7, 'motherboard', 219.00), -- MSI MAG B650 Tomahawk WiFi
+(4, 9, 'ram', 129.00),         -- Corsair Vengeance RGB 32GB
+(4, 4, 'gpu', 749.00),         -- GeForce RTX 4070 Ti 12GB
+(4, 10, 'psu', 139.00);        -- Corsair RM850x 850W
 
 -- Sync sequence for auto-incrementing custom builds
 SELECT setval('custombuilds_buildid_seq', (SELECT GREATEST(MAX(BuildId), 4) FROM CustomBuilds));
