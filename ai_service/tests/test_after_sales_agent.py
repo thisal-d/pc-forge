@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from ai_service.main import app
 from ai_service.agents.after_sales_agent.tools import (
     AFTER_SALES_TOOLS,
+    after_sales_context_var,
     check_warranty,
     create_service_request,
     get_customer,
@@ -21,7 +22,7 @@ from ai_service.agents.after_sales_agent.tools import (
     validate_service_appointment,
 )
 from ai_service.agents.after_sales_agent.models import AfterSalesChatRequest
-from ai_service.agents.after_sales_agent.agent import run_after_sales_chat
+from ai_service.agents.after_sales_agent.agent import run_after_sales_chat, clean_chat_formatting
 
 client = TestClient(app)
 
@@ -95,6 +96,7 @@ def test_get_order_and_warranty_tools():
 def test_validate_service_appointment_tool():
     """Validates service appointment validation rules (requires both date and time, rejects past dates and outside hours)."""
     # 1. Both date and time provided
+    after_sales_context_var.set({})
     val_both = validate_service_appointment.invoke({
         "preferred_date": "Tomorrow",
         "preferred_time": "10:00 AM"
@@ -104,7 +106,8 @@ def test_validate_service_appointment_tool():
     assert "date" in d_both
     assert "10:00 AM" in d_both["time"]
 
-    # 2. Date only provided -> must return valid=False with missing='time'
+    # 2. Date only provided -> must return valid=False with missing='time' and cache date
+    after_sales_context_var.set({})
     val_date_only = validate_service_appointment.invoke({
         "preferred_date": "Tomorrow",
         "preferred_time": ""
@@ -113,7 +116,34 @@ def test_validate_service_appointment_tool():
     assert d_date_only["valid"] is False
     assert d_date_only["missing"] == "time"
 
+    # 2b. Context preservation: follow-up with time only -> combines with cached date
+    val_followup_time = validate_service_appointment.invoke({
+        "preferred_time": "2 PM"
+    })
+    d_followup_time = json.loads(val_followup_time)
+    assert d_followup_time["valid"] is True
+    assert "02:00 PM" in d_followup_time["time"]
+    assert "date" in d_followup_time
+
+    # 2c. Time only provided first -> must return valid=False with missing='date' and cache time
+    after_sales_context_var.set({})
+    val_time_only = validate_service_appointment.invoke({
+        "preferred_time": "2 PM"
+    })
+    d_time_only = json.loads(val_time_only)
+    assert d_time_only["valid"] is False
+    assert d_time_only["missing"] == "date"
+
+    # Follow-up with date only -> combines with cached time
+    val_followup_date = validate_service_appointment.invoke({
+        "preferred_date": "Tomorrow"
+    })
+    d_followup_date = json.loads(val_followup_date)
+    assert d_followup_date["valid"] is True
+    assert "02:00 PM" in d_followup_date["time"]
+
     # 3. Past date provided -> must return valid=False with error='past_date' and explain date has passed
+    after_sales_context_var.set({})
     val_past = validate_service_appointment.invoke({
         "preferred_date": "2020-01-01",
         "preferred_time": "10:00 AM"
@@ -124,6 +154,7 @@ def test_validate_service_appointment_tool():
     assert "already passed" in d_past["message"]
 
     # 4. Outside operating hours (< 9 AM or > 6 PM) -> must return valid=False with error='outside_hours'
+    after_sales_context_var.set({})
     val_early = validate_service_appointment.invoke({
         "preferred_date": "Tomorrow",
         "preferred_time": "07:30 AM"
@@ -133,6 +164,7 @@ def test_validate_service_appointment_tool():
     assert d_early["error"] == "outside_hours"
     assert "9:00 AM" in d_early["message"]
 
+    after_sales_context_var.set({})
     val_late = validate_service_appointment.invoke({
         "preferred_date": "Tomorrow",
         "preferred_time": "08:00 PM"
@@ -292,8 +324,9 @@ def test_api_after_sales_chat_switch_to_service_request_mode():
     assert d2["service_request_mode"] is True
     assert d2["service_request_required"] is True
     reply_lower2 = d2["reply"].lower()
-    # The agent should ask for the Order ID to verify purchase/warranty
-    assert any(term in reply_lower2 for term in ["order", "warranty", "purchase", "order id"])
+    # The agent should ask for preferred appointment date and time, NOT Order ID
+    assert any(term in reply_lower2 for term in ["date", "time", "appointment", "schedule", "prefer"])
+    assert "order id" not in reply_lower2
 
 
 def test_after_sales_chat_suggest_service_request_after_5_attempts():
@@ -308,5 +341,16 @@ def test_after_sales_chat_suggest_service_request_after_5_attempts():
     assert res.service_request_mode is True or res.service_request_required is True
     reply_lower = res.reply.lower()
     assert "service request" in reply_lower
+
+
+def test_clean_chat_formatting():
+    """Verifies that markdown symbols (**bold**, *, headers, etc.) are stripped cleanly for a natural conversational message."""
+    raw = "**Hello!** Here is step 1:\n### Step 1: Check Power Cable\n* Inspect the *power switch*\n`done`"
+    cleaned = clean_chat_formatting(raw)
+    assert "**" not in cleaned
+    assert "*" not in cleaned
+    assert "###" not in cleaned
+    assert "Hello!" in cleaned
+    assert "Step 1: Check Power Cable" in cleaned
 
 
