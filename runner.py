@@ -275,9 +275,27 @@ class FileWatcher:
                     except Exception as e:
                         log("WATCHER", RED, f"Error in watch callback: {e}")
 
+def find_flutter_binary() -> str:
+    """Finds flutter binary in PATH or common installation directories."""
+    which_flutter = shutil.which("flutter")
+    if which_flutter:
+        return which_flutter
+
+    candidates = [
+        Path("C:/Softwares/flutter/bin/flutter.bat"),
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "flutter" / "bin" / "flutter.bat",
+        Path("C:/src/flutter/bin/flutter.bat"),
+        Path("C:/flutter/bin/flutter.bat"),
+        Path("D:/flutter/bin/flutter.bat"),
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c)
+    return "flutter.bat" if sys.platform == "win32" else "flutter"
+
 def detect_flutter_device() -> Optional[str]:
     """Detects available Flutter device (prefers running mobile emulator/device)."""
-    flutter_bin = shutil.which("flutter") or "flutter"
+    flutter_bin = find_flutter_binary()
     try:
         res = subprocess.run(
             [flutter_bin, "devices", "--machine"],
@@ -309,36 +327,65 @@ def detect_flutter_device() -> Optional[str]:
         pass
     return None
 
-def setup_adb_reverse(port: int = 5000, device: Optional[str] = None):
-    """Configures adb reverse tcp:port tcp:port so Android devices can reach host localhost."""
-    adb_bin = shutil.which("adb") or "adb"
-    try:
-        check = subprocess.run(
-            [adb_bin, "version"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False
-        )
-        if check.returncode != 0:
-            return
+def find_adb_binary() -> Optional[str]:
+    """Finds adb binary in PATH or common Android SDK locations."""
+    which_adb = shutil.which("adb")
+    if which_adb:
+        return which_adb
 
-        cmd = [adb_bin]
-        if device and not device.startswith("windows"):
-            cmd.extend(["-s", device])
-        cmd.extend(["reverse", f"tcp:{port}", f"tcp:{port}"])
+    candidates = [
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk" / "platform-tools" / "adb.exe",
+        Path(os.environ.get("ANDROID_HOME", "")) / "platform-tools" / "adb.exe",
+        Path(os.environ.get("ANDROID_SDK_ROOT", "")) / "platform-tools" / "adb.exe",
+        Path(Path.home()) / "AppData" / "Local" / "Android" / "Sdk" / "platform-tools" / "adb.exe",
+        Path("C:/Users/KHThi/AppData/Local/Android/Sdk/platform-tools/adb.exe")
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c)
+    return None
 
-        res = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=5,
-            check=False
-        )
-        if res.returncode == 0:
-            log("ADB", GREEN, f"Reverse tunnel established: device localhost:{port} -> host port {port}")
-    except Exception:
-        pass
+def setup_adb_reverse(ports=None, device: Optional[str] = None):
+    """Configures adb reverse tcp:port tcp:port so Android devices reach host ports over USB."""
+    if ports is None:
+        ports = [5000, 5050]
+    elif isinstance(ports, int):
+        ports = [ports]
+
+    adb_bin = find_adb_binary()
+    if not adb_bin:
+        log("ADB", YELLOW, "ADB binary not found in PATH or Android SDK. Run 'adb reverse tcp:5000 tcp:5000' manually.")
+        return
+
+    for port in ports:
+        try:
+            cmd = [adb_bin]
+            if device and not str(device).lower().startswith("windows"):
+                cmd.extend(["-s", str(device)])
+            cmd.extend(["reverse", f"tcp:{port}", f"tcp:{port}"])
+
+            res = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5,
+                check=False
+            )
+            if res.returncode == 0:
+                log("ADB", GREEN, f"Reverse tunnel established: device localhost:{port} -> host port {port}")
+            else:
+                # Fallback without -s if specific device selector failed
+                if device:
+                    cmd_fb = [adb_bin, "reverse", f"tcp:{port}", f"tcp:{port}"]
+                    res_fb = subprocess.run(cmd_fb, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5, check=False)
+                    if res_fb.returncode == 0:
+                        log("ADB", GREEN, f"Reverse tunnel established (fallback): device localhost:{port} -> host port {port}")
+                        continue
+                err = res.stderr.strip() or res.stdout.strip()
+                log("ADB", YELLOW, f"ADB reverse port {port} returned code {res.returncode}: {err}")
+        except Exception as e:
+            log("ADB", RED, f"Failed establishing ADB reverse tunnel for port {port}: {e}")
 
 class RunnerOrchestrator:
     def __init__(
@@ -370,6 +417,16 @@ class RunnerOrchestrator:
         # 0. Agentic AI Service (FastAPI)
         if self.run_ai:
             python_bin = sys.executable or "python"
+            venv_candidates = [
+                self.root_dir / "ai_service" / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python"),
+                self.root_dir / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python"),
+                self.root_dir / "ai_service" / "venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python"),
+                self.root_dir / "venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python"),
+            ]
+            for cand in venv_candidates:
+                if cand.exists():
+                    python_bin = str(cand)
+                    break
             self.services["ai"] = Service(
                 name="AI Agent Service (FastAPI)",
                 tag="AGENT_AI",
@@ -394,7 +451,8 @@ class RunnerOrchestrator:
 
             backend_env = {
                 "ASPNETCORE_ENVIRONMENT": "Development",
-                "DOTNET_ENVIRONMENT": "Development"
+                "DOTNET_ENVIRONMENT": "Development",
+                "DOTNET_ROLL_FORWARD": "LatestMajor",
             }
 
             self.services["backend"] = Service(
@@ -424,25 +482,91 @@ class RunnerOrchestrator:
 
         # 3. Mobile Service (Flutter)
         if self.run_mobile:
-            flutter_bin = shutil.which("flutter") or "flutter"
-            if sys.platform == "win32" and not flutter_bin.lower().endswith((".bat", ".exe")):
-                flutter_bin = "flutter.bat"
-
+            flutter_bin = find_flutter_binary()
+            app_dir = self.root_dir / "app"
             device = self.flutter_device or detect_flutter_device()
             self.flutter_device = device
 
-            mobile_cmd = [flutter_bin, "run"]
-            if device:
-                mobile_cmd.extend(["-d", device])
+            # Auto-scaffold platform directories if missing
+            if not (app_dir / "android").exists() or not (app_dir / "windows").exists():
+                log("MOBILE", YELLOW, "Platform templates missing in app/. Generating with 'flutter create .'...")
+                try:
+                    subprocess.run(
+                        [flutter_bin, "create", "--org", "com.pcforge", "."],
+                        cwd=str(app_dir),
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False
+                    )
+                    log("MOBILE", GREEN, "Flutter platform scaffolding generated successfully.")
+                except Exception as e:
+                    log("MOBILE", RED, f"Failed to scaffold Flutter platform: {e}")
+
+            api_base_url, app_env_mode = self.read_mobile_env()
+            log("MOBILE", BLUE, f"Mobile API Target: {api_base_url} (Env: {app_env_mode})")
+
+            mobile_cmd = self.build_mobile_cmd(api_base_url, app_env_mode, device)
 
             self.services["mobile"] = Service(
                 name=f"Mobile Client (Flutter {f'[{device}]' if device else ''})",
                 tag="MOBILE",
                 color=GREEN,
-                cwd=self.root_dir / "app",
+                cwd=app_dir,
                 cmd=mobile_cmd,
                 supports_stdin=True
             )
+
+    def read_mobile_env(self):
+        """Reads API_BASE_URL and APP_ENV from app/.env if present."""
+        app_dir = self.root_dir / "app"
+        app_env_file = app_dir / ".env"
+        api_base_url = "http://localhost:5000/api"
+        app_env_mode = "development"
+        if app_env_file.exists():
+            try:
+                for raw_line in app_env_file.read_text(encoding="utf-8").splitlines():
+                    line = raw_line.strip()
+                    if line.startswith("API_BASE_URL="):
+                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if val:
+                            api_base_url = val
+                    elif line.startswith("APP_ENV="):
+                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if val:
+                            app_env_mode = val
+            except Exception:
+                pass
+        return api_base_url, app_env_mode
+
+    def build_mobile_cmd(self, api_base_url: str, app_env_mode: str, device: Optional[str]) -> List[str]:
+        """Constructs flutter run command with current compile-time environment flags."""
+        flutter_bin = find_flutter_binary()
+        cmd = [
+            flutter_bin, "run",
+            f"--dart-define=API_BASE_URL={api_base_url}",
+            f"--dart-define=APP_ENV={app_env_mode}"
+        ]
+        if device:
+            cmd.extend(["-d", device])
+        return cmd
+
+    def restart_mobile(self):
+        """Full restart of Flutter process with latest app/.env flags and reverse tunnels."""
+        if "mobile" not in self.services:
+            log("RUNNER", YELLOW, "Mobile service is not running.")
+            return
+
+        api_base_url, app_env_mode = self.read_mobile_env()
+        device = self.flutter_device or detect_flutter_device()
+        self.flutter_device = device
+
+        if self.run_backend:
+            setup_adb_reverse([5000, 5050], self.flutter_device)
+
+        new_cmd = self.build_mobile_cmd(api_base_url, app_env_mode, device)
+        self.services["mobile"].cmd = new_cmd
+        log("MOBILE", BLUE, f"Restarting Mobile with Target: {api_base_url} (Env: {app_env_mode})")
+        self.services["mobile"].restart()
 
     def _setup_watcher(self):
         # Watch Backend files
@@ -450,7 +574,7 @@ class RunnerOrchestrator:
         if backend_dir.exists() and self.run_backend:
             def on_backend_change(filepath: str):
                 rel = os.path.relpath(filepath, self.root_dir)
-                if self.backend_mode == "restart":
+                if self.backend_mode == "restart" or not self.services.get("backend") or not self.services["backend"].is_running:
                     log("WATCHER", YELLOW, f"File changed: {rel} -> Auto-restarting Backend...")
                     if "backend" in self.services:
                         self.services["backend"].restart()
@@ -482,20 +606,25 @@ class RunnerOrchestrator:
                 callback=on_flutter_change
             )
 
-        # Watch Mobile pubspec.yaml for Hot Restart
+        # Watch Mobile pubspec.yaml and .env for Hot Restart / Full Restart
         app_dir = self.root_dir / "app"
         if app_dir.exists() and self.run_mobile:
-            def on_pubspec_change(filepath: str):
+            def on_mobile_config_change(filepath: str):
                 rel = os.path.relpath(filepath, self.root_dir)
-                log("WATCHER", GREEN, f"Config changed: {rel} -> Triggering Flutter Hot Restart...")
-                if "mobile" in self.services:
-                    self.services["mobile"].send_stdin("R\n")
+                fname = Path(filepath).name.lower()
+                if fname == ".env":
+                    log("WATCHER", GREEN, f"Mobile env file changed: {rel} -> Rebuilding Flutter with new config...")
+                    self.restart_mobile()
+                else:
+                    log("WATCHER", GREEN, f"Config changed: {rel} -> Triggering Flutter Hot Restart...")
+                    if "mobile" in self.services:
+                        self.services["mobile"].send_stdin("R\n")
 
             self.watcher.add_watch(
                 directory=app_dir,
-                extensions=["pubspec.yaml"],
+                extensions=["pubspec.yaml", ".env"],
                 ignored_dirs=[".dart_tool", "build", "android", "ios", "windows", "linux", "macos", ".git"],
-                callback=on_pubspec_change
+                callback=on_mobile_config_change
             )
 
         # Watch AI Service files
@@ -589,12 +718,7 @@ class RunnerOrchestrator:
             else:
                 log("RUNNER", YELLOW, "Web service is not running.")
         elif ch.lower() == "m":
-            if "mobile" in self.services:
-                if self.run_backend:
-                    setup_adb_reverse(5000, self.flutter_device)
-                self.services["mobile"].restart()
-            else:
-                log("RUNNER", YELLOW, "Mobile service is not running.")
+            self.restart_mobile()
         elif ch.lower() == "s":
             self.print_status()
         elif ch.lower() == "h":
@@ -606,6 +730,18 @@ class RunnerOrchestrator:
     def start(self):
         self.running = True
         self.print_banner()
+
+        # Clean up any lingering orphaned backend processes to release file locks on Windows
+        if sys.platform == "win32":
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/IM", "pc_forge_api.exe"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False
+                )
+            except Exception:
+                pass
 
         # Start services in order: AI -> Backend -> Web -> Mobile
         if "ai" in self.services:
@@ -622,7 +758,7 @@ class RunnerOrchestrator:
 
         if "mobile" in self.services:
             if self.run_backend:
-                setup_adb_reverse(5000, self.flutter_device)
+                setup_adb_reverse([5000, 5050], self.flutter_device)
             self.services["mobile"].start()
 
         # Start File Watcher
