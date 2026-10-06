@@ -94,6 +94,4 @@ public class UpdateBuildReviewStatusDto
     public string Status { get; set; } = string.Empty; // 'In Review by Staff', 'Approved by Staff', 'Changes Requested'
 
     public string? StaffNotes { get; set; }
-
-    public int? AssignedStaffId { get; set; }
 }

@@ -19,7 +19,6 @@ public class AppDbContext : DbContext
     public DbSet<MasterFilterOption> MasterFilterOptions => Set<MasterFilterOption>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
-    public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
     public DbSet<ServiceRequest> ServiceRequests => Set<ServiceRequest>();
     public DbSet<Staff> Staff => Set<Staff>();
     public DbSet<CustomBuild> CustomBuilds => Set<CustomBuild>();
@@ -92,6 +91,7 @@ public class AppDbContext : DbContext
             entity.Property(p => p.ImageUrl).HasColumnName("imageurl").HasMaxLength(500);
             entity.Property(p => p.Description).HasColumnName("description");
             entity.Property(p => p.WarrantyMonths).HasColumnName("warrantymonths").HasDefaultValue(36);
+            entity.Property(p => p.Status).HasColumnName("status").HasMaxLength(20).HasDefaultValue("Active");
             entity.Property(p => p.Specifications).HasColumnName("specifications").HasColumnType("jsonb");
             entity.Property(p => p.Socket).HasColumnName("socket").HasMaxLength(50);
             entity.Property(p => p.MemoryType).HasColumnName("memorytype").HasMaxLength(20);
@@ -222,48 +222,7 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // 9. Map SupportTickets
-        modelBuilder.Entity<SupportTicket>(entity =>
-        {
-            entity.ToTable("supporttickets");
-            entity.HasKey(st => st.TicketId);
-            entity.Property(st => st.TicketId).HasColumnName("ticketid");
-            entity.Property(st => st.UserId).HasColumnName("userid");
-            entity.Property(st => st.OrderId).HasColumnName("orderid");
-            entity.Property(st => st.ProductId).HasColumnName("productid");
-            entity.Property(st => st.IssueType).HasColumnName("issuetype").HasMaxLength(50).IsRequired();
-            entity.Property(st => st.Subject).HasColumnName("subject").HasMaxLength(200).IsRequired();
-            entity.Property(st => st.Description).HasColumnName("description").IsRequired();
-            entity.Property(st => st.AttachmentUrl).HasColumnName("attachmenturl").HasMaxLength(500);
-            entity.Property(st => st.Status).HasColumnName("status").HasMaxLength(50).HasDefaultValue("Open");
-            entity.Property(st => st.Priority).HasColumnName("priority").HasMaxLength(20).HasDefaultValue("Normal");
-            entity.Property(st => st.ResolutionNotes).HasColumnName("resolutionnotes");
-            entity.Property(st => st.AssignedStaffId).HasColumnName("assignedstaffid");
-            entity.Property(st => st.CreatedAt).HasColumnName("createdat").HasDefaultValueSql("NOW()");
-            entity.Property(st => st.UpdatedAt).HasColumnName("updatedat").HasDefaultValueSql("NOW()");
-
-            entity.HasOne(st => st.User)
-                  .WithMany()
-                  .HasForeignKey(st => st.UserId)
-                  .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(st => st.Order)
-                  .WithMany()
-                  .HasForeignKey(st => st.OrderId)
-                  .OnDelete(DeleteBehavior.SetNull);
-
-            entity.HasOne(st => st.Product)
-                  .WithMany()
-                  .HasForeignKey(st => st.ProductId)
-                  .OnDelete(DeleteBehavior.SetNull);
-
-            entity.HasOne(st => st.AssignedStaff)
-                  .WithMany()
-                  .HasForeignKey(st => st.AssignedStaffId)
-                  .OnDelete(DeleteBehavior.SetNull);
-        });
-
-        // 9b. Map ServiceRequests
+        // 9. Map ServiceRequests (Simplified After-Sales Service)
         modelBuilder.Entity<ServiceRequest>(entity =>
         {
             entity.ToTable("servicerequests");
@@ -272,25 +231,11 @@ public class AppDbContext : DbContext
             entity.Property(sr => sr.ServiceRequestNumber).HasColumnName("servicerequestnumber").HasMaxLength(30).IsRequired();
             entity.HasIndex(sr => sr.ServiceRequestNumber).IsUnique();
             entity.Property(sr => sr.UserId).HasColumnName("userid");
-            entity.Property(sr => sr.OrderId).HasColumnName("orderid");
-            entity.Property(sr => sr.ProductId).HasColumnName("productid");
             entity.Property(sr => sr.Title).HasColumnName("title").HasMaxLength(200);
             entity.Property(sr => sr.Description).HasColumnName("description");
-            entity.Property(sr => sr.ProblemDescription).HasColumnName("problemdescription").IsRequired();
-            entity.Property(sr => sr.ProblemCategory).HasColumnName("problemcategory").HasMaxLength(100).HasDefaultValue("General");
-            entity.Property(sr => sr.TroubleshootingSummary).HasColumnName("troubleshootingsummary");
-            entity.Property(sr => sr.AttemptCount).HasColumnName("attemptcount").HasDefaultValue(0);
-            entity.Property(sr => sr.InternalNotes).HasColumnName("internalnotes");
-            entity.Property(sr => sr.WarrantyStatus).HasColumnName("warrantystatus").HasMaxLength(50).HasDefaultValue("Active");
-            entity.Property(sr => sr.WarrantyExpiryDate).HasColumnName("warrantyexpirydate");
             entity.Property(sr => sr.PreferredDate).HasColumnName("preferreddate");
             entity.Property(sr => sr.PreferredTime).HasColumnName("preferredtime").HasMaxLength(50);
-            entity.Property(sr => sr.Status).HasColumnName("status").HasMaxLength(50).HasDefaultValue("PENDING");
-            entity.Property(sr => sr.Priority).HasColumnName("priority").HasMaxLength(20).HasDefaultValue("Normal");
-            entity.Property(sr => sr.AssignedStaffId).HasColumnName("assignedstaffid");
-            entity.Property(sr => sr.TechnicianNotes).HasColumnName("techniciannotes");
-            entity.Property(sr => sr.Resolution).HasColumnName("resolution");
-            entity.Property(sr => sr.AttachmentUrl).HasColumnName("attachmenturl").HasMaxLength(500);
+            entity.Property(sr => sr.Status).HasColumnName("status").HasMaxLength(50).HasDefaultValue("Pending");
             entity.Property(sr => sr.CreatedAt).HasColumnName("createdat").HasDefaultValueSql("NOW()");
             entity.Property(sr => sr.UpdatedAt).HasColumnName("updatedat").HasDefaultValueSql("NOW()");
 
@@ -298,21 +243,6 @@ public class AppDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(sr => sr.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(sr => sr.Order)
-                  .WithMany()
-                  .HasForeignKey(sr => sr.OrderId)
-                  .OnDelete(DeleteBehavior.SetNull);
-
-            entity.HasOne(sr => sr.Product)
-                  .WithMany()
-                  .HasForeignKey(sr => sr.ProductId)
-                  .OnDelete(DeleteBehavior.SetNull);
-
-            entity.HasOne(sr => sr.AssignedStaff)
-                  .WithMany()
-                  .HasForeignKey(sr => sr.AssignedStaffId)
-                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // 10. Map Staff (Option 2: Dedicated Staff Profile Table)
@@ -351,7 +281,6 @@ public class AppDbContext : DbContext
             entity.Property(cb => cb.Status).HasColumnName("status").HasMaxLength(50).HasDefaultValue("Pending Staff Review");
             entity.Property(cb => cb.CustomerNotes).HasColumnName("customernotes");
             entity.Property(cb => cb.StaffNotes).HasColumnName("staffnotes");
-            entity.Property(cb => cb.AssignedStaffId).HasColumnName("assignedstaffid");
             entity.Property(cb => cb.CreatedAt).HasColumnName("createdat").HasDefaultValueSql("NOW()");
             entity.Property(cb => cb.UpdatedAt).HasColumnName("updatedat").HasDefaultValueSql("NOW()");
 
@@ -359,11 +288,6 @@ public class AppDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(cb => cb.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(cb => cb.AssignedStaff)
-                  .WithMany()
-                  .HasForeignKey(cb => cb.AssignedStaffId)
-                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<CustomBuildItem>(entity =>

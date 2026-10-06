@@ -39,12 +39,28 @@ public class ProductsController : ControllerBase
         [FromQuery] string? speed = null,
         [FromQuery] string? capacity = null,
         [FromQuery] string? vram = null,
-        [FromQuery] string? efficiency = null)
+        [FromQuery] string? efficiency = null,
+        [FromQuery] string? status = null)
     {
         // 1. Relational database query for core fields
         IQueryable<Product> query = _context.Products
             .AsNoTracking()
             .Include(p => p.Category);
+
+        // Security & Storefront Status Filter:
+        // Customers and unauthenticated public visitors only see Active products.
+        // Admins and Staff can see all products or filter by specific status (e.g. ?status=Inactive, ?status=Active, ?status=all).
+        bool isStaffOrAdmin = User.Identity?.IsAuthenticated == true && (User.IsInRole("Admin") || User.IsInRole("Staff"));
+
+        if (!isStaffOrAdmin)
+        {
+            query = query.Where(p => p.Status == "Active");
+        }
+        else if (!string.IsNullOrWhiteSpace(status) && !status.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            var s = status.Trim().ToLower();
+            query = query.Where(p => p.Status.ToLower() == s);
+        }
 
         if (categoryId.HasValue && categoryId.Value > 0)
         {
@@ -147,7 +163,7 @@ public class ProductsController : ControllerBase
         var standardParams = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "categoryid", "brand", "search", "minprice", "maxprice", "instockonly", "sortby",
-            "socket", "chipset", "memorytype", "speed", "capacity", "vram", "efficiency"
+            "socket", "chipset", "memorytype", "speed", "capacity", "vram", "efficiency", "status"
         };
 
         foreach (var queryParam in Request.Query)
@@ -222,6 +238,7 @@ public class ProductsController : ControllerBase
             ImageUrl = p.ImageUrl,
             Description = p.Description,
             WarrantyMonths = p.WarrantyMonths,
+            Status = p.Status ?? "Active",
             Specifications = ParseJsonSpecifications(p.Specifications),
             Socket = p.Socket,
             MemoryType = p.MemoryType,
@@ -261,6 +278,7 @@ public class ProductsController : ControllerBase
             ImageUrl = product.ImageUrl,
             Description = product.Description,
             WarrantyMonths = product.WarrantyMonths,
+            Status = product.Status ?? "Active",
             Specifications = ParseJsonSpecifications(product.Specifications),
             Socket = product.Socket,
             MemoryType = product.MemoryType,
@@ -357,6 +375,7 @@ public class ProductsController : ControllerBase
             ImageUrl = string.IsNullOrWhiteSpace(dto.ImageUrl) ? null : dto.ImageUrl.Trim(),
             Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim(),
             WarrantyMonths = dto.WarrantyMonths > 0 ? dto.WarrantyMonths : 36,
+            Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status.Trim(),
             Specifications = string.IsNullOrWhiteSpace(dto.Specifications) ? null : dto.Specifications.Trim(),
             Socket = string.IsNullOrWhiteSpace(dto.Socket) ? null : dto.Socket.Trim(),
             MemoryType = string.IsNullOrWhiteSpace(dto.MemoryType) ? null : dto.MemoryType.Trim(),
@@ -384,6 +403,7 @@ public class ProductsController : ControllerBase
             ImageUrl = product.ImageUrl,
             Description = product.Description,
             WarrantyMonths = product.WarrantyMonths,
+            Status = product.Status,
             Specifications = ParseJsonSpecifications(product.Specifications),
             Socket = product.Socket,
             MemoryType = product.MemoryType,
@@ -426,6 +446,7 @@ public class ProductsController : ControllerBase
         if (dto.Price.HasValue) product.Price = dto.Price.Value;
         if (dto.StockQuantity.HasValue && dto.StockQuantity.Value >= 0) product.StockQuantity = dto.StockQuantity.Value;
         if (dto.WarrantyMonths.HasValue && dto.WarrantyMonths.Value > 0) product.WarrantyMonths = dto.WarrantyMonths.Value;
+        if (!string.IsNullOrWhiteSpace(dto.Status)) product.Status = dto.Status.Trim();
         if (dto.ImageUrl != null)
         {
             if (!IsValidImageUrl(dto.ImageUrl, out var updateImageError))
@@ -461,6 +482,64 @@ public class ProductsController : ControllerBase
             ImageUrl = product.ImageUrl,
             Description = product.Description,
             WarrantyMonths = product.WarrantyMonths,
+            Status = product.Status ?? "Active",
+            Specifications = ParseJsonSpecifications(product.Specifications),
+            Socket = product.Socket,
+            MemoryType = product.MemoryType,
+            PowerWattage = product.PowerWattage,
+            FormFactor = product.FormFactor
+        });
+    }
+
+    /// <summary>
+    /// Toggle or update product active/inactive status (Option B: Product Management).
+    /// Supports PATCH /api/products/{id}/status and PATCH /api/products/{id}/toggle-status.
+    /// </summary>
+    [Authorize(Policy = "StaffOnly")]
+    [HttpPatch("{id:int}/status")]
+    [HttpPatch("{id:int}/toggle-status")]
+    public async Task<ActionResult<ProductDto>> ToggleProductStatus(int id, [FromBody] UpdateProductStatusDto? dto = null)
+    {
+        var product = await _context.Products
+            .Include(p => p.Category)
+            .FirstOrDefaultAsync(p => p.ProductId == id);
+
+        if (product == null)
+        {
+            return NotFound(new { message = $"Product with ID {id} not found." });
+        }
+
+        if (dto != null && !string.IsNullOrWhiteSpace(dto.Status))
+        {
+            product.Status = dto.Status.Trim();
+        }
+        else
+        {
+            product.Status = string.Equals(product.Status, "Active", StringComparison.OrdinalIgnoreCase)
+                ? "Inactive"
+                : "Active";
+        }
+
+        product.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Product #{ProductId} ({Name}) status updated to '{Status}' by staff/admin.",
+            product.ProductId, product.Name, product.Status);
+
+        return Ok(new ProductDto
+        {
+            ProductId = product.ProductId,
+            CategoryId = product.CategoryId,
+            CategoryName = product.Category?.Name ?? "General",
+            Name = product.Name,
+            Brand = product.Brand,
+            Model = product.Model,
+            Price = product.Price,
+            StockQuantity = product.StockQuantity,
+            ImageUrl = product.ImageUrl,
+            Description = product.Description,
+            WarrantyMonths = product.WarrantyMonths,
+            Status = product.Status ?? "Active",
             Specifications = ParseJsonSpecifications(product.Specifications),
             Socket = product.Socket,
             MemoryType = product.MemoryType,

@@ -375,17 +375,11 @@ public class AiAgentService : IAiAgentService
                 {
                     ServiceRequestId = sr.ServiceRequestId,
                     ServiceRequestNumber = sr.ServiceRequestNumber,
-                    OrderId = sr.OrderId,
-                    ProductId = sr.ProductId,
                     Title = sr.Title,
                     Description = sr.Description,
-                    ProblemDescription = sr.ProblemDescription,
-                    ProblemCategory = sr.ProblemCategory,
-                    WarrantyStatus = sr.WarrantyStatus,
                     PreferredDate = sr.PreferredDate?.ToString("yyyy-MM-dd"),
                     PreferredTime = sr.PreferredTime,
                     Status = sr.Status,
-                    Priority = sr.Priority,
                     CreatedAt = sr.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
                 }).ToList();
             }
@@ -440,13 +434,6 @@ public class AiAgentService : IAiAgentService
                         extractedTime = timeMatch.Groups[1].Value.ToUpperInvariant();
                     }
 
-                    int? extractedOrderId = request.OrderId;
-                    var orderMatch = Regex.Match(msg, @"(?:order\s*#?|pcf-10)\s*(\d+)", RegexOptions.IgnoreCase);
-                    if (orderMatch.Success && int.TryParse(orderMatch.Groups[1].Value, out var oid))
-                    {
-                        extractedOrderId = oid;
-                    }
-
                     if (extractedDate.HasValue && !string.IsNullOrEmpty(extractedTime))
                     {
                         var valErrors = new List<string>();
@@ -489,12 +476,11 @@ public class AiAgentService : IAiAgentService
                                 return new AfterSalesChatResponseDto
                                 {
                                     Success = true,
-                                    Reply = $"I have generated your Service Request details based on our conversation:\n\nTitle: {generatedTitle}\nDescription: {generatedDescription}\nPreferred Date: {extractedDate.Value:yyyy-MM-dd}\nPreferred Time: {extractedTime}\nOrder ID: {(extractedOrderId.HasValue ? $"PCF-10{extractedOrderId:03d}" : "N/A")}\n\nPlease review the title and description above. You can confirm to submit, or let me know if you would like to edit them.",
+                                    Reply = $"I have generated your Service Request details based on our conversation:\n\nTitle: {generatedTitle}\nDescription: {generatedDescription}\nPreferred Date: {extractedDate.Value:yyyy-MM-dd}\nPreferred Time: {extractedTime}\n\nPlease review the title and description above. You can confirm to submit, or let me know if you would like to edit them.",
                                     ServiceRequestMode = true,
                                     ServiceRequestRequired = true,
                                     ServiceRequest = new ServiceRequestInfoDto
                                     {
-                                        OrderId = extractedOrderId,
                                         Title = generatedTitle,
                                         Description = generatedDescription,
                                         ProblemDescription = generatedDescription,
@@ -513,15 +499,11 @@ public class AiAgentService : IAiAgentService
                             {
                                 ServiceRequestNumber = srNumber,
                                 UserId = request.UserId > 0 ? request.UserId : 1,
-                                OrderId = extractedOrderId,
                                 Title = generatedTitle,
                                 Description = generatedDescription,
-                                ProblemDescription = generatedDescription,
-                                ProblemCategory = request.ProblemCategory ?? "General",
                                 PreferredDate = extractedDate,
                                 PreferredTime = extractedTime,
                                 Status = "Pending",
-                                Priority = "Normal",
                                 CreatedAt = DateTime.UtcNow,
                                 UpdatedAt = DateTime.UtcNow
                             };
@@ -531,7 +513,7 @@ public class AiAgentService : IAiAgentService
                             return new AfterSalesChatResponseDto
                             {
                                 Success = true,
-                                Reply = $"Your Service Request has been created successfully.\n\nService Request ID: {srNumber}\nTitle: {newSr.Title}\nOrder ID: {(newSr.OrderId.HasValue ? $"PCF-10{newSr.OrderId:03d}" : "N/A")}\nPreferred Date: {extractedDate.Value:yyyy-MM-dd}\nPreferred Time: {extractedTime}\nStatus: Pending\n\nPlease bring your PC or affected component to our service center for technician inspection.",
+                                Reply = $"Your Service Request has been created successfully.\n\nService Request ID: {srNumber}\nTitle: {newSr.Title}\nPreferred Date: {extractedDate.Value:yyyy-MM-dd}\nPreferred Time: {extractedTime}\nStatus: Pending\n\nPlease bring your PC or affected component to our service center for technician inspection.",
                                 ServiceRequestMode = true,
                                 ServiceRequestRequired = true,
                                 ServiceRequest = new ServiceRequestInfoDto
@@ -539,15 +521,11 @@ public class AiAgentService : IAiAgentService
                                     Id = newSr.ServiceRequestId,
                                     ServiceRequestId = newSr.ServiceRequestId,
                                     ServiceRequestNumber = newSr.ServiceRequestNumber,
-                                    OrderId = newSr.OrderId,
                                     Title = newSr.Title,
                                     Description = newSr.Description,
-                                    ProblemDescription = newSr.ProblemDescription,
-                                    ProblemCategory = newSr.ProblemCategory,
                                     PreferredDate = newSr.PreferredDate?.ToString("yyyy-MM-dd"),
                                     PreferredTime = newSr.PreferredTime,
                                     Status = newSr.Status,
-                                    Priority = newSr.Priority,
                                     CreatedAt = newSr.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
                                 }
                             };
@@ -563,12 +541,32 @@ public class AiAgentService : IAiAgentService
                             };
                         }
                     }
+                    else if (extractedDate.HasValue && string.IsNullOrEmpty(extractedTime))
+                    {
+                        return new AfterSalesChatResponseDto
+                        {
+                            Success = true,
+                            Reply = "What time would you prefer?",
+                            ServiceRequestMode = true,
+                            ServiceRequestRequired = true
+                        };
+                    }
+                    else if (!extractedDate.HasValue && !string.IsNullOrEmpty(extractedTime))
+                    {
+                        return new AfterSalesChatResponseDto
+                        {
+                            Success = true,
+                            Reply = "What date would you prefer?",
+                            ServiceRequestMode = true,
+                            ServiceRequestRequired = true
+                        };
+                    }
                     else
                     {
                         return new AfterSalesChatResponseDto
                         {
                             Success = true,
-                            Reply = "I can help you create a Service Request! Please specify your preferred appointment date (Monday - Saturday) and time between 09:00 AM and 06:00 PM. (Note: storewide capacity is max 10 appointments per day).",
+                            Reply = "What date and time would you prefer for the service?",
                             ServiceRequestMode = true,
                             ServiceRequestRequired = true
                         };
@@ -714,20 +712,11 @@ public class AiAgentService : IAiAgentService
                         {
                             ServiceRequestNumber = authoritativeSrNumber,
                             UserId = request.UserId > 0 ? request.UserId : 1,
-                            OrderId = srDto.OrderId,
-                            ProductId = srDto.ProductId,
                             Title = resolvedTitle,
                             Description = resolvedDesc,
-                            ProblemDescription = srDto.ProblemDescription.Trim(),
-                            ProblemCategory = string.IsNullOrWhiteSpace(srDto.ProblemCategory) ? "General" : srDto.ProblemCategory.Trim(),
-                            TroubleshootingSummary = srDto.TroubleshootingSummary,
-                            AttemptCount = srDto.AttemptCount,
-                            WarrantyStatus = verifiedWarrantyStatus,
-                            WarrantyExpiryDate = verifiedExpiryDate,
                             PreferredDate = parsedPreferredDate,
                             PreferredTime = srDto.PreferredTime,
                             Status = "Pending",
-                            Priority = !string.IsNullOrWhiteSpace(srDto.Priority) ? srDto.Priority : "Normal",
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };
@@ -745,8 +734,6 @@ public class AiAgentService : IAiAgentService
                         srDto.Title = newServiceRequest.Title;
                         srDto.Description = newServiceRequest.Description;
                         srDto.Status = newServiceRequest.Status;
-                        srDto.WarrantyStatus = newServiceRequest.WarrantyStatus;
-                        srDto.WarrantyExpiryDate = newServiceRequest.WarrantyExpiryDate?.ToString("yyyy-MM-dd");
                         srDto.CreatedAt = newServiceRequest.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ");
 
                         if (result.Ticket != null)

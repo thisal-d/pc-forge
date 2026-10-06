@@ -1,4 +1,12 @@
+using Microsoft.AspNetCore.Http;
+
 namespace PCForge.Api.DTOs;
+
+public class ImageUploadRequestDto
+{
+    public IFormFile File { get; set; } = null!;
+    public string? Folder { get; set; }
+}
 
 public class ImageUploadResultDto
 {

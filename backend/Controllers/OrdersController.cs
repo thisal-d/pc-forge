@@ -63,6 +63,11 @@ public class OrdersController : ControllerBase
                 return BadRequest(new { message = $"Product with ID {itemDto.ProductId} was not found." });
             }
 
+            if (!string.Equals(product.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { message = $"Product '{product.Name}' is currently inactive and not available for purchase." });
+            }
+
             if (product.StockQuantity < itemDto.Quantity)
             {
                 return BadRequest(new
@@ -373,8 +378,19 @@ public class OrdersController : ControllerBase
     /// - Fully idempotent: double-submitting does not double-restock inventory.
     /// </summary>
     [HttpPost("{id:int}/cancel")]
-    [HttpPatch("{id:int}/cancel")]
     public async Task<ActionResult<OrderDetailDto>> CancelOrder(int id)
+    {
+        return await CancelOrderInternal(id);
+    }
+
+    [HttpPatch("{id:int}/cancel")]
+    [ApiExplorerSettings(IgnoreApi = true)]
+    public async Task<ActionResult<OrderDetailDto>> CancelOrderPatch(int id)
+    {
+        return await CancelOrderInternal(id);
+    }
+
+    private async Task<ActionResult<OrderDetailDto>> CancelOrderInternal(int id)
     {
         var currentUserId = GetCurrentUserId();
         if (!currentUserId.HasValue)

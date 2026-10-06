@@ -54,9 +54,11 @@ public class UploadController : ControllerBase
     [ProducesResponseType(typeof(ImageUploadResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ImageUploadResultDto>> UploadImage(
-        [FromForm] IFormFile file,
-        [FromForm] string? folder = null)
+        [FromForm] ImageUploadRequestDto request)
     {
+        var file = request?.File;
+        var folder = request?.Folder;
+
         if (file == null || file.Length == 0)
         {
             return BadRequest(new { message = "Please select a valid image file to upload." });
