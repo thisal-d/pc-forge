@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/catalog_repository.dart';
 import '../../data/models/category_filter_model.dart';
-import '../../../../services/api_service.dart';
 import '../../../../core/theme/app_colors.dart';
 
 /// Reusable dynamic filter modal for Catalog & Component Picker (Dynamic Facets)
@@ -84,8 +83,6 @@ class CatalogFilterModal extends StatefulWidget {
 }
 
 class _CatalogFilterModalState extends State<CatalogFilterModal> {
-  final ApiService _apiService = ApiService();
-
   late String? _selectedBrand;
   late double _minPrice;
   late double _maxPrice;

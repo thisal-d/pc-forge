@@ -176,7 +176,7 @@ class _SupportScreenState extends State<SupportScreen> {
   List<ServiceRequestModel> _getFilteredRequests(List<ServiceRequestModel> requests) {
     return requests.where((sr) {
       if (_selectedStatus != 'ALL') {
-        final norm = (String s) => s.toUpperCase().replaceAll('_', ' ');
+        String norm(String s) => s.toUpperCase().replaceAll('_', ' ');
         final rStatus = norm(sr.status);
         final fStatus = norm(_selectedStatus);
 

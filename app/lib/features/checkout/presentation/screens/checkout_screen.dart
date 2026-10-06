@@ -620,6 +620,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // ignore: deprecated_member_use
                 Radio<String>(
                   value: id,
                   groupValue: _selectedPaymentMethod,

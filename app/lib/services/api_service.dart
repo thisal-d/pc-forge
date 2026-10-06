@@ -423,11 +423,7 @@ class ApiService {
 
   /// Cancel Order (Customer Cancellation & Automatic Stock Return)
   Future<Map<String, dynamic>> cancelOrder(int orderId, {String? token}) async {
-    final res = await post('/Orders/$orderId/cancel', {}, token: token);
-    if (res is Map) {
-      return Map<String, dynamic>.from(res);
-    }
-    return {'message': 'Order cancelled successfully'};
+    return await post('/Orders/$orderId/cancel', {}, token: token);
   }
 
   // ==================== AFTER-SALES SERVICE REQUESTS (MEMBER 05) ====================
@@ -467,9 +463,7 @@ class ApiService {
 
   /// Cancel a Service Request
   Future<Map<String, dynamic>> cancelServiceRequest(int id, {String? token}) async {
-    final res = await post('/ServiceRequests/$id/cancel', {}, token: token);
-    if (res is Map<String, dynamic>) return res;
-    return <String, dynamic>{'message': 'Service request cancelled'};
+    return await post('/ServiceRequests/$id/cancel', {}, token: token);
   }
 
   /// Create and Submit a new Service Request
