@@ -39,7 +39,6 @@ ci-log
 
 # IDE / OS
 .idea/
-.vscode/
 *.swp
 *.swo
 .DS_Store
@@ -50,7 +49,6 @@ contributed-history.md
 pubspec.lock
 
 # Local Environment Secrets (never commit!)
-**/.env
 **/.env.local
 **/.env.*.local
 **/deploy.env
