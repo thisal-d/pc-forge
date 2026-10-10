@@ -1,1 +1,44 @@
-// Icons Export Index
+import React from 'react';
+import Icon from './Icon.jsx';
+
+export { Icon };
+export default Icon;
+
+// Convenient icon wrappers (using createElement for pure JS compatibility)
+export const CloseIcon = (props) => React.createElement(Icon, { name: 'close', ...props });
+export const CheckIcon = (props) => React.createElement(Icon, { name: 'check', ...props });
+export const CheckCircleIcon = (props) => React.createElement(Icon, { name: 'checkCircle', ...props });
+export const SearchIcon = (props) => React.createElement(Icon, { name: 'search', ...props });
+export const AlertTriangleIcon = (props) => React.createElement(Icon, { name: 'alertTriangle', ...props });
+export const ZapIcon = (props) => React.createElement(Icon, { name: 'zap', ...props });
+export const PackageIcon = (props) => React.createElement(Icon, { name: 'package', ...props });
+export const LockIcon = (props) => React.createElement(Icon, { name: 'lock', ...props });
+export const UnlockIcon = (props) => React.createElement(Icon, { name: 'unlock', ...props });
+export const WrenchIcon = (props) => React.createElement(Icon, { name: 'wrench', ...props });
+export const SettingsIcon = (props) => React.createElement(Icon, { name: 'settings', ...props });
+export const CloudIcon = (props) => React.createElement(Icon, { name: 'cloud', ...props });
+export const CloudUploadIcon = (props) => React.createElement(Icon, { name: 'cloudUpload', ...props });
+export const KeyIcon = (props) => React.createElement(Icon, { name: 'key', ...props });
+export const PencilIcon = (props) => React.createElement(Icon, { name: 'pencil', ...props });
+export const CameraIcon = (props) => React.createElement(Icon, { name: 'camera', ...props });
+export const UserIcon = (props) => React.createElement(Icon, { name: 'user', ...props });
+export const UsersIcon = (props) => React.createElement(Icon, { name: 'users', ...props });
+export const ToolsIcon = (props) => React.createElement(Icon, { name: 'tools', ...props });
+export const RefreshCwIcon = (props) => React.createElement(Icon, { name: 'refreshCw', ...props });
+export const ClipboardListIcon = (props) => React.createElement(Icon, { name: 'clipboardList', ...props });
+export const PenLineIcon = (props) => React.createElement(Icon, { name: 'penLine', ...props });
+export const FolderOpenIcon = (props) => React.createElement(Icon, { name: 'folderOpen', ...props });
+export const BanIcon = (props) => React.createElement(Icon, { name: 'ban', ...props });
+export const MonitorIcon = (props) => React.createElement(Icon, { name: 'monitor', ...props });
+export const TargetIcon = (props) => React.createElement(Icon, { name: 'target', ...props });
+export const PlusIcon = (props) => React.createElement(Icon, { name: 'plus', ...props });
+export const StarIcon = (props) => React.createElement(Icon, { name: 'star', ...props });
+export const TicketIcon = (props) => React.createElement(Icon, { name: 'ticket', ...props });
+export const TagIcon = (props) => React.createElement(Icon, { name: 'tag', ...props });
+export const MessageSquareIcon = (props) => React.createElement(Icon, { name: 'messageSquare', ...props });
+export const ShieldCheckIcon = (props) => React.createElement(Icon, { name: 'shieldCheck', ...props });
+export const OctagonAlertIcon = (props) => React.createElement(Icon, { name: 'octagonAlert', ...props });
+export const HourglassIcon = (props) => React.createElement(Icon, { name: 'hourglass', ...props });
+export const HammerIcon = (props) => React.createElement(Icon, { name: 'hammer', ...props });
+export const TrendingUpIcon = (props) => React.createElement(Icon, { name: 'trendingUp', ...props });
+export const TrendingDownIcon = (props) => React.createElement(Icon, { name: 'trendingDown', ...props });
