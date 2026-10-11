@@ -1,7 +1,7 @@
 # Git Exclusions
-.env
 bin/
 obj/
 node_modules/
 build/
 __pycache__/
+config.bat
