@@ -1,7 +1,37 @@
-# Git Exclusions
-.env
-bin/
-obj/
-node_modules/
-build/
+# .NET / C#
+**/bin/
+**/obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+**/wwwroot/uploads/
+
+# Node / Web
+**/node_modules/
+**/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Flutter / Dart
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+
+# IDE / OS
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+config.bat
