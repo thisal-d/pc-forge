@@ -22,6 +22,30 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
 </p>
 
+> [!CAUTION]
+> ## 🚨 CRITICAL SECURITY ADVISORY: REPOSITORY INTEGRITY WARNING 🚨
+>
+> <p align="center">
+>   <font color="#d32f2f" size="+1"><strong>⚠️ ATTENTION: ONLY THE <code>main</code> BRANCH IS VERIFIED CLEAN AND SAFE ⚠️</strong></font>
+> </p>
+>
+> <div style="color: #d32f2f; font-weight: 500; font-size: 15px; border-left: 4px solid #d32f2f; padding: 12px 16px; background-color: rgba(211, 47, 47, 0.08); margin: 12px 0; border-radius: 4px;">
+>
+> <strong style="color: #b71c1c; font-size: 16px;">🛑 SECURITY NOTICE:</strong><br/>
+> This repository recently experienced a security attack involving malicious code introduced by a contributor across other branches.<br/><br/>
+>
+> 🔒 <strong style="color: #b71c1c;">ONLY THE <code>main</code> BRANCH IS CLEAN AND SAFE:</strong><br/>
+> Only the <code>main</code> branch has been thoroughly audited, sanitized, and verified safe for use.<br/><br/>
+>
+> ⛔ <strong style="color: #b71c1c;">STRICT WARNING — NEVER CHECK OUT ANY OTHER BRANCH:</strong><br/>
+> <strong>DO NOT</strong> switch to, checkout, pull, or run code from any other branch (including <code>dev</code>, stale branches, or contributor PR branches). Doing so risks exposing your local environment to compromised code.<br/><br/>
+>
+> 🛡️ <strong>Please be safe:</strong> Keep your local working copy strictly on <code>main</code> at all times.
+>
+> </div>
+
+---
+
 A full-stack, cross-platform e-commerce and custom PC building ecosystem modeled on the enthusiast computer retail industry. Customers design custom rigs with real-time hardware compatibility validation, autonomous LangGraph AI agents recommend specifications and reserve inventory, store technicians review builds in dedicated assembly workbenches, and after-sales service workflows provide seamless RMA and appointment scheduling.
 
 ---
