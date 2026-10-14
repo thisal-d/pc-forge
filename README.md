@@ -22,6 +22,51 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
 </p>
 
+> [!CAUTION]
+> ## 🚨 CRITICAL SECURITY ADVISORY: REPOSITORY INTEGRITY WARNING 🚨
+>
+> <p align="center">
+>   <font color="#d32f2f" size="+2"><strong>⚠️ ATTENTION: ONLY THE <code>main</code> BRANCH IS VERIFIED CLEAN AND SAFE ⚠️</strong></font>
+> </p>
+>
+> <div style="color: #d32f2f; font-weight: 500; font-size: 15px; border-left: 4px solid #d32f2f; padding: 14px 18px; background-color: rgba(211, 47, 47, 0.08); margin: 12px 0; border-radius: 6px;">
+>
+> <strong style="color: #b71c1c; font-size: 16px;">🛑 INCIDENT OVERVIEW: MALWARE INFECTION & SUPPLY CHAIN ATTACK</strong><br/>
+> This repository was subjected to a security incident involving malicious code and trojanized payloads introduced by an external contributor on non-main branches and unmerged feature branches.<br/><br/>
+>
+> 🔒 <strong style="color: #b71c1c; font-size: 15px;">1. CURRENT REPOSITORY STATUS — ONLY <code>main</code> IS CLEAN:</strong><br/>
+> The repository maintainers have conducted an extensive security audit and purged all untrusted references. <strong>ONLY THE <code>main</code> BRANCH HAS BEEN FULLY SANITIZED, AUDITED, AND VERIFIED SAFE FOR USE.</strong> All other branches (including historical <code>dev</code>, experimental feature branches, and contributor pull request branches) are considered unverified, compromised, and hazardous.<br/><br/>
+>
+> 🔍 <strong style="color: #b71c1c; font-size: 15px;">2. WHERE THE MALWARE WAS & COMPROMISED TARGET FILES:</strong><br/>
+> The malicious contributor planted backdoors and execution hooks specifically across three high-impact vectors on untrusted branches:<br/>
+> • 🔤 <strong>The Binary Font File Asset (<code>.ttf</code> / <code>.otf</code> / <code>.woff2</code>):</strong> Used binary steganography to conceal encrypted shellcode inside font metadata tables, evading standard Git diff detection since binary assets bypass text code review.<br/>
+> • 🌐 <strong>The API Client Interceptor (<code>web/src/api/axiosInstance.js</code> / <code>api.js</code>):</strong> Injected backdoor interceptors into Axios HTTP handlers to silently intercept, copy, and exfiltrate user credentials and <code>pcforge_token</code> JWTs to an external server.<br/>
+> • ⚙️ <strong>The Vite Configuration (<code>web/vite.config.js</code>):</strong> Injected malicious Node.js hooks and rogue build plugins that execute arbitrary system commands with full developer machine privileges as soon as <code>npm run dev</code> or <code>npm run build</code> is started.<br/><br/>
+>
+> ⚡ <strong style="color: #b71c1c; font-size: 15px;">3. HOW IT COULD BE RUN / TRIGGERED:</strong><br/>
+> The malware is designed to trigger automatically or through routine development workflows if a user switches away from <code>main</code>:<br/>
+> • <strong>Branch Checkout:</strong> Running <code>git checkout &lt;untrusted-branch&gt;</code> pulls infected scripts, rogue font loaders, and compromised configs into your local directory.<br/>
+> • <strong>Dependency & Build Invocations:</strong> Running <code>npm install</code>, <code>npm run dev</code>, <code>python main.py</code>, or <code>dotnet run</code> on an affected branch allows <code>vite.config.js</code> and malicious scripts to execute directly in your local shell.<br/>
+> • <strong>Web Authentication:</strong> Logging into the web client while running code from an unverified branch triggers backdoored interceptors in <code>api.js</code>, exfiltrating credentials.<br/><br/>
+>
+> 📄 <strong style="color: #b71c1c; font-size: 15px;">📖 FULL FORENSIC REPORT:</strong><br/>
+> For detailed payload analysis, code diffs, and exact remediation steps, read the dedicated disclosure:  
+> 👉 **[MALWARE_INCIDENT_REPORT.md](MALWARE_INCIDENT_REPORT.md)**<br/><br/>
+>
+> 🛡️ <strong style="color: #b71c1c; font-size: 15px;">4. MANDATORY SAFETY GUIDELINES — HOW TO STAY SAFE:</strong><br/>
+> • ⛔ <strong>NEVER SWITCH TO ANY OTHER BRANCH:</strong> Under no circumstances should you checkout, switch to, pull from, or merge any branch other than <code>main</code>.<br/>
+> • 🔍 <strong>Verify Active Branch:</strong> Always check your branch before running any local setup commands:
+> <pre style="background: #2b0d0d; color: #ff8080; padding: 10px; border-radius: 4px; margin: 8px 0; font-family: monospace;">git status
+> git branch --show-current  # MUST output: main</pre>
+> • 🧹 <strong>Prune Local Untrusted Branches:</strong> If you previously checked out or fetched other branches locally, purge them immediately:
+> <pre style="background: #2b0d0d; color: #ff8080; padding: 10px; border-radius: 4px; margin: 8px 0; font-family: monospace;">git checkout main
+> git branch | grep -v "main" | xargs git branch -D</pre>
+> • 🔒 <strong>Do not execute scripts from unverified PRs:</strong> Only run code that is present on the verified <code>main</code> branch.
+>
+> </div>
+
+---
+
 A full-stack, cross-platform e-commerce and custom PC building ecosystem modeled on the enthusiast computer retail industry. Customers design custom rigs with real-time hardware compatibility validation, autonomous LangGraph AI agents recommend specifications and reserve inventory, store technicians review builds in dedicated assembly workbenches, and after-sales service workflows provide seamless RMA and appointment scheduling.
 
 ---
