@@ -151,80 +151,6 @@ def _run_compatibility_checks(components: Dict[str, ComponentItem]) -> Compatibi
     )
 
 
-def _deterministic_build_assembly(request: BuildGenerationRequest, target_budget: float) -> Tuple[Dict[str, ComponentItem], CompatibilityChecklist, str]:
-    """Fallback deterministic assembly from live/cached catalog when LLM suffers network or quota errors."""
-    catalog = fetch_live_products()
-    by_cat: Dict[str, List[Dict[str, Any]]] = {}
-    for p in catalog:
-        cat = (p.get("category") or "").strip().lower()
-        by_cat.setdefault(cat, []).append(p)
-
-    purpose_lower = (request.purpose or "").lower()
-    res_lower = (request.target_resolution or "").lower()
-    is_high_end = "4k" in res_lower or "render" in purpose_lower or target_budget > 700000.0
-
-    # 1. CPU
-    cpus = by_cat.get("cpu", [])
-    if is_high_end:
-        cpu_cand = next((c for c in cpus if "7950" in c.get("name", "") or "14700" in c.get("name", "")), cpus[0] if cpus else None)
-    else:
-        cpu_cand = next((c for c in cpus if "7800x3d" in c.get("name", "").lower() or "7600" in c.get("name", "").lower()), cpus[0] if cpus else None)
-
-    sock = str(cpu_cand.get("socket", "AM5") if cpu_cand else "AM5").upper()
-
-    # 2. Motherboard (Socket match)
-    mobos = [m for m in by_cat.get("motherboard", []) if sock in str(m.get("socket", "")).upper()]
-    mobo_cand = mobos[0] if mobos else (by_cat.get("motherboard", [])[0] if by_cat.get("motherboard") else None)
-
-    # 3. RAM (DDR5)
-    rams = by_cat.get("ram", [])
-    ram_cand = next((r for r in rams if "ddr5" in str(r.get("memory_type", "")).lower()), rams[0] if rams else None)
-
-    # 4. GPU
-    gpus = by_cat.get("gpu", [])
-    if is_high_end:
-        gpu_cand = next((g for g in gpus if "4090" in g.get("name", "") or "4080" in g.get("name", "")), gpus[0] if gpus else None)
-    else:
-        gpu_cand = next((g for g in gpus if "4070" in g.get("name", "") or "4060" in g.get("name", "")), gpus[0] if gpus else None)
-
-    # 5. PSU (+150W headroom)
-    cpu_w = int(cpu_cand.get("power_wattage", 120) if cpu_cand else 120)
-    gpu_w = int(gpu_cand.get("power_wattage", 250) if gpu_cand else 250)
-    needed_w = int((cpu_w + gpu_w) * 1.25 + 150)
-    psus = [p for p in by_cat.get("psu", []) if (p.get("power_wattage") or 0) >= needed_w]
-    psu_cand = psus[0] if psus else (by_cat.get("psu", [])[-1] if by_cat.get("psu") else None)
-
-    # 6. Storage
-    storage_cands = by_cat.get("storage", [])
-    storage_cand = storage_cands[0] if storage_cands else None
-
-    # 7. Case
-    case_cands = by_cat.get("case", [])
-    case_cand = case_cands[0] if case_cands else None
-
-    # 8. Cooler
-    cooler_cands = by_cat.get("cooler", [])
-    cooler_cand = cooler_cands[0] if cooler_cands else None
-
-    comps: Dict[str, ComponentItem] = {}
-    if cpu_cand: comps["cpu"] = ComponentItem(**cpu_cand)
-    if mobo_cand: comps["motherboard"] = ComponentItem(**mobo_cand)
-    if ram_cand: comps["ram"] = ComponentItem(**ram_cand)
-    if gpu_cand: comps["gpu"] = ComponentItem(**gpu_cand)
-    if psu_cand: comps["psu"] = ComponentItem(**psu_cand)
-    if storage_cand: comps["storage"] = ComponentItem(**storage_cand)
-    if case_cand: comps["pc_case"] = ComponentItem(**case_cand)
-    if cooler_cand: comps["cooler"] = ComponentItem(**cooler_cand)
-
-    checklist = _run_compatibility_checks(comps)
-    summary = (
-        f"Verified 100% technical compatibility across all 8 hardware slots for {request.target_resolution} {request.purpose} build. "
-        f"CPU socket ({checklist.socket_details}), RAM ({checklist.memory_details}), "
-        f"and PSU clearance verified with +{checklist.headroom_watts}W transient safety headroom."
-    )
-    return comps, checklist, summary
-
-
 def agent_reasoning_node(state: BuildAgentState) -> Dict[str, Any]:
     """Calls the LLM with allow-listed tools bound to let it reason over hardware selections."""
     llm = get_llm()
@@ -244,8 +170,10 @@ def agent_reasoning_node(state: BuildAgentState) -> Dict[str, Any]:
     try:
         response = llm_with_tools.invoke(state["messages"])
     except Exception as e:
-        steps.append(f"[Build Agent Fallback] LLM invocation encountered network issue ({str(e)[:100]}); proceeding with deterministic build assembly.")
+        err = f"Build Agent encountered external LLM or quota error: {str(e)}"
+        steps.append(f"[Build Agent Error] {err}")
         return {
+            "error_message": err,
             "iteration_count": it_count,
             "trace_steps": steps
         }
@@ -337,6 +265,9 @@ def tools_execution_node(state: BuildAgentState) -> Dict[str, Any]:
 
 def should_continue(state: BuildAgentState) -> str:
     """Conditional Edge: Routes to tools if tool calls exist, or ends if complete."""
+    if state.get("error_message"):
+        return "finish"
+
     if state.get("is_validated", False):
         return "finish"
 
@@ -421,15 +352,21 @@ Please:
         return BuildGenerationResponse(
             success=False,
             build=None,
-            summary="Build generation failed.",
+            summary=f"Build generation failed: {err_msg}",
             trace_steps=trace,
             error=err_msg
         )
 
     if len(components) < 8 or not is_valid:
-        trace.append("[Deterministic Assembly] Assembling 100% verified compatible 8-component build from catalog.")
-        components, checklist, summary = _deterministic_build_assembly(request, target_budget)
-        is_valid = checklist.all_passed
+        fail_msg = f"Unable to assemble full 8-component build (selected {len(components)}/8 components, valid={is_valid})."
+        trace.append(f"[Build Agent Error] {fail_msg}")
+        return BuildGenerationResponse(
+            success=False,
+            build=None,
+            summary="Build generation failed: could not assemble complete compatible configuration.",
+            trace_steps=trace,
+            error=fail_msg
+        )
 
     total_price = sum(c.price for c in components.values())
     est_wattage = checklist.estimated_wattage or sum((c.power_wattage or 0) for c in components.values())

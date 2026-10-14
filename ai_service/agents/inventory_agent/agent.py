@@ -43,6 +43,7 @@ class InventoryAgentState(TypedDict):
     is_complete: bool
     summary: str
     trace_steps: List[str]
+    error_message: Optional[str]
 
 
 INVENTORY_SYSTEM_PROMPT = """\
@@ -77,6 +78,7 @@ def agent_reasoning_node(state: InventoryAgentState) -> Dict[str, Any]:
         err = "LLM not configured for Inventory Agent. Please check GOOGLE_API_KEY in .env."
         steps.append(f"[Inventory Error] {err}")
         return {
+            "error_message": err,
             "messages": [AIMessage(content=f"Error: {err}")],
             "iteration_count": it_count,
             "trace_steps": steps
@@ -86,8 +88,10 @@ def agent_reasoning_node(state: InventoryAgentState) -> Dict[str, Any]:
     try:
         response = llm_with_tools.invoke(state["messages"])
     except Exception as e:
-        steps.append(f"[Inventory Fallback] LLM invocation encountered network issue ({str(e)[:100]}); proceeding with deterministic warehouse check.")
+        err = f"Inventory Agent encountered external LLM or quota error: {str(e)}"
+        steps.append(f"[Inventory Error] {err}")
         return {
+            "error_message": err,
             "iteration_count": it_count,
             "trace_steps": steps
         }
@@ -182,6 +186,9 @@ def tools_execution_node(state: InventoryAgentState) -> Dict[str, Any]:
 
 def should_continue(state: InventoryAgentState) -> str:
     """Conditional Edge: Routes to tools if tool calls exist, or finishes when reservation is locked."""
+    if state.get("error_message"):
+        return "finish"
+
     if state.get("is_complete", False) and state.get("reservation") is not None:
         return "finish"
 
@@ -242,12 +249,32 @@ Please:
         "summary": "",
         "trace_steps": [
             f"[Inventory Initiated] Starting warehouse inventory verification for {len(comp_ids)} components."
-        ]
+        ],
+        "error_message": None,
     }
 
     final_state = INVENTORY_GRAPH.invoke(initial_state)
 
     trace = final_state.get("trace_steps", [])
+    err_msg = final_state.get("error_message")
+    if err_msg:
+        return StockVerificationResult(
+            success=False,
+            all_in_stock=False,
+            total_price=0.0,
+            components={},
+            reservation=ReservationHold(
+                reservation_id="FAILED",
+                held_minutes=0,
+                expires_at="",
+                status="Failed",
+                reserved_product_ids=[]
+            ),
+            substitutions_made=[],
+            summary=f"Inventory check failed: {err_msg}",
+            trace_steps=trace,
+            error=err_msg
+        )
     reservation = final_state.get("reservation")
     substitutions = final_state.get("substitutions_made", [])
 

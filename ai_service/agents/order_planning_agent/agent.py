@@ -55,6 +55,7 @@ class OrderPlanningState(TypedDict):
     proposal_payload: Optional[Dict]
     agent_trace: List[str]
     iteration_count: int
+    error_message: Optional[str]
 
 
 def agent_reasoning_node(state: OrderPlanningState) -> Dict:
@@ -67,8 +68,10 @@ def agent_reasoning_node(state: OrderPlanningState) -> Dict:
 
     llm_instance = get_llm()
     if llm_instance is None:
-        trace.append("[Warning] LLM not available; falling back to direct tool calculation.")
+        err = "Order Planning Agent requires an active LLM client. Please check GOOGLE_API_KEY in .env."
+        trace.append(f"[Order Planning Error] {err}")
         return {
+            "error_message": err,
             "agent_trace": trace,
             "iteration_count": iteration,
         }
@@ -77,8 +80,10 @@ def agent_reasoning_node(state: OrderPlanningState) -> Dict:
     try:
         response = order_planner_llm.invoke(messages)
     except Exception as e:
-        trace.append(f"[Warning] LLM call failed ({str(e)[:120]}); falling back to deterministic tool execution.")
+        err = f"Order Planning Agent encountered external LLM or quota error: {str(e)}"
+        trace.append(f"[Order Planning Error] {err}")
         return {
+            "error_message": err,
             "agent_trace": trace,
             "iteration_count": iteration,
         }
@@ -141,6 +146,8 @@ def tools_execution_node(state: OrderPlanningState) -> Dict:
 
 def should_continue(state: OrderPlanningState) -> str:
     """Routes to tools node if Gemini issued tool calls, or terminates graph if done."""
+    if state.get("error_message"):
+        return END
     last_message = state["messages"][-1]
     iteration = state.get("iteration_count", 0)
 
@@ -210,6 +217,7 @@ Please execute:
         "messages": initial_messages,
         "request_data": request.model_dump(),
         "proposal_payload": None,
+        "error_message": None,
         "agent_trace": [
             f"[Order Planning Agent Initialized] Processing build '{request.build_name}' (Reservation {request.reservation_id})."
         ],
@@ -220,8 +228,16 @@ Please execute:
         final_state = ORDER_PLANNING_GRAPH.invoke(initial_state)
         proposal_dict = final_state.get("proposal_payload")
         trace = final_state.get("agent_trace", [])
+        err_msg = final_state.get("error_message")
 
-        # Fallback extraction from messages if create_order_proposal tool was called earlier
+        if err_msg:
+            return OrderProposalResponse(
+                success=False,
+                error=err_msg,
+                agent_trace=trace
+            )
+
+        # Extraction from messages if create_order_proposal tool was called earlier
         if not proposal_dict:
             for msg in reversed(final_state["messages"]):
                 if isinstance(msg, ToolMessage) and msg.name == "create_order_proposal":
@@ -230,46 +246,6 @@ Please execute:
                         break
                     except Exception:
                         pass
-
-        # Fallback to direct allow-listed tool calculation if LLM was unavailable or did not produce proposal
-        if not proposal_dict:
-            trace.append("[Fallback] Calculating order proposal deterministically using allow-listed tools.")
-            price_raw = calculate_pricing.invoke({
-                "components_json": components_payload,
-                "currency": request.currency or "Rs."
-            })
-            pricing_info = json.loads(price_raw)
-            subtotal = float(pricing_info.get("subtotal", 0.0))
-
-            disc_raw = apply_discount.invoke({
-                "promo_code": request.promo_code or "WELCOME5",
-                "subtotal": subtotal,
-                "currency": request.currency or "Rs."
-            })
-            disc_info = json.loads(disc_raw)
-            discount_amount = float(disc_info.get("discount_amount", 0.0))
-
-            deliv_raw = calculate_delivery.invoke({
-                "shipping_method": request.shipping_method or "standard",
-                "address_zone": request.shipping_address or "Colombo",
-                "currency": request.currency or "Rs."
-            })
-            deliv_info = json.loads(deliv_raw)
-            delivery_fee = float(deliv_info.get("delivery_fee", 2500.0))
-
-            net_total = max(0.0, subtotal - discount_amount) + delivery_fee
-
-            prop_raw = create_order_proposal.invoke({
-                "build_name": request.build_name,
-                "reservation_id": request.reservation_id,
-                "subtotal": subtotal,
-                "discount_amount": discount_amount,
-                "delivery_fee": delivery_fee,
-                "total_price": net_total,
-                "promo_code": request.promo_code or "WELCOME5",
-                "currency": request.currency or "Rs."
-            })
-            proposal_dict = json.loads(prop_raw)
 
         # If still no proposal
         if not proposal_dict:

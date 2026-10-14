@@ -103,6 +103,15 @@ def test_get_candidate_components_filter():
     assert all("AM5" in c["socket"] for c in am5_cpus)
 
 
+def _check_build_quota(resp):
+    if not resp.get("success") if isinstance(resp, dict) else not resp.success:
+        err = (resp.get("error") if isinstance(resp, dict) else resp.error) or ""
+        summary = (resp.get("summary") if isinstance(resp, dict) else resp.summary) or ""
+        combined = (err + " " + summary).lower()
+        if "quota" in combined or "resource_exhausted" in combined or "429" in combined:
+            pytest.skip("External Gemini API quota exhausted")
+
+
 # ------------------------------------------------------------------------------
 # 2. Agent Workflow & Clearance Tests
 # ------------------------------------------------------------------------------
@@ -117,6 +126,7 @@ def test_generate_compatible_build_gaming_1440p():
     )
 
     resp = generate_compatible_build(req)
+    _check_build_quota(resp)
     assert resp.success is True
     assert resp.build is not None
 
@@ -153,6 +163,7 @@ def test_generate_compatible_build_high_end_4k():
     )
 
     resp = generate_compatible_build(req)
+    _check_build_quota(resp)
     assert resp.success is True
     b = resp.build
     assert b is not None
@@ -191,6 +202,7 @@ def test_post_build_generate_endpoint():
     response = client.post("/agent/build/generate", json=payload)
     assert response.status_code == 200
     data = response.json()
+    _check_build_quota(data)
     assert data["success"] is True
     assert data["build"]["is_valid"] is True
     assert data["build"]["compatibility"]["all_passed"] is True

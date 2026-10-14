@@ -117,6 +117,8 @@ def test_api_verify_stock_endpoint():
     response = client.post("/agent/inventory/verify-stock", json=payload)
     assert response.status_code == 200
     data = response.json()
+    if not data.get("success") and ("quota" in str(data.get("error", "")).lower() or "resource_exhausted" in str(data.get("error", "")).lower()):
+        pytest.skip("External Gemini API quota exhausted")
 
     assert data["success"] is True
     assert "components" in data

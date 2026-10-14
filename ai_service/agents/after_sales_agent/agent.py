@@ -610,36 +610,12 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
 
     except Exception as e:
         print(f"[run_after_sales_chat] Error: {e}")
-        user_msg = (request.message or "").lower()
-        if "step 5" in user_msg or "5 attempts" in user_msg or "5th attempt" in user_msg:
-            return AfterSalesChatResponse(
-                success=True,
-                reply=clean_chat_formatting(
-                    "We have completed 5 troubleshooting steps and your PC issue is not resolved. "
-                    "I suggest creating a Service Request so one of our service center technicians can inspect and repair your PC in person.\n\n"
-                    "What date and time would you prefer for the service appointment (Monday to Saturday, 9:00 AM to 6:00 PM)?"
-                ),
-                attempt_count=5,
-                service_request_mode=True,
-                service_request_required=True,
-                agent_trace=[f"[Fallback Mode - External LLM Error: {str(e)}"]
-            )
-        if user_requested_sr or "service request" in user_msg or "appointment" in user_msg or "stop chatting" in user_msg:
-            return AfterSalesChatResponse(
-                success=True,
-                reply=clean_chat_formatting(
-                    "Understood. We will stop troubleshooting here and set up a Service Request for our technicians to inspect your system.\n\n"
-                    "What date and time would you prefer for the service appointment (Monday to Saturday, 9:00 AM to 6:00 PM)?"
-                ),
-                service_request_mode=True,
-                service_request_required=True,
-                agent_trace=[f"[Fallback Mode - External LLM Error: {str(e)}"]
-            )
         return AfterSalesChatResponse(
-            success=True,
-            reply=clean_chat_formatting(
-                "I am here to help troubleshoot your PC. Please check that all cables and power connections are securely seated.\n\n"
-                "If you would like to schedule an in-person technician appointment instead, just let me know or say 'Create Service Request'."
-            ),
-            agent_trace=[f"[Fallback Mode - External LLM Error: {str(e)}"]
+            success=False,
+            reply="The AI service is currently experiencing high demand or quota limits. Please try again shortly.",
+            attempt_count=0,
+            attempted_steps=[],
+            service_request_mode=False,
+            service_request_required=False,
+            agent_trace=[f"[Error - External LLM Error: {str(e)}"]
         )

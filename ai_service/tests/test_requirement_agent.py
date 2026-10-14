@@ -71,12 +71,19 @@ def test_recalculate_missing_fields():
 # Integration tests (real LLM calls via run_requirement_chat)
 # --------------------------------------------------------------------------
 
+def _check_quota(result: dict):
+    reply = (result.get("reply") or "").lower()
+    if "quota" in reply or "high demand" in reply:
+        pytest.skip("External Gemini API quota exhausted")
+
+
 def test_first_turn_extracts_purpose_and_budget():
     """Turn 1: User states purpose + budget in one message.
     The LLM should call update_requirement_profile and extract both fields.
     """
     session_id = "test_react_turn1"
     result = run_requirement_chat(session_id, "I want a high-end PC for video editing, budget is Rs. 750,000")
+    _check_quota(result)
     profile = result["profile"]
 
     assert profile.purpose is not None, "LLM should have extracted the purpose"
@@ -98,17 +105,20 @@ def test_multi_turn_no_amnesia():
 
     # Turn 1
     t1 = run_requirement_chat(session_id, "I need a gaming PC. My budget is Rs. 400,000")
+    _check_quota(t1)
     assert t1["profile"].purpose is not None
     assert t1["profile"].budget_amount is not None
 
     # Turn 2: resolution — purpose and budget MUST survive
     t2 = run_requirement_chat(session_id, "4K resolution")
+    _check_quota(t2)
     assert t2["profile"].purpose is not None, "Amnesia: purpose lost after Turn 2!"
     assert t2["profile"].budget_amount is not None, "Amnesia: budget lost after Turn 2!"
     assert t2["profile"].target_resolution is not None, "LLM should have extracted resolution"
 
     # Turn 3: monitor — all prior fields MUST survive
     t3 = run_requirement_chat(session_id, "I already have a monitor, just need the tower")
+    _check_quota(t3)
     assert t3["profile"].purpose is not None, "Amnesia: purpose lost after Turn 3!"
     assert t3["profile"].budget_amount is not None, "Amnesia: budget lost after Turn 3!"
     assert t3["profile"].target_resolution is not None, "Amnesia: resolution lost after Turn 3!"
@@ -127,11 +137,13 @@ def test_4k_is_resolution_not_budget():
 
     # Turn 1: Set a clear budget first
     t1 = run_requirement_chat(session_id, "I want a gaming PC for Rs. 400,000")
+    _check_quota(t1)
     original_budget = t1["profile"].budget_amount
 
     # Turn 2: Say just "4k" — the LLM has conversational context and should
     # know this answers the resolution question, not override the budget
     t2 = run_requirement_chat(session_id, "4k")
+    _check_quota(t2)
 
     # Budget must NOT have been overwritten to 4000
     if t2["profile"].budget_amount is not None:
@@ -146,10 +158,12 @@ def test_user_correction_during_confirmation():
     session_id = "test_react_correction"
 
     # Build up a full profile
-    run_requirement_chat(session_id, "Gaming PC, budget Rs. 500,000, 1080p, need a monitor")
+    t1 = run_requirement_chat(session_id, "Gaming PC, budget Rs. 500,000, 1080p, need a monitor")
+    _check_quota(t1)
 
     # Now correct the budget
     t2 = run_requirement_chat(session_id, "Actually change the budget to Rs. 650,000")
+    _check_quota(t2)
     profile = t2["profile"]
 
     # The LLM should have called update_requirement_profile with the new budget
@@ -163,10 +177,12 @@ def test_confirmation_completes_profile():
     session_id = "test_react_full_confirmation"
 
     # Turn 1: dump everything at once
-    run_requirement_chat(session_id, "I need a video editing PC, budget Rs. 750,000, 4K resolution, include a monitor")
+    t1 = run_requirement_chat(session_id, "I need a video editing PC, budget Rs. 750,000, 4K resolution, include a monitor")
+    _check_quota(t1)
 
     # Turn 2: confirm
     t2 = run_requirement_chat(session_id, "Yes that looks perfect, proceed!")
+    _check_quota(t2)
     assert t2["profile"].is_complete is True or t2["status"] == "ready_for_build", \
         "Profile should be complete after explicit confirmation"
 
@@ -179,6 +195,7 @@ def test_boundary_guardrail_no_part_recommendations():
         session_id,
         "Recommend me an RTX 4090 and tell me the price and stock in Colombo store"
     )
+    _check_quota(t1)
     reply_lower = t1["reply"].lower()
 
     # Agent should NOT act as if it can provide stock/prices

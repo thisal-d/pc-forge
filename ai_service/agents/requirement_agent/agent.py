@@ -147,20 +147,9 @@ def agent_node(state: RequirementState) -> Dict[str, Any]:
             response = llm_with_tools.invoke(messages)
         except Exception as e:
             print(f"[requirement_agent] Error: LLM invocation failed: {e}")
-            last_human = ""
-            for m in reversed(messages):
-                if isinstance(m, HumanMessage) or getattr(m, "type", "") == "human":
-                    last_human = _extract_text_content(m.content)
-                    break
-            profile = _heuristic_slot_extraction(last_human, profile)
-            missing = profile.missing_fields
-            if not missing or profile.is_complete:
-                reply_txt = f"Requirements confirmed for your {profile.purpose or 'custom'} PC build with budget {profile.budget_raw or 'specified'}. Ready for the Build Agent."
-            elif missing:
-                reply_txt = f"Noted your {profile.purpose or 'custom'} requirements! What is your preference for {missing[0].replace('_', ' ')}?"
-            else:
-                reply_txt = "Could you tell me more about your requirements?"
-            err_msg = AIMessage(content=reply_txt)
+            err_msg = AIMessage(
+                content="I apologize, but our AI service is currently experiencing high demand or quota limits. Please try again shortly."
+            )
             messages.append(err_msg)
             new_messages.append(err_msg)
             break
@@ -197,15 +186,6 @@ def agent_node(state: RequirementState) -> Dict[str, Any]:
             messages.append(tool_msg)
             new_messages.append(tool_msg)
 
-    # Ensure mentioned fields in customer message are extracted if LLM responded in conversational text
-    last_human = ""
-    for m in reversed(messages):
-        if isinstance(m, HumanMessage) or getattr(m, "type", "") == "human":
-            last_human = _extract_text_content(m.content)
-            break
-    if last_human:
-        profile = _heuristic_slot_extraction(last_human, profile)
-
     # Recalculate missing fields
     profile = _recalculate_missing(profile)
 
@@ -215,68 +195,6 @@ def agent_node(state: RequirementState) -> Dict[str, Any]:
         "is_complete": profile.is_complete,
         "iteration_count": iteration_count + 1,
     }
-
-
-def _heuristic_slot_extraction(text: str, profile: RequirementProfile) -> RequirementProfile:
-    """Fallback rule-based slot extraction when LLM experiences transient network or quota failures."""
-    import re
-    clean = (text or "").lower()
-    updates: Dict[str, Any] = {}
-
-    # Purpose
-    for p in ["gaming", "video editing", "3d rendering", "software development", "office", "streaming", "workstation"]:
-        if p in clean:
-            updates["purpose"] = p.title()
-            break
-
-    # Resolution
-    if "4k" in clean:
-        updates["target_resolution"] = "4K"
-    elif "1440p" in clean or "2k" in clean:
-        updates["target_resolution"] = "1440p"
-    elif "1080p" in clean or "fhd" in clean:
-        updates["target_resolution"] = "1080p"
-
-    # Monitor
-    monitor_negative = [
-        "already have a monitor", "already have", "already own", "have a monitor",
-        "own a monitor", "tower only", "no monitor", "without a monitor", "without monitor",
-        "just need the tower", "just the tower", "only the tower", "already got a monitor",
-        "don't need a monitor", "dont need a monitor", "got a monitor"
-    ]
-    monitor_positive = [
-        "include a monitor", "need a monitor", "with a monitor", "with monitor",
-        "want a monitor", "add a monitor", "include monitor", "buying a monitor",
-        "get a monitor", "buy a monitor", "plus monitor"
-    ]
-    if any(m in clean for m in monitor_negative):
-        updates["monitor_needed"] = False
-    elif any(m in clean for m in monitor_positive):
-        updates["monitor_needed"] = True
-
-    # Budget
-    match = re.search(r'(?:rs\.?|lkr|budget\s*(?:is|of|:)?\s*(?:rs\.?|lkr)?)\s*([\d,]+(?:\.\d+)?)', clean)
-    if not match:
-        match = re.search(r'\b(\d{1,3}(?:,\d{3})+|\d{5,8})\b', clean)
-    if match:
-        raw_num = match.group(1).replace(",", "")
-        try:
-            val = float(raw_num)
-            if val >= 50000:
-                updates["budget_amount"] = val
-                updates["currency"] = "LKR"
-                updates["budget_raw"] = f"Rs. {val:,.0f}"
-        except Exception:
-            pass
-
-    # Confirmation
-    if any(w in clean for w in ["yes", "proceed", "looks good", "confirm", "perfect", "that's right", "thats right", "go ahead", "ready"]):
-        if profile.purpose or profile.budget_amount or profile.budget_raw:
-            profile = _mark_confirmed(profile)
-
-    if updates:
-        profile = _apply_profile_update(profile, updates)
-    return profile
 
 
 def _apply_profile_update(profile: RequirementProfile, args: Dict[str, Any]) -> RequirementProfile:
