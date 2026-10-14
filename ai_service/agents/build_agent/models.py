@@ -72,7 +72,7 @@ class BuildGenerationRequest(BaseModel):
     session_id: Optional[str] = Field(default=None, description="Optional requirement session ID")
     purpose: str = Field(default="Gaming", description="Customer's primary PC workload")
     budget_amount: float = Field(default=400000.0, description="Target budget amount")
-    currency: str = Field(default="LKR", description="Budget currency (e.g. LKR or USD)")
+    currency: str = Field(default="LKR", description="Budget currency (e.g. LKR)")
     target_resolution: str = Field(default="1440p", description="Target resolution")
     preferences: List[str] = Field(default_factory=list, description="Customer preferences (e.g. RGB, WiFi, Silent)")
     catalog: Optional[List[Dict[str, Any]]] = Field(default=None, description="Catalog products passed as context from ASP.NET Core")

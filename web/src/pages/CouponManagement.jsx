@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { couponService } from '../services/couponService.js';
 import { Pagination } from '../components/common/Pagination.jsx';
 import { TableSkeleton } from '../components/common/TableSkeleton.jsx';
+import { CloseIcon } from '../components/icons/index.js';
 import '../styles/pages/coupons.css';
 
 export const CouponManagement = () => {
@@ -38,27 +39,46 @@ export const CouponManagement = () => {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Toast
-  const [toast, setToast] = useState(null);
+  // Notification & Load Error State
+  const [notification, setNotification] = useState(null);
+  const [loadError, setLoadError] = useState(null);
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
+  const showNotification = (arg1, arg2 = 'success') => {
+    let type = 'success';
+    let message = '';
+    if (['success', 'error', 'info', 'warning'].includes(arg1)) {
+      type = arg1;
+      message = arg2;
+    } else if (['success', 'error', 'info', 'warning'].includes(arg2)) {
+      type = arg2;
+      message = arg1;
+    } else {
+      message = arg1 || 'Notification';
+    }
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 4500);
   };
+  const showToast = showNotification;
 
   // Load coupons from backend
   const loadCoupons = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
+    setLoadError(null);
 
     try {
       const data = await couponService.getCoupons({
         search: searchQuery,
       });
-      setCoupons(data);
+      setCoupons(Array.isArray(data) ? data : []);
+      if (isRefresh) {
+        showNotification('success', 'Coupons refreshed successfully.');
+      }
     } catch (err) {
       console.error('Failed to load coupons:', err);
-      showToast('Failed to load coupons from backend.', 'error');
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to load coupons from backend.';
+      setLoadError(errMsg);
+      showNotification('error', `Failed to load coupons from backend: ${errMsg}`);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -77,8 +97,10 @@ export const CouponManagement = () => {
   // Filtered and sorted coupons
   const filteredCoupons = useMemo(() => {
     const list = coupons.filter((c) => {
+      if (!c) return false;
+      const cType = (c.discountType || 'PERCENTAGE').toUpperCase();
       // Type filter
-      if (typeFilter !== 'all' && c.discountType.toUpperCase() !== typeFilter.toUpperCase()) {
+      if (typeFilter !== 'all' && cType !== typeFilter.toUpperCase()) {
         return false;
       }
       // Status filter
@@ -88,8 +110,8 @@ export const CouponManagement = () => {
       // Search query (client filter for instant reactivity)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const codeMatch = c.code.toLowerCase().includes(q);
-        const descMatch = c.description.toLowerCase().includes(q);
+        const codeMatch = (c.code || '').toLowerCase().includes(q);
+        const descMatch = (c.description || '').toLowerCase().includes(q);
         if (!codeMatch && !descMatch) return false;
       }
 
@@ -97,8 +119,8 @@ export const CouponManagement = () => {
     });
 
     return [...list].sort((a, b) => {
-      if (sortBy === 'code-asc') return a.code.localeCompare(b.code);
-      if (sortBy === 'code-desc') return b.code.localeCompare(a.code);
+      if (sortBy === 'code-asc') return (a.code || '').localeCompare(b.code || '');
+      if (sortBy === 'code-desc') return (b.code || '').localeCompare(a.code || '');
       if (sortBy === 'discount-desc') return (Number(b.discountValue) || 0) - (Number(a.discountValue) || 0);
       if (sortBy === 'discount-asc') return (Number(a.discountValue) || 0) - (Number(b.discountValue) || 0);
       return 0;
@@ -114,9 +136,9 @@ export const CouponManagement = () => {
   // KPIs
   const kpis = useMemo(() => {
     const total = coupons.length;
-    const active = coupons.filter((c) => c.isActive).length;
+    const active = coupons.filter((c) => Boolean(c?.isActive)).length;
     const inactive = total - active;
-    const percentageCount = coupons.filter((c) => c.discountType.toUpperCase() === 'PERCENTAGE').length;
+    const percentageCount = coupons.filter((c) => (c?.discountType || '').toUpperCase() === 'PERCENTAGE').length;
     return { total, active, inactive, percentageCount };
   }, [coupons]);
 
@@ -159,17 +181,38 @@ export const CouponManagement = () => {
     e.preventDefault();
     setFormError('');
 
-    if (!formData.code.trim()) {
+    const codeClean = formData.code.trim().toUpperCase();
+    if (!codeClean) {
       setFormError('Coupon code is required.');
       return;
     }
+    if (codeClean.length < 3) {
+      setFormError('Coupon code must be at least 3 characters long.');
+      return;
+    }
+    if (!/^[A-Z0-9_-]+$/.test(codeClean)) {
+      setFormError('Coupon code can only contain uppercase letters, numbers, hyphens, and underscores.');
+      return;
+    }
     if (!formData.description.trim()) {
-      setFormError('Description is required.');
+      setFormError('Campaign description is required.');
       return;
     }
     const val = parseFloat(formData.discountValue);
     if (isNaN(val) || val <= 0) {
       setFormError('Discount value must be greater than 0.');
+      return;
+    }
+    if (formData.discountType === 'PERCENTAGE' && val > 100) {
+      setFormError('Percentage discount cannot exceed 100%.');
+      return;
+    }
+    if (formData.minSubtotal && parseFloat(formData.minSubtotal) < 0) {
+      setFormError('Minimum subtotal cannot be negative.');
+      return;
+    }
+    if (formData.maxDiscount && parseFloat(formData.maxDiscount) <= 0) {
+      setFormError('Maximum discount cap must be greater than 0.');
       return;
     }
 
@@ -188,10 +231,10 @@ export const CouponManagement = () => {
 
       if (isEditing && currentCoupon) {
         await couponService.updateCoupon(currentCoupon.couponId, payload);
-        showToast(`Coupon "${payload.code}" updated successfully!`);
+        showNotification('success', `Coupon "${payload.code}" updated successfully.`);
       } else {
         await couponService.createCoupon(payload);
-        showToast(`Coupon "${payload.code}" created and live in PostgreSQL!`);
+        showNotification('success', `Coupon "${payload.code}" created successfully.`);
       }
 
       setIsModalOpen(false);
@@ -210,11 +253,12 @@ export const CouponManagement = () => {
       setCoupons((prev) =>
         prev.map((c) => (c.couponId === coupon.couponId ? { ...c, isActive: updated.isActive } : c))
       );
-      showToast(
-        `Coupon "${coupon.code}" is now ${updated.isActive ? 'Active' : 'Inactive'}.`
+      showNotification(
+        'success',
+        `Coupon "${coupon.code}" status set to ${updated.isActive ? 'Active' : 'Inactive'}.`
       );
     } catch (err) {
-      showToast(err.message || 'Failed to toggle coupon status.', 'error');
+      showNotification('error', err.message || 'Failed to toggle coupon status.');
     }
   };
 
@@ -225,19 +269,19 @@ export const CouponManagement = () => {
     try {
       await couponService.deleteCoupon(deleteCandidate.couponId);
       setCoupons((prev) => prev.filter((c) => c.couponId !== deleteCandidate.couponId));
-      showToast(`Coupon "${deleteCandidate.code}" deleted.`);
+      showNotification('success', `Coupon "${deleteCandidate.code}" deleted successfully.`);
       setDeleteCandidate(null);
     } catch (err) {
-      showToast(err.message || 'Failed to delete coupon.', 'error');
+      showNotification('error', err.message || 'Failed to delete coupon.');
     }
   };
 
   return (
     <div className="coupons-page">
       {/* Toast Notification */}
-      {toast && (
-        <div className={`coupons-toast ${toast.type}`}>
-          <span>{toast.message}</span>
+      {notification && (
+        <div className={`coupons-toast ${notification.type}`}>
+          <span>{notification.message}</span>
         </div>
       )}
 
@@ -269,6 +313,22 @@ export const CouponManagement = () => {
           </button>
         </div>
       </div>
+
+      {/* Standard Notification Banner */}
+      {notification && (
+        <div className={`notification-banner alert alert-${notification.type === 'error' ? 'error' : 'success'}`}>
+          <span>{notification.message}</span>
+          <button
+            type="button"
+            onClick={() => setNotification(null)}
+            className="clear-search-btn"
+            style={{ position: 'static', marginLeft: 'auto' }}
+            aria-label="Dismiss notification"
+          >
+            <CloseIcon size={14} />
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="coupons-kpi-grid">
@@ -356,7 +416,7 @@ export const CouponManagement = () => {
           >
             <option value="all">All Discount Types</option>
             <option value="PERCENTAGE">Percentage (%)</option>
-            <option value="FLAT">Flat Amount (LKR)</option>
+            <option value="FLAT">Flat Amount (Rs.)</option>
           </select>
 
           <select
@@ -409,28 +469,52 @@ export const CouponManagement = () => {
               <tbody>
                 <tr>
                   <td colSpan="7" style={{ padding: 0 }}>
-                    <div className="empty-state">
-                      <div className="empty-state-icon">
-                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-                          <line x1="7" y1="7" x2="7.01" y2="7" />
-                        </svg>
+                    {loadError ? (
+                      <div className="empty-state error-state" style={{ padding: '40px 24px', textAlign: 'center' }}>
+                        <div className="empty-state-icon" style={{ color: '#ef4444', marginBottom: '12px' }}>
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                          </svg>
+                        </div>
+                        <h4 style={{ color: '#991b1b', marginBottom: '6px' }}>Failed to load coupons from backend</h4>
+                        <p style={{ color: '#64748b', maxWidth: '440px', margin: '0 auto 16px', fontSize: '13px' }}>
+                          {loadError}. Please verify that the backend API server is running on port 5000 and try again.
+                        </p>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => loadCoupons(true)}
+                          disabled={refreshing}
+                        >
+                          {refreshing ? 'Retrying...' : 'Retry Connection'}
+                        </button>
                       </div>
-                      <h4>No coupons found</h4>
-                      <p>Try clearing your filters or create a new coupon.</p>
-                      <button
-                        type="button"
-                        className="btn btn-outline-sm"
-                        onClick={() => {
-                          setSearchQuery('');
-                          setTypeFilter('all');
-                          setStatusFilter('all');
-                          setSortBy('code-asc');
-                        }}
-                      >
-                        Clear Filters
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="empty-state">
+                        <div className="empty-state-icon">
+                          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                            <line x1="7" y1="7" x2="7.01" y2="7" />
+                          </svg>
+                        </div>
+                        <h4>No coupons found</h4>
+                        <p>Try clearing your filters or create a new coupon.</p>
+                        <button
+                          type="button"
+                          className="btn btn-outline-sm"
+                          onClick={() => {
+                            setSearchQuery('');
+                            setTypeFilter('all');
+                            setStatusFilter('all');
+                            setSortBy('code-asc');
+                          }}
+                        >
+                          Clear Filters
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               </tbody>
@@ -447,24 +531,24 @@ export const CouponManagement = () => {
                       <div style={{ fontWeight: 600, color: '#0f172a' }}>{coupon.description}</div>
                     </td>
                     <td>
-                      {coupon.discountType.toUpperCase() === 'PERCENTAGE' ? (
+                      {(coupon.discountType || 'PERCENTAGE').toUpperCase() === 'PERCENTAGE' ? (
                         <span className="discount-rate-badge percentage">
                           {coupon.discountValue}% OFF
                         </span>
                       ) : (
                         <span className="discount-rate-badge flat">
-                          LKR {Number(coupon.discountValue).toLocaleString()} FLAT
+                          Rs. {Number(coupon.discountValue).toLocaleString()} FLAT
                         </span>
                       )}
                     </td>
                     <td>
                       {coupon.minSubtotal && Number(coupon.minSubtotal) > 0
-                        ? `LKR ${Number(coupon.minSubtotal).toLocaleString()}`
-                        : 'None (LKR 0)'}
+                        ? `Rs. ${Number(coupon.minSubtotal).toLocaleString()}`
+                        : 'None (Rs. 0)'}
                     </td>
                     <td>
                       {coupon.maxDiscount && Number(coupon.maxDiscount) > 0
-                        ? `LKR ${Number(coupon.maxDiscount).toLocaleString()}`
+                        ? `Rs. ${Number(coupon.maxDiscount).toLocaleString()}`
                         : 'No Limit'}
                     </td>
                     <td>
@@ -582,13 +666,13 @@ export const CouponManagement = () => {
                       onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
                     >
                       <option value="PERCENTAGE">Percentage (%)</option>
-                      <option value="FLAT">Flat Amount (LKR)</option>
+                      <option value="FLAT">Flat Amount (Rs.)</option>
                     </select>
                   </div>
 
                   <div className="form-group">
                     <label className="form-label">
-                      {formData.discountType === 'PERCENTAGE' ? 'Discount Percentage (%)' : 'Discount Amount (LKR)'}
+                      {formData.discountType === 'PERCENTAGE' ? 'Discount Percentage (%)' : 'Discount Amount (Rs.)'}
                     </label>
                     <input
                       type="number"
@@ -604,7 +688,7 @@ export const CouponManagement = () => {
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">Min Subtotal (LKR)</label>
+                    <label className="form-label">Min Subtotal (Rs.)</label>
                     <input
                       type="number"
                       step="1"
@@ -617,7 +701,7 @@ export const CouponManagement = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Max Discount Cap (LKR)</label>
+                    <label className="form-label">Max Discount Cap (Rs.)</label>
                     <input
                       type="number"
                       step="1"
@@ -648,12 +732,12 @@ export const CouponManagement = () => {
                   <div className="receipt-preview-title">Receipt Preview (UI 4 Simulation)</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569' }}>
                     <span>Subtotal (example):</span>
-                    <span>LKR 150,000</span>
+                    <span>Rs. 150,000</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#059669', fontWeight: 700, marginTop: '4px' }}>
                     <span>Discount ({formData.code || 'CODE'}):</span>
                     <span>
-                      - LKR{' '}
+                      - Rs.{' '}
                       {formData.discountType === 'PERCENTAGE'
                         ? Math.min(
                             Math.round(150000 * ((parseFloat(formData.discountValue) || 0) / 100)),

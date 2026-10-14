@@ -86,22 +86,22 @@ def fetch_live_products() -> List[Dict[str, Any]]:
 
 
 DEFAULT_CATALOG: List[Dict[str, Any]] = [
-    {"product_id": 1, "name": "AMD Ryzen 5 7600X", "category": "CPU", "brand": "AMD", "model": "7600X", "price": 229.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 105, "form_factor": None},
-    {"product_id": 2, "name": "Intel Core i5-13600K", "category": "CPU", "brand": "Intel", "model": "13600K", "price": 299.0, "socket": "LGA1700", "memory_type": "DDR5", "power_wattage": 125, "form_factor": None},
-    {"product_id": 3, "name": "MSI B650 Gaming Plus WiFi", "category": "Motherboard", "brand": "MSI", "model": "B650", "price": 179.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 50, "form_factor": "ATX"},
-    {"product_id": 4, "name": "ASUS TUF Gaming B760-PLUS", "category": "Motherboard", "brand": "ASUS", "model": "B760", "price": 189.0, "socket": "LGA1700", "memory_type": "DDR5", "power_wattage": 50, "form_factor": "ATX"},
-    {"product_id": 5, "name": "Corsair Vengeance 32GB (2x16GB) DDR5 6000MHz", "category": "RAM", "brand": "Corsair", "model": "Vengeance", "price": 115.0, "socket": None, "memory_type": "DDR5", "power_wattage": 15, "form_factor": "DIMM"},
-    {"product_id": 6, "name": "Kingston Fury Beast 16GB (2x8GB) DDR5 5200MHz", "category": "RAM", "brand": "Kingston", "model": "Fury", "price": 65.0, "socket": None, "memory_type": "DDR5", "power_wattage": 15, "form_factor": "DIMM"},
-    {"product_id": 8, "name": "NVIDIA GeForce RTX 4070 Ti 12GB", "category": "GPU", "brand": "NVIDIA", "model": "RTX 4070 Ti", "price": 799.0, "socket": None, "memory_type": "GDDR6X", "power_wattage": 285, "form_factor": None},
-    {"product_id": 9, "name": "AMD Radeon RX 7800 XT 16GB", "category": "GPU", "brand": "AMD", "model": "RX 7800 XT", "price": 499.0, "socket": None, "memory_type": "GDDR6", "power_wattage": 263, "form_factor": None},
-    {"product_id": 10, "name": "Corsair RM750e 750W 80+ Gold Fully Modular", "category": "PSU", "brand": "Corsair", "model": "RM750e", "price": 99.0, "socket": None, "memory_type": None, "power_wattage": 750, "form_factor": "ATX"},
-    {"product_id": 11, "name": "Samsung 980 Pro 1TB NVMe PCIe 4.0 SSD", "category": "Storage", "brand": "Samsung", "model": "980 Pro", "price": 89.0, "socket": None, "memory_type": None, "power_wattage": 10, "form_factor": "M.2 2280"},
-    {"product_id": 12, "name": "NZXT H5 Flow ATX Mid-Tower Case", "category": "Case", "brand": "NZXT", "model": "H5 Flow", "price": 89.0, "socket": None, "memory_type": None, "power_wattage": 0, "form_factor": "ATX"},
-    {"product_id": 13, "name": "DeepCool AK620 High-Performance CPU Air Cooler", "category": "Cooler", "brand": "DeepCool", "model": "AK620", "price": 65.0, "socket": "AM5 / LGA1700", "memory_type": None, "power_wattage": 5, "form_factor": None},
-    {"product_id": 14, "name": "AMD Ryzen 9 7950X", "category": "CPU", "brand": "AMD", "model": "7950X", "price": 699.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 170, "form_factor": None},
-    {"product_id": 15, "name": "ASUS ROG Strix RTX 4090 24GB", "category": "GPU", "brand": "ASUS", "model": "RTX 4090", "price": 1599.0, "socket": None, "memory_type": "GDDR6X", "power_wattage": 450, "form_factor": None},
-    {"product_id": 16, "name": "Corsair RM850x 850W 80+ Gold Fully Modular", "category": "PSU", "brand": "Corsair", "model": "RM850x", "price": 139.0, "socket": None, "memory_type": None, "power_wattage": 850, "form_factor": "ATX"},
-    {"product_id": 17, "name": "Corsair RM1000x 1000W 80+ Gold Fully Modular", "category": "PSU", "brand": "Corsair", "model": "RM1000x", "price": 189.0, "socket": None, "memory_type": None, "power_wattage": 1000, "form_factor": "ATX"},
+    {"product_id": 1, "name": "AMD Ryzen 7 7800X3D", "category": "CPU", "brand": "AMD", "model": "7800X3D", "price": 145000.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 120, "form_factor": None},
+    {"product_id": 3, "name": "AMD Ryzen 5 7600X", "category": "CPU", "brand": "AMD", "model": "7600X", "price": 69000.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 105, "form_factor": None},
+    {"product_id": 4, "name": "Intel Core i7-14700K", "category": "CPU", "brand": "Intel", "model": "14700K", "price": 128000.0, "socket": "LGA1700", "memory_type": "DDR5", "power_wattage": 253, "form_factor": None},
+    {"product_id": 11, "name": "MSI MAG B650 Tomahawk WiFi", "category": "Motherboard", "brand": "MSI", "model": "B650", "price": 68000.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 50, "form_factor": "ATX"},
+    {"product_id": 13, "name": "ASUS TUF Gaming Z790-Plus WiFi", "category": "Motherboard", "brand": "ASUS", "model": "Z790", "price": 79000.0, "socket": "LGA1700", "memory_type": "DDR5", "power_wattage": 50, "form_factor": "ATX"},
+    {"product_id": 16, "name": "Corsair Vengeance RGB 32GB (2x16GB) DDR5 6000MHz", "category": "RAM", "brand": "Corsair", "model": "Vengeance", "price": 36000.0, "socket": None, "memory_type": "DDR5", "power_wattage": 15, "form_factor": "DIMM"},
+    {"product_id": 15, "name": "G.Skill Trident Z5 RGB 32GB (2x16GB) DDR5 6000MHz", "category": "RAM", "brand": "G.Skill", "model": "Trident Z5", "price": 38000.0, "socket": None, "memory_type": "DDR5", "power_wattage": 15, "form_factor": "DIMM"},
+    {"product_id": 8, "name": "Gigabyte GeForce RTX 4070 Ti Super 16GB", "category": "GPU", "brand": "Gigabyte", "model": "RTX 4070 Ti Super", "price": 265000.0, "socket": None, "memory_type": "GDDR6X", "power_wattage": 285, "form_factor": None},
+    {"product_id": 9, "name": "ASUS Dual GeForce RTX 4060 Ti 8GB", "category": "GPU", "brand": "ASUS", "model": "RTX 4060 Ti", "price": 129000.0, "socket": None, "memory_type": "GDDR6", "power_wattage": 160, "form_factor": None},
+    {"product_id": 18, "name": "Corsair RM850x 850W 80+ Gold Fully Modular", "category": "PSU", "brand": "Corsair", "model": "RM850x", "price": 45000.0, "socket": None, "memory_type": None, "power_wattage": 850, "form_factor": "ATX"},
+    {"product_id": 21, "name": "Samsung 990 PRO 2TB PCIe 4.0 NVMe SSD", "category": "Storage", "brand": "Samsung", "model": "990 Pro", "price": 55000.0, "socket": None, "memory_type": None, "power_wattage": 10, "form_factor": "M.2 2280"},
+    {"product_id": 24, "name": "Fractal Design North Mid Tower Case", "category": "Case", "brand": "Fractal Design", "model": "North", "price": 46000.0, "socket": None, "memory_type": None, "power_wattage": 0, "form_factor": "ATX"},
+    {"product_id": 26, "name": "Thermalright Peerless Assassin 120 SE Air Cooler", "category": "Cooler", "brand": "Thermalright", "model": "PA120-SE", "price": 12000.0, "socket": "AM5 / LGA1700", "memory_type": None, "power_wattage": 5, "form_factor": None},
+    {"product_id": 2, "name": "AMD Ryzen 9 7950X", "category": "CPU", "brand": "AMD", "model": "7950X", "price": 175000.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 170, "form_factor": None},
+    {"product_id": 6, "name": "ASUS ROG Strix RTX 4090 24GB", "category": "GPU", "brand": "ASUS", "model": "RTX 4090", "price": 580000.0, "socket": None, "memory_type": "GDDR6X", "power_wattage": 450, "form_factor": None},
+    {"product_id": 19, "name": "Seasonic Focus GX-1000 1000W 80+ Gold", "category": "PSU", "brand": "Seasonic", "model": "GX-1000", "price": 58000.0, "socket": None, "memory_type": None, "power_wattage": 1000, "form_factor": "ATX"},
 ]
 
 
@@ -120,7 +120,7 @@ def get_candidate_components(
     Use this tool to find options for CPU, Motherboard, RAM, GPU, PSU, Storage, Case, and Cooler.
     Args:
         category: Hardware category ('CPU', 'GPU', 'Motherboard', 'RAM', 'PSU', 'Storage', 'Case', 'Cooler').
-        max_price: Maximum allowed unit price in USD/LKR equivalent.
+        max_price: Maximum allowed unit price in LKR.
         socket: Optional socket constraint (e.g. 'AM5' or 'LGA1700').
         memory_type: Optional memory standard (e.g. 'DDR5' or 'DDR4').
     Returns:
@@ -268,18 +268,18 @@ def check_case_fit(motherboard_form_factor: str, case_form_factor: str) -> str:
     Returns:
         JSON string with 'compatible' boolean and clearance details.
     """
-    mb_ff = (motherboard_form_factor or "ATX").strip().upper()
-    cs_ff = (case_form_factor or "ATX").strip().upper()
+    def _rank(ff_str: str) -> int:
+        s = str(ff_str or "ATX").upper()
+        if "MINI" in s:
+            return 1
+        if "MICRO" in s or "M-ATX" in s or "MATX" in s:
+            return 2
+        if "E-ATX" in s or "EATX" in s:
+            return 4
+        return 3
 
-    hierarchy = {
-        "MINI-ITX": 1,
-        "MICRO-ATX": 2,
-        "ATX": 3,
-        "E-ATX": 4
-    }
-
-    mb_rank = hierarchy.get(mb_ff, 3)
-    cs_rank = hierarchy.get(cs_ff, 3)
+    mb_rank = _rank(motherboard_form_factor)
+    cs_rank = _rank(case_form_factor)
 
     is_fit = mb_rank <= cs_rank
     details = (

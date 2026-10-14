@@ -30,7 +30,7 @@ def test_chat_and_session_endpoints():
     session_id = "test_http_session_react"
     res = client.post(
         "/agent/requirements/chat",
-        json={"session_id": session_id, "message": "I want a video editing PC for $2500"}
+        json={"session_id": session_id, "message": "I want a video editing PC for Rs. 750,000"}
     )
     assert res.status_code == 200
     data = res.json()

@@ -63,15 +63,52 @@ public class CouponsController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves a single coupon by ID.
+    /// Retrieves a single coupon by numeric ID or uppercase voucher code.
     /// </summary>
-    [HttpGet("{id}")]
-    public async Task<ActionResult<CouponDto>> GetCouponById(int id)
+    [HttpGet("{identifier}")]
+    public async Task<ActionResult<CouponDto>> GetCoupon(string identifier)
     {
-        var coupon = await _context.Coupons.AsNoTracking().FirstOrDefaultAsync(c => c.CouponId == id);
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            return BadRequest(new { message = "Coupon identifier cannot be empty." });
+        }
+
+        Coupon? coupon = null;
+        if (int.TryParse(identifier, out var id))
+        {
+            coupon = await _context.Coupons.AsNoTracking().FirstOrDefaultAsync(c => c.CouponId == id);
+        }
+
         if (coupon == null)
         {
-            return NotFound(new { message = $"Coupon #{id} not found." });
+            var clean = identifier.Trim().ToUpper();
+            coupon = await _context.Coupons.AsNoTracking().FirstOrDefaultAsync(c => c.Code == clean);
+        }
+
+        if (coupon == null)
+        {
+            return NotFound(new { message = $"Coupon '{identifier}' not found." });
+        }
+
+        return Ok(MapToDto(coupon));
+    }
+
+    /// <summary>
+    /// Quick validation endpoint for customer checkout / order planning.
+    /// </summary>
+    [HttpGet("validate/{code}")]
+    public async Task<ActionResult<CouponDto>> ValidateCoupon(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return BadRequest(new { message = "Promo code is required." });
+        }
+
+        var clean = code.Trim().ToUpper();
+        var coupon = await _context.Coupons.AsNoTracking().FirstOrDefaultAsync(c => c.Code == clean && c.IsActive);
+        if (coupon == null)
+        {
+            return NotFound(new { message = $"Coupon '{clean}' is invalid or expired." });
         }
 
         return Ok(MapToDto(coupon));
@@ -114,7 +151,7 @@ public class CouponsController : ControllerBase
 
         _logger.LogInformation("New coupon created: {Code} ({Type} {Value})", coupon.Code, coupon.DiscountType, coupon.DiscountValue);
 
-        return CreatedAtAction(nameof(GetCouponById), new { id = coupon.CouponId }, MapToDto(coupon));
+        return CreatedAtAction(nameof(GetCoupon), new { identifier = coupon.CouponId.ToString() }, MapToDto(coupon));
     }
 
     /// <summary>

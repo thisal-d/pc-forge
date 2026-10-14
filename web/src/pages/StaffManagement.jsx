@@ -235,8 +235,8 @@ export const StaffManagement = () => {
     if (modalMode === 'add') {
       if (!formData.password) {
         errors.password = 'Account password is required.';
-      } else if (formData.password.length < 6) {
-        errors.password = 'Password must be at least 6 characters long.';
+      } else if (formData.password.length < 8) {
+        errors.password = 'Password must be at least 8 characters long.';
       }
 
       if (!formData.confirmPassword) {
@@ -305,8 +305,8 @@ export const StaffManagement = () => {
 
     if (!resetPasswordData.password) {
       errors.password = 'New password is required.';
-    } else if (resetPasswordData.password.length < 6) {
-      errors.password = 'New password must be at least 6 characters long.';
+    } else if (resetPasswordData.password.length < 8) {
+      errors.password = 'New password must be at least 8 characters long.';
     }
 
     if (!resetPasswordData.confirmPassword) {

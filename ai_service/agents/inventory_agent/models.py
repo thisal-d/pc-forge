@@ -32,7 +32,7 @@ class ComponentStockStatus(BaseModel):
     name: str = Field(..., description="Product name")
     category: str = Field(..., description="Component category")
     brand: str = Field("", description="Manufacturer brand")
-    price: float = Field(0.0, description="Unit price in USD/LKR")
+    price: float = Field(0.0, description="Unit price in LKR")
     stock_quantity: int = Field(..., description="Current warehouse shelf count in PostgreSQL")
     status: str = Field(
         ...,

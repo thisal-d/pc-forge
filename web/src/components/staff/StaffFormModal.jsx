@@ -138,7 +138,7 @@ export const StaffFormModal = ({
                   <input
                     id="staff-password"
                     type="password"
-                    placeholder="Min. 6 characters"
+                    placeholder="Min. 8 characters"
                     value={formData.password}
                     onChange={(e) => onFormChange('password', e.target.value)}
                     className={formErrors.password ? 'input-error' : ''}

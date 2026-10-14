@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from ai_service.agents.requirement_agent.models import RequirementProfile
 from ai_service.config import get_llm
+from ai_service.guardrails import SYSTEM_SECURITY_RULES, sanitize_and_delimit, validate_runtime_safety
 
 
 # ------------------------------------------------------------------------------
@@ -53,7 +54,7 @@ YOUR JOB:
 Gather the customer's PC requirements through natural, warm conversation.
 You must discover ALL of these before presenting a summary:
   1. Purpose / Workload (Gaming, Video Editing, 3D Rendering, Office, Software Development, etc.)
-  2. Budget (amount and currency, e.g., Rs. 400,000 or $2500)
+  2. Budget (amount and currency, e.g., Rs. 400,000 or 400,000 LKR)
   3. Target Display Resolution (1080p, 1440p, 4K)
   4. Monitor Requirement (need a new monitor included, or already own one / tower only)
   5. Any special preferences (RGB, silent build, white aesthetic, compact ITX, peripherals, etc.)
@@ -62,20 +63,16 @@ RULES:
 - Ask at most ONE focused question per turn. Never overwhelm with multiple questions.
 - NEVER repeat your opening greeting once the conversation is underway.
 - Keep responses warm, concise — 1 to 3 sentences maximum.
-- When you learn new requirement info from the customer's message, call the \
-`update_requirement_profile` tool with the fields you extracted. \
-You can call it with only the fields mentioned — omit fields you don't know yet.
-- When you need to correct a previously set field (customer says "actually my budget is X"), \
-call the tool again with the corrected value.
-- Once ALL required fields are gathered, present a bullet-point summary and ask the customer \
-to confirm. Only call `confirm_requirements` after the customer explicitly agrees.
+- When you learn new requirement info from the customer's message, call `update_requirement_profile` with the fields you extracted.
+- When you need to correct a previously set field (e.g. customer says "actually my budget is X"), call `update_requirement_profile` with the corrected value.
+- Once ALL required fields are gathered, present a bullet-point summary and ask the customer to confirm. Call `confirm_requirements` once the customer agrees.
 
 BOUNDARIES (Least-Privilege — Lecture 07):
 - You have NO access to product catalogs, stock inventory, or component prices.
 - Do NOT recommend specific parts (e.g., "RTX 4070", "Ryzen 9") — that is the Build Agent's job.
 - If asked about specific parts or stock, politely explain you need their general requirements \
 first, then the Build and Inventory teams will handle part selection.
-"""
+""" + "\n\n" + SYSTEM_SECURITY_RULES
 
 MAX_AGENT_ITERATIONS = 8  # Hard iteration cap (Lecture 07 Slide 122)
 
@@ -97,8 +94,8 @@ def update_requirement_profile(
     """Update the customer's PC requirement profile with newly discovered or corrected fields.
     Call this whenever the customer mentions their purpose, budget, resolution, monitor needs,
     or preferences. Only include the fields that were mentioned or changed — omit the rest.
-    For budget: set budget_amount as a plain number (e.g., 400000), currency as 'LKR' or 'USD',
-    and budget_raw as the original text (e.g., 'Rs. 400,000').
+    For budget: set budget_amount as a plain number (e.g., 400000), currency as 'LKR',
+    and budget_raw as the original text (e.g., 'Rs. 400,000' or '400k LKR').
     For resolution: use '1080p', '1440p', or '4K'.
     """
     # This function body is executed by our code (Lab 05 Task 02 pattern).
@@ -194,7 +191,20 @@ def agent_node(state: RequirementState) -> Dict[str, Any]:
             response = llm_with_tools.invoke(messages)
         except Exception as e:
             print(f"[requirement_agent] Error: LLM invocation failed: {e}")
-            err_msg = AIMessage(content=f"AI Agent Error: Failed to generate response from model ({e}).")
+            last_human = ""
+            for m in reversed(messages):
+                if isinstance(m, HumanMessage) or getattr(m, "type", "") == "human":
+                    last_human = _extract_text_content(m.content)
+                    break
+            profile = _heuristic_slot_extraction(last_human, profile)
+            missing = profile.missing_fields
+            if not missing or profile.is_complete:
+                reply_txt = f"Requirements confirmed for your {profile.purpose or 'custom'} PC build with budget {profile.budget_raw or 'specified'}. Ready for the Build Agent."
+            elif missing:
+                reply_txt = f"Noted your {profile.purpose or 'custom'} requirements! What is your preference for {missing[0].replace('_', ' ')}?"
+            else:
+                reply_txt = "Could you tell me more about your requirements?"
+            err_msg = AIMessage(content=reply_txt)
             messages.append(err_msg)
             new_messages.append(err_msg)
             break
@@ -231,6 +241,15 @@ def agent_node(state: RequirementState) -> Dict[str, Any]:
             messages.append(tool_msg)
             new_messages.append(tool_msg)
 
+    # Ensure mentioned fields in customer message are extracted if LLM responded in conversational text
+    last_human = ""
+    for m in reversed(messages):
+        if isinstance(m, HumanMessage) or getattr(m, "type", "") == "human":
+            last_human = _extract_text_content(m.content)
+            break
+    if last_human:
+        profile = _heuristic_slot_extraction(last_human, profile)
+
     # Recalculate missing fields
     profile = _recalculate_missing(profile)
 
@@ -242,9 +261,68 @@ def agent_node(state: RequirementState) -> Dict[str, Any]:
     }
 
 
-# ------------------------------------------------------------------------------
-# 6. Profile update helpers
-# ------------------------------------------------------------------------------
+def _heuristic_slot_extraction(text: str, profile: RequirementProfile) -> RequirementProfile:
+    """Fallback rule-based slot extraction when LLM experiences transient network or quota failures."""
+    import re
+    clean = (text or "").lower()
+    updates: Dict[str, Any] = {}
+
+    # Purpose
+    for p in ["gaming", "video editing", "3d rendering", "software development", "office", "streaming", "workstation"]:
+        if p in clean:
+            updates["purpose"] = p.title()
+            break
+
+    # Resolution
+    if "4k" in clean:
+        updates["target_resolution"] = "4K"
+    elif "1440p" in clean or "2k" in clean:
+        updates["target_resolution"] = "1440p"
+    elif "1080p" in clean or "fhd" in clean:
+        updates["target_resolution"] = "1080p"
+
+    # Monitor
+    monitor_negative = [
+        "already have a monitor", "already have", "already own", "have a monitor",
+        "own a monitor", "tower only", "no monitor", "without a monitor", "without monitor",
+        "just need the tower", "just the tower", "only the tower", "already got a monitor",
+        "don't need a monitor", "dont need a monitor", "got a monitor"
+    ]
+    monitor_positive = [
+        "include a monitor", "need a monitor", "with a monitor", "with monitor",
+        "want a monitor", "add a monitor", "include monitor", "buying a monitor",
+        "get a monitor", "buy a monitor", "plus monitor"
+    ]
+    if any(m in clean for m in monitor_negative):
+        updates["monitor_needed"] = False
+    elif any(m in clean for m in monitor_positive):
+        updates["monitor_needed"] = True
+
+    # Budget
+    match = re.search(r'(?:rs\.?|lkr|budget\s*(?:is|of|:)?\s*(?:rs\.?|lkr)?)\s*([\d,]+(?:\.\d+)?)', clean)
+    if not match:
+        match = re.search(r'\b(\d{1,3}(?:,\d{3})+|\d{5,8})\b', clean)
+    if match:
+        raw_num = match.group(1).replace(",", "")
+        try:
+            val = float(raw_num)
+            if val >= 50000:
+                updates["budget_amount"] = val
+                updates["currency"] = "LKR"
+                updates["budget_raw"] = f"Rs. {val:,.0f}"
+        except Exception:
+            pass
+
+    # Confirmation
+    if any(w in clean for w in ["yes", "proceed", "looks good", "confirm", "perfect", "that's right", "thats right", "go ahead", "ready"]):
+        if profile.purpose or profile.budget_amount or profile.budget_raw:
+            profile = _mark_confirmed(profile)
+
+    if updates:
+        profile = _apply_profile_update(profile, updates)
+    return profile
+
+
 def _apply_profile_update(profile: RequirementProfile, args: Dict[str, Any]) -> RequirementProfile:
     """Non-destructively merge tool call args into the existing profile.
     Only fields explicitly provided in args are updated.
@@ -344,9 +422,12 @@ def run_requirement_chat(session_id: str, message: str) -> Dict[str, Any]:
     """
     config = {"configurable": {"thread_id": session_id}}
 
-    # Input: just the new HumanMessage. The checkpointer restores prior messages.
+    # Defense Layer 2: Delimit untrusted input & neutralize delimiter breakouts (Lab 07 Part 5)
+    delimited_message = sanitize_and_delimit(message, tag="user_input")
+
+    # Input: delimited HumanMessage. The checkpointer restores prior messages.
     inputs = {
-        "messages": [HumanMessage(content=message)],
+        "messages": [HumanMessage(content=delimited_message)],
     }
 
     final_state = REQUIREMENT_GRAPH.invoke(inputs, config)
@@ -364,6 +445,11 @@ def run_requirement_chat(session_id: str, message: str) -> Dict[str, Any]:
                 last_ai_msg = text
                 break
 
+    # Defense Layer 1: Deterministic runtime safety filter (Lab 07 Part 5)
+    is_safe, validated_reply = validate_runtime_safety(last_ai_msg)
+    if not is_safe:
+        last_ai_msg = validated_reply
+
     return {
         "session_id": session_id,
         "reply": last_ai_msg,
@@ -371,3 +457,4 @@ def run_requirement_chat(session_id: str, message: str) -> Dict[str, Any]:
         "is_complete": profile.is_complete,
         "status": "ready_for_build" if profile.is_complete else "gathering",
     }
+

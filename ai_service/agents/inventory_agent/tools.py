@@ -161,7 +161,7 @@ def find_compatible_substitute(
         failed_product_id: ID of the out-of-stock product to replace.
         socket: Physical socket requirement (e.g. 'AM5', 'LGA1700').
         memory_type: Memory standard requirement (e.g. 'DDR5', 'DDR4').
-        max_price: Maximum allowed unit price in USD.
+        max_price: Maximum allowed unit price in LKR.
     Returns:
         JSON string list of in-stock substitute components.
     """

@@ -269,5 +269,24 @@ def after_sales_chat_endpoint(request: AfterSalesChatRequest):
         raise HTTPException(status_code=500, detail=f"After-Sales Agent error: {str(e)}")
 
 
+from pydantic import BaseModel
+from ai_service.guardrails import run_injection_drill
+
+
+class InjectionDrillRequest(BaseModel):
+    mode: str = "defended"  # "naive" | "defended" | "least_privilege"
+    custom_payload: Optional[str] = None
+
+
+@app.post("/agent/drill")
+def injection_drill_endpoint(request: InjectionDrillRequest):
+    """Executes the Injection Drill from Lab 07 (Part 5) in 'naive', 'defended', or 'least_privilege' mode."""
+    try:
+        return run_injection_drill(mode=request.mode, custom_payload=request.custom_payload)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Injection drill error: {str(e)}")
+
+
 if __name__ == "__main__":
     uvicorn.run("ai_service.main:app", host=AI_SERVICE_HOST, port=AI_SERVICE_PORT, reload=True)
+

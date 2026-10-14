@@ -88,7 +88,19 @@ builder.Services.AddCors(options =>
             ? configuredOrigins
             : new[] { "http://localhost:5173", "http://localhost:3000" };
 
-        policy.WithOrigins(origins)
+        policy.SetIsOriginAllowed(origin =>
+              {
+                  if (string.IsNullOrWhiteSpace(origin)) return false;
+                  if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                  {
+                      if (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                          uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                      {
+                          return true;
+                      }
+                  }
+                  return origins != null && origins.Contains(origin, StringComparer.OrdinalIgnoreCase);
+              })
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

@@ -29,6 +29,7 @@ from ai_service.agents.inventory_agent.tools import (
     reserve_stock,
 )
 from ai_service.config import get_llm
+from ai_service.guardrails import SYSTEM_SECURITY_RULES
 
 MAX_INVENTORY_ITERATIONS = 8
 TOOLS_MAP = {t.name: t for t in INVENTORY_TOOLS}
@@ -57,22 +58,22 @@ INVENTORY_SYSTEM_PROMPT = """\
 You are the Inventory Agent (Member 02) for PCForge, an automated warehouse logistics and stock specialist.
 
 YOUR MISSION:
-1. Inspect the real-time shelf inventory for all hardware components in the customer's build using `get_stock_level(product_id)`.
+1. Inspect the real-time shelf inventory for all hardware components in the customer's build using your inventory tools.
 2. Evaluate stock quantity for each part:
-   - If stock_quantity > 5: Mark as 'IN_STOCK'.
-   - If 1 <= stock_quantity <= 5: Mark as 'LOW_STOCK' (e.g. 'Low — 2 left').
-   - If stock_quantity == 0: It is OUT OF STOCK.
-3. If ANY component is OUT OF STOCK:
-   - DO NOT fail the build outright!
-   - Call `find_compatible_substitute` to search for in-stock alternatives in the same category matching socket/memory.
-   - Pick the best substitute and swap it into the build.
-4. Once all parts are verified in stock (or substituted), call `reserve_stock` to place a temporary 15-minute reservation hold.
+   - stock_quantity > 5: In Stock.
+   - 1 <= stock_quantity <= 5: Low Stock.
+   - stock_quantity == 0: Out of Stock.
+3. If ANY component is out of stock:
+   - Do NOT fail the build outright.
+   - Search for compatible in-stock substitutes within the same category matching socket and memory standards.
+   - Select the best substitute and swap it into the build.
+4. Once all parts are verified in stock (or substituted), place a temporary 15-minute reservation hold.
 5. Provide a clear summary of warehouse availability and any substitutions made.
 
 BOUNDARIES (Least Privilege — Lecture 07):
 - You do NOT change motherboard sockets or memory standards without verifying compatibility.
 - You do NOT apply discount vouchers, calculate shipping, or process payments — that belongs to Member 04.
-"""
+""" + "\n\n" + SYSTEM_SECURITY_RULES
 
 
 # ------------------------------------------------------------------------------
@@ -94,7 +95,14 @@ def agent_reasoning_node(state: InventoryAgentState) -> Dict[str, Any]:
         }
 
     llm_with_tools = llm.bind_tools(INVENTORY_TOOLS)
-    response = llm_with_tools.invoke(state["messages"])
+    try:
+        response = llm_with_tools.invoke(state["messages"])
+    except Exception as e:
+        steps.append(f"[Member 02 Fallback] LLM invocation encountered network issue ({str(e)[:100]}); proceeding with deterministic warehouse check.")
+        return {
+            "iteration_count": it_count,
+            "trace_steps": steps
+        }
 
     if hasattr(response, "tool_calls") and response.tool_calls:
         tool_names = [tc["name"] for tc in response.tool_calls]

@@ -55,7 +55,7 @@ def test_find_compatible_substitute_tool():
         "category": "CPU",
         "failed_product_id": 99999,
         "socket": "AM5",
-        "max_price": 500.0,
+        "max_price": 200000.0,
     })
     candidates = json.loads(result_str)
 

@@ -22,6 +22,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
 from ai_service.config import get_llm
+from ai_service.guardrails import SYSTEM_SECURITY_RULES, sanitize_and_delimit
 from ai_service.agents.order_planning_agent.models import (
     OrderPlanningRequest,
     OrderPricingItem,
@@ -45,19 +46,19 @@ SYSTEM_PROMPT = """You are Member 04 (Order Planning Agent) of the PCForge Multi
 Your mission is to take an approved, stock-verified PC build from Member 02 (Inventory Agent) and produce a full, transparent order proposal matching Screen UI 4.
 
 YOUR RESPONSIBILITIES:
-1. Examine the 8 components provided in the customer's build.
-2. Call `calculate_pricing` to compute the subtotal and itemized line items.
-3. If a promo code was provided (or default 'WELCOME5'), call `apply_discount` to calculate the discount amount.
-4. Call `calculate_delivery` with the requested shipping method to determine freight logistics and timeframe.
-5. Compute the final total: Subtotal - Discount + Delivery Fee.
-6. Call `create_order_proposal` with the calculated values to produce the formal proposal holding status 'WAITING_FOR_APPROVAL'.
+1. Examine the components provided in the customer's build.
+2. Calculate itemized pricing and subtotal using your pricing calculation tools.
+3. If a promo voucher is provided (e.g. 'WELCOME5'), evaluate the discount.
+4. Calculate delivery freight logistics and timeframe for the chosen shipping method.
+5. Create the formal order proposal holding status 'WAITING_FOR_APPROVAL'.
 
 STRICT RULES & CONSTRAINTS:
 - You CANNOT select, swap, or replace hardware components (that was Member 03 and Member 02's job).
 - You CANNOT process payments or charge customer credit cards.
 - The order status MUST be 'WAITING_FOR_APPROVAL'.
 - Ensure all numbers reconcile correctly before submitting the proposal.
-"""
+""" + "\n\n" + SYSTEM_SECURITY_RULES
+
 
 
 class OrderPlanningState(TypedDict):
@@ -86,7 +87,14 @@ def agent_reasoning_node(state: OrderPlanningState) -> Dict:
         }
 
     order_planner_llm = llm_instance.bind_tools(ORDER_PLANNING_TOOLS)
-    response = order_planner_llm.invoke(messages)
+    try:
+        response = order_planner_llm.invoke(messages)
+    except Exception as e:
+        trace.append(f"[Warning] LLM call failed ({str(e)[:120]}); falling back to deterministic tool execution.")
+        return {
+            "agent_trace": trace,
+            "iteration_count": iteration,
+        }
 
     if response.tool_calls:
         for tc in response.tool_calls:
@@ -183,17 +191,20 @@ ORDER_PLANNING_GRAPH = build_order_planning_graph()
 def generate_order_proposal(request: OrderPlanningRequest) -> OrderProposalResponse:
     """Public execution entry point for Member 04 Order Planning Agent."""
     order_planning_context_var.set({"coupons": request.coupons or []})
-    components_payload = json.dumps(request.components)
-    initial_user_prompt = f"""Please price and generate a customer order proposal for the following stock-confirmed PC build:
-Build Name: {request.build_name}
-Warehouse Reservation ID: {request.reservation_id}
-Promo Code: {request.promo_code or 'WELCOME5'}
-Shipping Method: {request.shipping_method or 'standard'}
-Shipping Address: {request.shipping_address or 'Colombo, Western Province'}
-Currency: {request.currency or 'Rs.'}
+    components_payload = json.dumps(request.components, indent=2) if request.components else "{}"
+    raw_order_details = (
+        f"Build Name: {request.build_name}\n"
+        f"Warehouse Reservation ID: {request.reservation_id}\n"
+        f"Promo Code: {request.promo_code or 'WELCOME5'}\n"
+        f"Shipping Method: {request.shipping_method or 'standard'}\n"
+        f"Shipping Address: {request.shipping_address or 'Colombo, Western Province'}\n"
+        f"Currency: {request.currency or 'Rs.'}\n\n"
+        f"Components Data:\n{components_payload}"
+    )
+    delimited_details = sanitize_and_delimit(raw_order_details, tag="order_request")
 
-Components Data:
-{components_payload}
+    initial_user_prompt = f"""Please price and generate a customer order proposal for the following stock-confirmed PC build:
+{delimited_details}
 
 Please execute:
 1. `calculate_pricing` to compute the subtotal.
@@ -201,6 +212,7 @@ Please execute:
 3. `calculate_delivery` for shipping method '{request.shipping_method or 'standard'}'.
 4. Calculate net total and call `create_order_proposal`.
 """
+
 
     initial_messages = [
         SystemMessage(content=SYSTEM_PROMPT),
@@ -232,7 +244,47 @@ Please execute:
                     except Exception:
                         pass
 
-        # If LLM did not produce a valid proposal
+        # Fallback to direct allow-listed tool calculation if LLM was unavailable or did not produce proposal
+        if not proposal_dict:
+            trace.append("[Fallback] Calculating order proposal deterministically using allow-listed tools.")
+            price_raw = calculate_pricing.invoke({
+                "components_json": components_payload,
+                "currency": request.currency or "Rs."
+            })
+            pricing_info = json.loads(price_raw)
+            subtotal = float(pricing_info.get("subtotal", 0.0))
+
+            disc_raw = apply_discount.invoke({
+                "promo_code": request.promo_code or "WELCOME5",
+                "subtotal": subtotal,
+                "currency": request.currency or "Rs."
+            })
+            disc_info = json.loads(disc_raw)
+            discount_amount = float(disc_info.get("discount_amount", 0.0))
+
+            deliv_raw = calculate_delivery.invoke({
+                "shipping_method": request.shipping_method or "standard",
+                "address_zone": request.shipping_address or "Colombo",
+                "currency": request.currency or "Rs."
+            })
+            deliv_info = json.loads(deliv_raw)
+            delivery_fee = float(deliv_info.get("delivery_fee", 2500.0))
+
+            net_total = max(0.0, subtotal - discount_amount) + delivery_fee
+
+            prop_raw = create_order_proposal.invoke({
+                "build_name": request.build_name,
+                "reservation_id": request.reservation_id,
+                "subtotal": subtotal,
+                "discount_amount": discount_amount,
+                "delivery_fee": delivery_fee,
+                "total_price": net_total,
+                "promo_code": request.promo_code or "WELCOME5",
+                "currency": request.currency or "Rs."
+            })
+            proposal_dict = json.loads(prop_raw)
+
+        # If still no proposal
         if not proposal_dict:
             return OrderProposalResponse(
                 success=False,

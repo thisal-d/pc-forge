@@ -76,13 +76,13 @@ def test_first_turn_extracts_purpose_and_budget():
     The LLM should call update_requirement_profile and extract both fields.
     """
     session_id = "test_react_turn1"
-    result = run_requirement_chat(session_id, "I want a high-end PC for video editing, budget is $2500")
+    result = run_requirement_chat(session_id, "I want a high-end PC for video editing, budget is Rs. 750,000")
     profile = result["profile"]
 
     assert profile.purpose is not None, "LLM should have extracted the purpose"
     assert "edit" in profile.purpose.lower() or "video" in profile.purpose.lower()
     assert profile.budget_amount is not None, "LLM should have extracted the budget"
-    assert profile.budget_amount >= 2000  # Should be ~2500
+    assert profile.budget_amount >= 500000  # Should be ~750000
     assert result["is_complete"] is False
     assert result["status"] == "gathering"
 
@@ -146,16 +146,16 @@ def test_user_correction_during_confirmation():
     session_id = "test_react_correction"
 
     # Build up a full profile
-    run_requirement_chat(session_id, "Gaming PC, budget $2000, 1080p, need a monitor")
+    run_requirement_chat(session_id, "Gaming PC, budget Rs. 500,000, 1080p, need a monitor")
 
     # Now correct the budget
-    t2 = run_requirement_chat(session_id, "Actually change the budget to $3000")
+    t2 = run_requirement_chat(session_id, "Actually change the budget to Rs. 650,000")
     profile = t2["profile"]
 
     # The LLM should have called update_requirement_profile with the new budget
     if profile.budget_amount is not None:
-        assert profile.budget_amount >= 2500, \
-            f"Correction failed: budget is {profile.budget_amount}, expected ~3000"
+        assert profile.budget_amount >= 500000, \
+            f"Correction failed: budget is {profile.budget_amount}, expected ~650000"
 
 
 def test_confirmation_completes_profile():
@@ -163,7 +163,7 @@ def test_confirmation_completes_profile():
     session_id = "test_react_full_confirmation"
 
     # Turn 1: dump everything at once
-    run_requirement_chat(session_id, "I need a video editing PC, budget $2500, 4K resolution, include a monitor")
+    run_requirement_chat(session_id, "I need a video editing PC, budget Rs. 750,000, 4K resolution, include a monitor")
 
     # Turn 2: confirm
     t2 = run_requirement_chat(session_id, "Yes that looks perfect, proceed!")
@@ -199,7 +199,7 @@ def test_checkpointer_state_persistence():
     """
     import os
     session_id = "test_react_checkpointer"
-    run_requirement_chat(session_id, "Video editing PC for $3000")
+    run_requirement_chat(session_id, "Video editing PC for Rs. 850,000")
 
     config = {"configurable": {"thread_id": session_id}}
     snapshot = REQUIREMENT_GRAPH.get_state(config)

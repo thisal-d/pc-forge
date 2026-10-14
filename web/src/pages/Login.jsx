@@ -17,10 +17,31 @@ export const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const emailTrim = email.trim();
+    if (!emailTrim) {
+      setError('Email address is required.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailTrim)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!password) {
+      setError('Password is required.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      await login(email, password);
+      await login(emailTrim, password);
       navigate(from, { replace: true });
     } catch (err) {
       const msg = err.response?.data?.message || 'Login failed. Please verify your credentials.';

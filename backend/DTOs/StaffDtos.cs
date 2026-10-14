@@ -16,7 +16,7 @@ public class CreateStaffDto
     [EmailAddress]
     public string Email { get; set; } = string.Empty;
 
-    [MinLength(6)]
+    [MinLength(8, ErrorMessage = "Password must be at least 8 characters long.")]
     public string? Password { get; set; }
 
     [Required]
@@ -79,7 +79,7 @@ public class StaffResponseDto
 
 public class ResetStaffPasswordDto
 {
-    [Required]
-    [MinLength(6)]
+    [Required(ErrorMessage = "New password is required.")]
+    [MinLength(8, ErrorMessage = "New password must be at least 8 characters long.")]
     public string NewPassword { get; set; } = string.Empty;
 }

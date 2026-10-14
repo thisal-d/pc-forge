@@ -147,8 +147,8 @@ def test_generate_compatible_build_high_end_4k():
     """Verifies high-end 4K build selection and wattage headroom."""
     req = BuildGenerationRequest(
         purpose="3D Rendering & 4K Gaming",
-        budget_amount=3500.0,
-        currency="USD",
+        budget_amount=1200000.0,
+        currency="LKR",
         target_resolution="4K",
         preferences=["Liquid Cooling"]
     )
@@ -184,8 +184,8 @@ def test_post_build_generate_endpoint():
     """Verify POST /agent/build/generate executes and returns ValidatedBuild."""
     payload = {
         "purpose": "Esports Gaming",
-        "budget_amount": 1500.0,
-        "currency": "USD",
+        "budget_amount": 450000.0,
+        "currency": "LKR",
         "target_resolution": "1440p",
         "preferences": ["Fast NVMe"]
     }
