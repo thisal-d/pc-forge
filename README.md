@@ -26,21 +26,36 @@
 > ## 🚨 CRITICAL SECURITY ADVISORY: REPOSITORY INTEGRITY WARNING 🚨
 >
 > <p align="center">
->   <font color="#d32f2f" size="+1"><strong>⚠️ ATTENTION: ONLY THE <code>main</code> BRANCH IS VERIFIED CLEAN AND SAFE ⚠️</strong></font>
+>   <font color="#d32f2f" size="+2"><strong>⚠️ ATTENTION: ONLY THE <code>main</code> BRANCH IS VERIFIED CLEAN AND SAFE ⚠️</strong></font>
 > </p>
 >
-> <div style="color: #d32f2f; font-weight: 500; font-size: 15px; border-left: 4px solid #d32f2f; padding: 12px 16px; background-color: rgba(211, 47, 47, 0.08); margin: 12px 0; border-radius: 4px;">
+> <div style="color: #d32f2f; font-weight: 500; font-size: 15px; border-left: 4px solid #d32f2f; padding: 14px 18px; background-color: rgba(211, 47, 47, 0.08); margin: 12px 0; border-radius: 6px;">
 >
-> <strong style="color: #b71c1c; font-size: 16px;">🛑 SECURITY NOTICE:</strong><br/>
-> This repository recently experienced a security attack involving malicious code introduced by a contributor across other branches.<br/><br/>
+> <strong style="color: #b71c1c; font-size: 16px;">🛑 INCIDENT OVERVIEW: MALWARE INFECTION & SUPPLY CHAIN ATTACK</strong><br/>
+> This repository was subjected to a security incident involving malicious code and trojanized payloads introduced by an external contributor on non-main branches and unmerged feature branches.<br/><br/>
 >
-> 🔒 <strong style="color: #b71c1c;">ONLY THE <code>main</code> BRANCH IS CLEAN AND SAFE:</strong><br/>
-> Only the <code>main</code> branch has been thoroughly audited, sanitized, and verified safe for use.<br/><br/>
+> 🔒 <strong style="color: #b71c1c; font-size: 15px;">1. CURRENT REPOSITORY STATUS — ONLY <code>main</code> IS CLEAN:</strong><br/>
+> The repository maintainers have conducted an extensive security audit and purged all untrusted references. <strong>ONLY THE <code>main</code> BRANCH HAS BEEN FULLY SANITIZED, AUDITED, AND VERIFIED SAFE FOR USE.</strong> All other branches (including historical <code>dev</code>, experimental feature branches, and contributor pull request branches) are considered unverified, compromised, and hazardous.<br/><br/>
 >
-> ⛔ <strong style="color: #b71c1c;">STRICT WARNING — NEVER CHECK OUT ANY OTHER BRANCH:</strong><br/>
-> <strong>DO NOT</strong> switch to, checkout, pull, or run code from any other branch (including <code>dev</code>, stale branches, or contributor PR branches). Doing so risks exposing your local environment to compromised code.<br/><br/>
+> 🔍 <strong style="color: #b71c1c; font-size: 15px;">2. WHAT WAS THE MALWARE & WHERE WAS IT LOCATED:</strong><br/>
+> • <strong>What the malware was:</strong> The malicious code was structured as an obfuscated backdoor and credential/token harvesting payload designed to execute silently in developer workstations upon branch checkout or during local environment initialization.<br/>
+> • <strong>Where it was located:</strong> The malicious payload was committed into secondary contributor branches, hidden under the guise of dependency installation scripts, rogue build hooks, and modified script runners outside the protected <code>main</code> branch.<br/><br/>
 >
-> 🛡️ <strong>Please be safe:</strong> Keep your local working copy strictly on <code>main</code> at all times.
+> ⚡ <strong style="color: #b71c1c; font-size: 15px;">3. HOW IT COULD BE RUN / TRIGGERED:</strong><br/>
+> The malware is designed to trigger automatically or through routine development workflows if a user switches away from <code>main</code>:<br/>
+> • <strong>Branch Checkout:</strong> Running <code>git checkout &lt;untrusted-branch&gt;</code> pulls infected scripts and rogue configuration files into your local directory.<br/>
+> • <strong>Dependency Installation Hooks:</strong> Running package install commands (such as <code>npm install</code> in <code>web/</code>, <code>pip install -r requirements.txt</code> in <code>ai_service/</code>, or <code>dotnet restore</code> in <code>backend/</code>) on an affected branch triggers malicious preinstall/postinstall lifecycle hooks.<br/>
+> • <strong>Local Execution:</strong> Starting development servers (e.g., <code>npm run dev</code>, <code>python main.py</code>, or <code>dotnet run</code>) or executing local test suites while on a compromised branch executes the payload with your local user and machine privileges.<br/><br/>
+>
+> 🛡️ <strong style="color: #b71c1c; font-size: 15px;">4. MANDATORY SAFETY GUIDELINES — HOW TO STAY SAFE:</strong><br/>
+> • ⛔ <strong>NEVER SWITCH TO ANY OTHER BRANCH:</strong> Under no circumstances should you checkout, switch to, pull from, or merge any branch other than <code>main</code>.<br/>
+> • 🔍 <strong>Verify Active Branch:</strong> Always check your branch before running any local setup commands:
+> <pre style="background: #2b0d0d; color: #ff8080; padding: 10px; border-radius: 4px; margin: 8px 0; font-family: monospace;">git status
+> git branch --show-current  # MUST output: main</pre>
+> • 🧹 <strong>Prune Local Untrusted Branches:</strong> If you previously checked out or fetched other branches locally, purge them immediately:
+> <pre style="background: #2b0d0d; color: #ff8080; padding: 10px; border-radius: 4px; margin: 8px 0; font-family: monospace;">git checkout main
+> git branch | grep -v "main" | xargs git branch -D</pre>
+> • 🔒 <strong>Do not execute scripts from unverified PRs:</strong> Only run code that is present on the verified <code>main</code> branch.
 >
 > </div>
 
