@@ -60,3 +60,4 @@ pubspec.lock
 /Data/knowledge/
 !backend/Data/
 readme-test.md
+.env.deploy
