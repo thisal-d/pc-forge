@@ -37,15 +37,21 @@
 > 🔒 <strong style="color: #b71c1c; font-size: 15px;">1. CURRENT REPOSITORY STATUS — ONLY <code>main</code> IS CLEAN:</strong><br/>
 > The repository maintainers have conducted an extensive security audit and purged all untrusted references. <strong>ONLY THE <code>main</code> BRANCH HAS BEEN FULLY SANITIZED, AUDITED, AND VERIFIED SAFE FOR USE.</strong> All other branches (including historical <code>dev</code>, experimental feature branches, and contributor pull request branches) are considered unverified, compromised, and hazardous.<br/><br/>
 >
-> 🔍 <strong style="color: #b71c1c; font-size: 15px;">2. WHAT WAS THE MALWARE & WHERE WAS IT LOCATED:</strong><br/>
-> • <strong>What the malware was:</strong> The malicious code was structured as an obfuscated backdoor and credential/token harvesting payload designed to execute silently in developer workstations upon branch checkout or during local environment initialization.<br/>
-> • <strong>Where it was located:</strong> The malicious payload was committed into secondary contributor branches, hidden under the guise of dependency installation scripts, rogue build hooks, and modified script runners outside the protected <code>main</code> branch.<br/><br/>
+> 🔍 <strong style="color: #b71c1c; font-size: 15px;">2. WHERE THE MALWARE WAS & COMPROMISED TARGET FILES:</strong><br/>
+> The malicious contributor planted backdoors and execution hooks specifically across three high-impact vectors on untrusted branches:<br/>
+> • 🔤 <strong>The Binary Font File Asset (<code>.ttf</code> / <code>.otf</code> / <code>.woff2</code>):</strong> Used binary steganography to conceal encrypted shellcode inside font metadata tables, evading standard Git diff detection since binary assets bypass text code review.<br/>
+> • 🌐 <strong>The API Client Interceptor (<code>web/src/api/axiosInstance.js</code> / <code>api.js</code>):</strong> Injected backdoor interceptors into Axios HTTP handlers to silently intercept, copy, and exfiltrate user credentials and <code>pcforge_token</code> JWTs to an external server.<br/>
+> • ⚙️ <strong>The Vite Configuration (<code>web/vite.config.js</code>):</strong> Injected malicious Node.js hooks and rogue build plugins that execute arbitrary system commands with full developer machine privileges as soon as <code>npm run dev</code> or <code>npm run build</code> is started.<br/><br/>
 >
 > ⚡ <strong style="color: #b71c1c; font-size: 15px;">3. HOW IT COULD BE RUN / TRIGGERED:</strong><br/>
 > The malware is designed to trigger automatically or through routine development workflows if a user switches away from <code>main</code>:<br/>
-> • <strong>Branch Checkout:</strong> Running <code>git checkout &lt;untrusted-branch&gt;</code> pulls infected scripts and rogue configuration files into your local directory.<br/>
-> • <strong>Dependency Installation Hooks:</strong> Running package install commands (such as <code>npm install</code> in <code>web/</code>, <code>pip install -r requirements.txt</code> in <code>ai_service/</code>, or <code>dotnet restore</code> in <code>backend/</code>) on an affected branch triggers malicious preinstall/postinstall lifecycle hooks.<br/>
-> • <strong>Local Execution:</strong> Starting development servers (e.g., <code>npm run dev</code>, <code>python main.py</code>, or <code>dotnet run</code>) or executing local test suites while on a compromised branch executes the payload with your local user and machine privileges.<br/><br/>
+> • <strong>Branch Checkout:</strong> Running <code>git checkout &lt;untrusted-branch&gt;</code> pulls infected scripts, rogue font loaders, and compromised configs into your local directory.<br/>
+> • <strong>Dependency & Build Invocations:</strong> Running <code>npm install</code>, <code>npm run dev</code>, <code>python main.py</code>, or <code>dotnet run</code> on an affected branch allows <code>vite.config.js</code> and malicious scripts to execute directly in your local shell.<br/>
+> • <strong>Web Authentication:</strong> Logging into the web client while running code from an unverified branch triggers backdoored interceptors in <code>api.js</code>, exfiltrating credentials.<br/><br/>
+>
+> 📄 <strong style="color: #b71c1c; font-size: 15px;">📖 FULL FORENSIC REPORT:</strong><br/>
+> For detailed payload analysis, code diffs, and exact remediation steps, read the dedicated disclosure:  
+> 👉 **[MALWARE_INCIDENT_REPORT.md](MALWARE_INCIDENT_REPORT.md)**<br/><br/>
 >
 > 🛡️ <strong style="color: #b71c1c; font-size: 15px;">4. MANDATORY SAFETY GUIDELINES — HOW TO STAY SAFE:</strong><br/>
 > • ⛔ <strong>NEVER SWITCH TO ANY OTHER BRANCH:</strong> Under no circumstances should you checkout, switch to, pull from, or merge any branch other than <code>main</code>.<br/>
