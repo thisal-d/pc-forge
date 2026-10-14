@@ -22,6 +22,43 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto dto)
     {
+        // 0. Explicit input validation
+        if (string.IsNullOrWhiteSpace(dto.Email) || !dto.Email.Contains('@'))
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "A valid email address is required."
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Password) || dto.Password.Length < 8)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Password must be at least 8 characters long."
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.FirstName) || dto.FirstName.Trim().Length < 2)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "First name must be at least 2 characters."
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.LastName) || dto.LastName.Trim().Length < 2)
+        {
+            return new AuthResponseDto
+            {
+                Success = false,
+                Message = "Last name must be at least 2 characters."
+            };
+        }
+
         // 1. Check if user already exists
         var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
         if (await _context.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail))

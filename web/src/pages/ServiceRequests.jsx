@@ -173,7 +173,23 @@ export const ServiceRequests = () => {
 
   // Handle manual Service Request creation (Simple & optional)
   const handleCreateSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    if (!createData.title || !createData.title.trim()) {
+      showNotification('error', 'Issue title is required.');
+      return;
+    }
+    if (createData.title.trim().length < 3) {
+      showNotification('error', 'Issue title must be at least 3 characters.');
+      return;
+    }
+    if (!createData.description || !createData.description.trim()) {
+      showNotification('error', 'Problem description is required.');
+      return;
+    }
+    if (createData.description.trim().length < 10) {
+      showNotification('error', 'Please provide a more detailed problem description (at least 10 characters).');
+      return;
+    }
 
     if (dateAvailability && !dateAvailability.isAvailable) {
       showNotification(

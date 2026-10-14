@@ -1,6 +1,6 @@
 """
-Tests for the Requirement & Product Discovery Agent (Member 01).
-Uses the real Gemini model to validate the true ReAct agent loop.
+Tests for the Requirement & Product Discovery Agent.
+Validates the ReAct loop and profile extraction.
 """
 import pytest
 from ai_service.agents.requirement_agent.agent import (
@@ -20,7 +20,7 @@ from ai_service.agents.requirement_agent.models import RequirementProfile
 # --------------------------------------------------------------------------
 
 def test_update_requirement_profile_tool_schema():
-    """Verify the tool's docstring and args are correctly exposed (Lab 05 pattern)."""
+    """Verify the tool's docstring and args are correctly exposed."""
     assert update_requirement_profile.name == "update_requirement_profile"
     assert "budget" in update_requirement_profile.description.lower()
     assert "purpose" in update_requirement_profile.description.lower()
@@ -71,18 +71,25 @@ def test_recalculate_missing_fields():
 # Integration tests (real LLM calls via run_requirement_chat)
 # --------------------------------------------------------------------------
 
+def _check_quota(result: dict):
+    reply = (result.get("reply") or "").lower()
+    if "quota" in reply or "high demand" in reply:
+        pytest.skip("External Gemini API quota exhausted")
+
+
 def test_first_turn_extracts_purpose_and_budget():
     """Turn 1: User states purpose + budget in one message.
     The LLM should call update_requirement_profile and extract both fields.
     """
     session_id = "test_react_turn1"
-    result = run_requirement_chat(session_id, "I want a high-end PC for video editing, budget is $2500")
+    result = run_requirement_chat(session_id, "I want a high-end PC for video editing, budget is Rs. 750,000")
+    _check_quota(result)
     profile = result["profile"]
 
     assert profile.purpose is not None, "LLM should have extracted the purpose"
     assert "edit" in profile.purpose.lower() or "video" in profile.purpose.lower()
     assert profile.budget_amount is not None, "LLM should have extracted the budget"
-    assert profile.budget_amount >= 2000  # Should be ~2500
+    assert profile.budget_amount >= 500000  # Should be ~750000
     assert result["is_complete"] is False
     assert result["status"] == "gathering"
 
@@ -98,17 +105,20 @@ def test_multi_turn_no_amnesia():
 
     # Turn 1
     t1 = run_requirement_chat(session_id, "I need a gaming PC. My budget is Rs. 400,000")
+    _check_quota(t1)
     assert t1["profile"].purpose is not None
     assert t1["profile"].budget_amount is not None
 
     # Turn 2: resolution — purpose and budget MUST survive
     t2 = run_requirement_chat(session_id, "4K resolution")
+    _check_quota(t2)
     assert t2["profile"].purpose is not None, "Amnesia: purpose lost after Turn 2!"
     assert t2["profile"].budget_amount is not None, "Amnesia: budget lost after Turn 2!"
     assert t2["profile"].target_resolution is not None, "LLM should have extracted resolution"
 
     # Turn 3: monitor — all prior fields MUST survive
     t3 = run_requirement_chat(session_id, "I already have a monitor, just need the tower")
+    _check_quota(t3)
     assert t3["profile"].purpose is not None, "Amnesia: purpose lost after Turn 3!"
     assert t3["profile"].budget_amount is not None, "Amnesia: budget lost after Turn 3!"
     assert t3["profile"].target_resolution is not None, "Amnesia: resolution lost after Turn 3!"
@@ -127,11 +137,13 @@ def test_4k_is_resolution_not_budget():
 
     # Turn 1: Set a clear budget first
     t1 = run_requirement_chat(session_id, "I want a gaming PC for Rs. 400,000")
+    _check_quota(t1)
     original_budget = t1["profile"].budget_amount
 
     # Turn 2: Say just "4k" — the LLM has conversational context and should
     # know this answers the resolution question, not override the budget
     t2 = run_requirement_chat(session_id, "4k")
+    _check_quota(t2)
 
     # Budget must NOT have been overwritten to 4000
     if t2["profile"].budget_amount is not None:
@@ -146,16 +158,18 @@ def test_user_correction_during_confirmation():
     session_id = "test_react_correction"
 
     # Build up a full profile
-    run_requirement_chat(session_id, "Gaming PC, budget $2000, 1080p, need a monitor")
+    t1 = run_requirement_chat(session_id, "Gaming PC, budget Rs. 500,000, 1080p, need a monitor")
+    _check_quota(t1)
 
     # Now correct the budget
-    t2 = run_requirement_chat(session_id, "Actually change the budget to $3000")
+    t2 = run_requirement_chat(session_id, "Actually change the budget to Rs. 650,000")
+    _check_quota(t2)
     profile = t2["profile"]
 
     # The LLM should have called update_requirement_profile with the new budget
     if profile.budget_amount is not None:
-        assert profile.budget_amount >= 2500, \
-            f"Correction failed: budget is {profile.budget_amount}, expected ~3000"
+        assert profile.budget_amount >= 500000, \
+            f"Correction failed: budget is {profile.budget_amount}, expected ~650000"
 
 
 def test_confirmation_completes_profile():
@@ -163,10 +177,12 @@ def test_confirmation_completes_profile():
     session_id = "test_react_full_confirmation"
 
     # Turn 1: dump everything at once
-    run_requirement_chat(session_id, "I need a video editing PC, budget $2500, 4K resolution, include a monitor")
+    t1 = run_requirement_chat(session_id, "I need a video editing PC, budget Rs. 750,000, 4K resolution, include a monitor")
+    _check_quota(t1)
 
     # Turn 2: confirm
     t2 = run_requirement_chat(session_id, "Yes that looks perfect, proceed!")
+    _check_quota(t2)
     assert t2["profile"].is_complete is True or t2["status"] == "ready_for_build", \
         "Profile should be complete after explicit confirmation"
 
@@ -179,6 +195,7 @@ def test_boundary_guardrail_no_part_recommendations():
         session_id,
         "Recommend me an RTX 4090 and tell me the price and stock in Colombo store"
     )
+    _check_quota(t1)
     reply_lower = t1["reply"].lower()
 
     # Agent should NOT act as if it can provide stock/prices
@@ -189,17 +206,14 @@ def test_boundary_guardrail_no_part_recommendations():
 
 
 def test_checkpointer_state_persistence():
-    """Verifies that the checkpointer retains state across invocations (Lab 06 pattern).
+    """Verifies that the checkpointer retains state across invocations.
 
-    In CI the GEMINI_API_KEY is a placeholder so the LLM returns a plain text
-    reply instead of a tool call — meaning the profile field may not be
-    populated.  The important invariant is that the checkpointer persisted the
-    graph state (snapshot exists + messages recorded).  Profile extraction is
-    covered by the LLM-skipped integration tests.
+    The important invariant is that the checkpointer persisted the
+    graph state (snapshot exists + messages recorded).
     """
     import os
     session_id = "test_react_checkpointer"
-    run_requirement_chat(session_id, "Video editing PC for $3000")
+    run_requirement_chat(session_id, "Video editing PC for Rs. 850,000")
 
     config = {"configurable": {"thread_id": session_id}}
     snapshot = REQUIREMENT_GRAPH.get_state(config)

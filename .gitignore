@@ -17,6 +17,7 @@ yarn-error.log*
 # Flutter / Dart
 **/.dart_tool/
 **/build/
+contributions.md
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
 **/.pub-cache/
@@ -61,3 +62,4 @@ pubspec.lock
 !backend/Data/
 readme-test.md
 .env.deploy
+test-member/

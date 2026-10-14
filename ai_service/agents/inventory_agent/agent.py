@@ -1,10 +1,7 @@
 """
-Inventory Agent — PCForge (Member 02)
-=====================================
-Architecture:
-  - Lab 05: LLM Tool Binding with INVENTORY_TOOLS (get_stock_level, find_compatible_substitute, reserve_stock)
-  - Lab 06: LangGraph StateGraph with messages reducer and ToolNode routing
-  - Lecture 07: Warehouse least-privilege boundary, out-of-stock substitution, and 15-min reservation
+Inventory Management Agent for PCForge.
+Verifies real-time warehouse stock, resolves component substitutions,
+and places temporary reservation holds for custom PC builds.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -29,14 +26,12 @@ from ai_service.agents.inventory_agent.tools import (
     reserve_stock,
 )
 from ai_service.config import get_llm
+from ai_service.guardrails import SYSTEM_SECURITY_RULES
 
 MAX_INVENTORY_ITERATIONS = 8
 TOOLS_MAP = {t.name: t for t in INVENTORY_TOOLS}
 
 
-# ------------------------------------------------------------------------------
-# 1. State Definition (Lab 06 StateGraph)
-# ------------------------------------------------------------------------------
 class InventoryAgentState(TypedDict):
     """Workflow state for the Inventory Agent."""
     messages: Annotated[list, add_messages]
@@ -48,61 +43,66 @@ class InventoryAgentState(TypedDict):
     is_complete: bool
     summary: str
     trace_steps: List[str]
+    error_message: Optional[str]
 
 
-# ------------------------------------------------------------------------------
-# 2. System Prompt & Persona
-# ------------------------------------------------------------------------------
 INVENTORY_SYSTEM_PROMPT = """\
-You are the Inventory Agent (Member 02) for PCForge, an automated warehouse logistics and stock specialist.
+You are the Inventory Agent for PCForge, an automated warehouse logistics and stock specialist.
 
 YOUR MISSION:
-1. Inspect the real-time shelf inventory for all hardware components in the customer's build using `get_stock_level(product_id)`.
+1. Inspect the real-time shelf inventory for all hardware components in the customer's build using your inventory tools.
 2. Evaluate stock quantity for each part:
-   - If stock_quantity > 5: Mark as 'IN_STOCK'.
-   - If 1 <= stock_quantity <= 5: Mark as 'LOW_STOCK' (e.g. 'Low — 2 left').
-   - If stock_quantity == 0: It is OUT OF STOCK.
-3. If ANY component is OUT OF STOCK:
-   - DO NOT fail the build outright!
-   - Call `find_compatible_substitute` to search for in-stock alternatives in the same category matching socket/memory.
-   - Pick the best substitute and swap it into the build.
-4. Once all parts are verified in stock (or substituted), call `reserve_stock` to place a temporary 15-minute reservation hold.
+   - stock_quantity > 5: In Stock.
+   - 1 <= stock_quantity <= 5: Low Stock.
+   - stock_quantity == 0: Out of Stock.
+3. If ANY component is out of stock:
+   - Do NOT fail the build outright.
+   - Search for compatible in-stock substitutes within the same category matching socket and memory standards.
+   - Select the best substitute and swap it into the build.
+4. Once all parts are verified in stock (or substituted), place a temporary 15-minute reservation hold.
 5. Provide a clear summary of warehouse availability and any substitutions made.
 
-BOUNDARIES (Least Privilege — Lecture 07):
+OPERATIONAL BOUNDARIES:
 - You do NOT change motherboard sockets or memory standards without verifying compatibility.
-- You do NOT apply discount vouchers, calculate shipping, or process payments — that belongs to Member 04.
-"""
+- You do NOT apply discount vouchers, calculate shipping, or process payments (handled by Order Planning).
+""" + "\n\n" + SYSTEM_SECURITY_RULES
 
 
-# ------------------------------------------------------------------------------
-# 3. LangGraph ReAct Agent Nodes (Lab 05 Task 02 + Lab 06 StateGraph)
-# ------------------------------------------------------------------------------
 def agent_reasoning_node(state: InventoryAgentState) -> Dict[str, Any]:
-    """Invokes Google Gemini LLM with allow-listed inventory tools bound."""
+    """Invokes the language model with inventory tools bound."""
     llm = get_llm()
     steps = list(state.get("trace_steps", []))
     it_count = state.get("iteration_count", 0) + 1
 
     if llm is None:
-        err = "Google Gemini LLM not configured for Inventory Agent. Please check GOOGLE_API_KEY in .env."
-        steps.append(f"[Member 02 Error] {err}")
+        err = "LLM not configured for Inventory Agent. Please check GOOGLE_API_KEY in .env."
+        steps.append(f"[Inventory Error] {err}")
         return {
+            "error_message": err,
             "messages": [AIMessage(content=f"Error: {err}")],
             "iteration_count": it_count,
             "trace_steps": steps
         }
 
     llm_with_tools = llm.bind_tools(INVENTORY_TOOLS)
-    response = llm_with_tools.invoke(state["messages"])
+    try:
+        response = llm_with_tools.invoke(state["messages"])
+    except Exception as e:
+        err = f"Inventory Agent encountered external LLM or quota error: {str(e)}"
+        steps.append(f"[Inventory Error] {err}")
+        return {
+            "error_message": err,
+            "iteration_count": it_count,
+            "trace_steps": steps
+        }
 
     if hasattr(response, "tool_calls") and response.tool_calls:
         tool_names = [tc["name"] for tc in response.tool_calls]
-        steps.append(f"[Member 02 LLM Decision #{it_count}] Invoking inventory tools: {', '.join(tool_names)}")
+        steps.append(f"[Inventory Decision #{it_count}] Invoking inventory tools: {', '.join(tool_names)}")
     elif response.content:
         thought = response.content if isinstance(response.content, str) else str(response.content)
         if thought.strip():
-            steps.append(f"[Member 02 LLM Reasoning] {thought.strip()[:180]}")
+            steps.append(f"[Inventory Reasoning] {thought.strip()[:180]}")
 
     return {
         "messages": [response],
@@ -140,14 +140,14 @@ def tools_execution_node(state: InventoryAgentState) -> Dict[str, Any]:
                     data = json.loads(res_str)
                     pid = data.get("product_id")
                     steps.append(
-                        f"[Member 02 Stock Check] {data.get('name', 'Product')} -> {data.get('status_label', 'In stock')} "
+                        f"[Stock Check] {data.get('name', 'Product')} -> {data.get('status_label', 'In stock')} "
                         f"({data.get('stock_quantity', 0)} in warehouse)"
                     )
                 except Exception:
                     pass
 
             elif tname == "find_compatible_substitute":
-                steps.append(f"[Member 02 Substitution Search] Searched alternatives for {targs.get('category')} -> Results retrieved.")
+                steps.append(f"[Substitution Search] Searched alternatives for {targs.get('category')} -> Results retrieved.")
 
             elif tname == "reserve_stock":
                 try:
@@ -160,12 +160,12 @@ def tools_execution_node(state: InventoryAgentState) -> Dict[str, Any]:
                         reserved_product_ids=res_data.get("reserved_product_ids", [])
                     )
                     steps.append(
-                        f"[Member 02 Reservation Locked] Hold ID: {reservation.reservation_id} "
+                        f"[Reservation Locked] Hold ID: {reservation.reservation_id} "
                         f"(Held for {reservation.held_minutes} minutes, Expires at {reservation.expires_at[:19]})"
                     )
                     is_done = True
                 except Exception as ex:
-                    steps.append(f"[Member 02 Warning] Failed parsing reservation: {ex}")
+                    steps.append(f"[Inventory Warning] Failed parsing reservation: {ex}")
 
             tool_messages.append(ToolMessage(
                 content=res_str,
@@ -186,6 +186,9 @@ def tools_execution_node(state: InventoryAgentState) -> Dict[str, Any]:
 
 def should_continue(state: InventoryAgentState) -> str:
     """Conditional Edge: Routes to tools if tool calls exist, or finishes when reservation is locked."""
+    if state.get("error_message"):
+        return "finish"
+
     if state.get("is_complete", False) and state.get("reservation") is not None:
         return "finish"
 
@@ -199,9 +202,7 @@ def should_continue(state: InventoryAgentState) -> str:
     return "finish"
 
 
-# ------------------------------------------------------------------------------
-# 4. StateGraph Compilation
-# ------------------------------------------------------------------------------
+# StateGraph workflow setup
 workflow = StateGraph(InventoryAgentState)
 workflow.add_node("agent", agent_reasoning_node)
 workflow.add_node("tools", tools_execution_node)
@@ -217,13 +218,8 @@ workflow.add_edge("tools", "agent")
 INVENTORY_GRAPH = workflow.compile()
 
 
-# ------------------------------------------------------------------------------
-# 5. Public Entry Point
-# ------------------------------------------------------------------------------
 def verify_build_inventory(request: InventoryCheckRequest) -> StockVerificationResult:
-    """Public entry point for Member 02 Inventory Agent.
-    Checks warehouse catalog stock levels, substitutes out-of-stock items, and locks 15-min reservation.
-    """
+    """Verifies warehouse catalog stock levels, substitutes out-of-stock items, and locks a 15-min reservation hold."""
     inventory_context_var.set({"catalog": request.catalog or []})
     comp_ids = request.component_ids
     items_desc = ", ".join(f"{slot}: Product #{pid}" for slot, pid in comp_ids.items())
@@ -252,13 +248,33 @@ Please:
         "is_complete": False,
         "summary": "",
         "trace_steps": [
-            f"[Member 02 Initiated] Starting warehouse inventory verification for {len(comp_ids)} components."
-        ]
+            f"[Inventory Initiated] Starting warehouse inventory verification for {len(comp_ids)} components."
+        ],
+        "error_message": None,
     }
 
     final_state = INVENTORY_GRAPH.invoke(initial_state)
 
     trace = final_state.get("trace_steps", [])
+    err_msg = final_state.get("error_message")
+    if err_msg:
+        return StockVerificationResult(
+            success=False,
+            all_in_stock=False,
+            total_price=0.0,
+            components={},
+            reservation=ReservationHold(
+                reservation_id="FAILED",
+                held_minutes=0,
+                expires_at="",
+                status="Failed",
+                reserved_product_ids=[]
+            ),
+            substitutions_made=[],
+            summary=f"Inventory check failed: {err_msg}",
+            trace_steps=trace,
+            error=err_msg
+        )
     reservation = final_state.get("reservation")
     substitutions = final_state.get("substitutions_made", [])
 
@@ -295,7 +311,7 @@ Please:
                 st = "SUBSTITUTED"
                 lbl = f"Substituted ({sub_item.get('name')})"
                 substitutions.append(f"Substituted out-of-stock {orig_name} with in-stock {sub_item.get('name')}.")
-                trace.append(f"[Member 02 Auto-Substitution] Replaced {orig_name} with {sub_item.get('name')} (Stock: {qty})")
+                trace.append(f"[Auto-Substitution] Replaced {orig_name} with {sub_item.get('name')} (Stock: {qty})")
 
         statuses[slot] = ComponentStockStatus(
             slot_type=slot,
@@ -324,7 +340,7 @@ Please:
             status="Reserved",
             reserved_product_ids=[s.product_id for s in statuses.values()]
         )
-        trace.append(f"[Member 02 Reservation Confirmed] Locked {len(statuses)} components under {reservation.reservation_id}.")
+        trace.append(f"[Reservation Confirmed] Locked {len(statuses)} components under {reservation.reservation_id}.")
 
     summary = (
         f"Inventory Agent verified stock for all {len(statuses)} build components. "

@@ -1,8 +1,7 @@
 """
-Tests for AI After-Sales Service Agent (Member 05)
-==================================================
-Verifies RAG knowledge base retrieval, allow-listed tools, order & warranty verification,
-safe troubleshooting guidance, attempt tracking, and Service Request creation.
+Tests for After-Sales Service Agent.
+Verifies knowledge base retrieval, warranty inspection,
+troubleshooting guidance, and service request creation.
 """
 
 import json
@@ -282,6 +281,11 @@ def test_api_after_sales_tools_endpoint():
     assert len(data["tools"]) >= 9
 
 
+def _check_after_sales_quota(data: dict):
+    if not data.get("success") and ("quota" in str(data.get("reply", "")).lower() or "high demand" in str(data.get("reply", "")).lower()):
+        pytest.skip("External Gemini API quota exhausted")
+
+
 def test_api_after_sales_chat_troubleshooting():
     """POST /agent/after-sales/chat guides customer with safe troubleshooting instructions and prompts for SR."""
     payload = {
@@ -292,6 +296,7 @@ def test_api_after_sales_chat_troubleshooting():
     response = client.post("/agent/after-sales/chat", json=payload)
     assert response.status_code == 200
     data = response.json()
+    _check_after_sales_quota(data)
 
     assert data["success"] is True
     assert len(data["reply"]) > 0
@@ -314,6 +319,7 @@ def test_api_after_sales_chat_switch_to_service_request_mode():
     })
     assert r1.status_code == 200
     d1 = r1.json()
+    _check_after_sales_quota(d1)
     assert d1["success"] is True
 
     # Step 2: Customer asks to stop chatting and create a service request
@@ -324,6 +330,7 @@ def test_api_after_sales_chat_switch_to_service_request_mode():
     })
     assert r2.status_code == 200
     d2 = r2.json()
+    _check_after_sales_quota(d2)
     assert d2["success"] is True
     assert d2["service_request_mode"] is True
     assert d2["service_request_required"] is True
@@ -341,6 +348,7 @@ def test_after_sales_chat_suggest_service_request_after_5_attempts():
         session_id="test_5_attempts_session",
     )
     res = run_after_sales_chat(req)
+    _check_after_sales_quota(res.model_dump())
     assert res.success is True
     assert res.service_request_mode is True or res.service_request_required is True
     reply_lower = res.reply.lower()

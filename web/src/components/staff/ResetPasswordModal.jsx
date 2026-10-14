@@ -38,7 +38,7 @@ const ResetPasswordModal = ({
               <input
                 id="reset-new-password"
                 type="password"
-                placeholder="Minimum 6 characters"
+                placeholder="Minimum 8 characters"
                 className={errors.password ? 'input-error' : ''}
                 value={passwordData.password}
                 onChange={(e) => onChangePasswordData('password', e.target.value)}

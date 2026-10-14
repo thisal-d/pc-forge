@@ -282,7 +282,7 @@ class _BuildPcHubScreenState extends State<BuildPcHubScreen> {
               color: const Color(0xFFF59E0B),
               agentName: 'Budget Arbitrage Agent',
               description:
-                  'Maximizes frame-rate-per-dollar against current inventory stock in real time.',
+                  'Maximizes performance-per-rupee against current inventory stock in real time.',
             ),
 
             const SizedBox(height: 28),

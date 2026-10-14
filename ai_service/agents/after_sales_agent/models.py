@@ -1,8 +1,6 @@
 """
-After-Sales Service Agent Models — PCForge (Member 05)
-======================================================
-Defines schemas for troubleshooting conversation, attempt tracking,
-warranty inspection, and Service Request creation.
+Data schemas for after-sales troubleshooting conversations, warranty checks,
+and service request creation.
 """
 
 from typing import Dict, List, Optional, Any
@@ -10,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class ServiceRequestDetails(BaseModel):
-    """Structured Service Request produced by Member 05 After-Sales Service Agent."""
+    """Structured service request details for persistence and customer communication."""
     id: Optional[int] = Field(default=None, description="Primary database ID")
     service_request_id: Optional[int] = Field(default=None, description="Service Request primary key")
     service_request_number: str = Field(default="", description="Generated Service Request Number, e.g. SR-000108")

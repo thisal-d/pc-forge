@@ -1,12 +1,7 @@
 """
-Allow-Listed Tools for After-Sales Service Agent — PCForge (Member 05)
-=====================================================================
-Performs verified system operations without direct database access:
-  - Customer & order inspection from ASP.NET Core context
-  - Live hardware warranty verification from ASP.NET Core context
-  - RAG knowledge base search
-  - Appointment validation
-  - Structured Service Request generation for ASP.NET Core persistence
+After-sales support tools for PCForge.
+Provides customer order lookup, hardware warranty inspection, RAG troubleshooting
+search, and service appointment scheduling.
 """
 
 from contextvars import ContextVar

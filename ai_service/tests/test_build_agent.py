@@ -1,8 +1,7 @@
 """
-Tests for PC Build & Compatibility Agent (Member 03)
-====================================================
-Verifies deterministic compatibility tools, LangGraph workflow execution,
-and FastAPI endpoint contracts.
+Tests for PC Build & Compatibility Agent.
+Verifies compatibility clearance tools, build workflow execution,
+and API endpoint contracts.
 """
 
 import json
@@ -25,7 +24,7 @@ client = TestClient(app)
 
 
 # ------------------------------------------------------------------------------
-# 1. Deterministic Tool Tests (Lab 05 Tool Contract Verification)
+# 1. Deterministic Tool Tests
 # ------------------------------------------------------------------------------
 def test_socket_compatibility_tool():
     """Validates CPU to Motherboard socket matching logic."""
@@ -104,8 +103,17 @@ def test_get_candidate_components_filter():
     assert all("AM5" in c["socket"] for c in am5_cpus)
 
 
+def _check_build_quota(resp):
+    if not resp.get("success") if isinstance(resp, dict) else not resp.success:
+        err = (resp.get("error") if isinstance(resp, dict) else resp.error) or ""
+        summary = (resp.get("summary") if isinstance(resp, dict) else resp.summary) or ""
+        combined = (err + " " + summary).lower()
+        if "quota" in combined or "resource_exhausted" in combined or "429" in combined:
+            pytest.skip("External Gemini API quota exhausted")
+
+
 # ------------------------------------------------------------------------------
-# 2. Agent Workflow & Clearance Tests (Member 03 ReAct / LangGraph)
+# 2. Agent Workflow & Clearance Tests
 # ------------------------------------------------------------------------------
 def test_generate_compatible_build_gaming_1440p():
     """Verifies complete build generation for 1440p Gaming rig."""
@@ -118,6 +126,7 @@ def test_generate_compatible_build_gaming_1440p():
     )
 
     resp = generate_compatible_build(req)
+    _check_build_quota(resp)
     assert resp.success is True
     assert resp.build is not None
 
@@ -147,13 +156,14 @@ def test_generate_compatible_build_high_end_4k():
     """Verifies high-end 4K build selection and wattage headroom."""
     req = BuildGenerationRequest(
         purpose="3D Rendering & 4K Gaming",
-        budget_amount=3500.0,
-        currency="USD",
+        budget_amount=1200000.0,
+        currency="LKR",
         target_resolution="4K",
         preferences=["Liquid Cooling"]
     )
 
     resp = generate_compatible_build(req)
+    _check_build_quota(resp)
     assert resp.success is True
     b = resp.build
     assert b is not None
@@ -166,7 +176,7 @@ def test_generate_compatible_build_high_end_4k():
 # 3. FastAPI Endpoint Integration Tests
 # ------------------------------------------------------------------------------
 def test_get_build_tools_endpoint():
-    """Verify GET /agent/build/tools exposes schemas for Lab 05 compliance."""
+    """Verify GET /agent/build/tools exposes registered tools."""
     response = client.get("/agent/build/tools")
     assert response.status_code == 200
     data = response.json()
@@ -184,14 +194,15 @@ def test_post_build_generate_endpoint():
     """Verify POST /agent/build/generate executes and returns ValidatedBuild."""
     payload = {
         "purpose": "Esports Gaming",
-        "budget_amount": 1500.0,
-        "currency": "USD",
+        "budget_amount": 450000.0,
+        "currency": "LKR",
         "target_resolution": "1440p",
         "preferences": ["Fast NVMe"]
     }
     response = client.post("/agent/build/generate", json=payload)
     assert response.status_code == 200
     data = response.json()
+    _check_build_quota(data)
     assert data["success"] is True
     assert data["build"]["is_valid"] is True
     assert data["build"]["compatibility"]["all_passed"] is True

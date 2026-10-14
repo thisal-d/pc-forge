@@ -1,11 +1,6 @@
 """
-PC Build & Compatibility Agent Models — PCForge (Member 03)
-===========================================================
-Defines structured data contracts for:
-  - Hardware components (CPU, Motherboard, RAM, GPU, PSU, Storage, Case, Cooler)
-  - Deterministic compatibility clearance checklist (Socket, Memory, Wattage, Case-fit)
-  - Validated build proposals
-  - API request & response schemas
+Data contracts for hardware components, compatibility clearance checklists,
+and validated PC build proposals.
 """
 
 from typing import Dict, List, Optional, Any
@@ -72,7 +67,7 @@ class BuildGenerationRequest(BaseModel):
     session_id: Optional[str] = Field(default=None, description="Optional requirement session ID")
     purpose: str = Field(default="Gaming", description="Customer's primary PC workload")
     budget_amount: float = Field(default=400000.0, description="Target budget amount")
-    currency: str = Field(default="LKR", description="Budget currency (e.g. LKR or USD)")
+    currency: str = Field(default="LKR", description="Budget currency (e.g. LKR)")
     target_resolution: str = Field(default="1440p", description="Target resolution")
     preferences: List[str] = Field(default_factory=list, description="Customer preferences (e.g. RGB, WiFi, Silent)")
     catalog: Optional[List[Dict[str, Any]]] = Field(default=None, description="Catalog products passed as context from ASP.NET Core")

@@ -1,11 +1,5 @@
 """
-Order Planning Agent Models — PCForge (Member 04)
-=================================================
-Defines structured data contracts for:
-  - Component item pricing
-  - Financial breakdown (Subtotal, Discount, Delivery, Total)
-  - Formal Order Proposal (Status: WAITING_FOR_APPROVAL)
-  - API request & response schemas
+Data models for order pricing, financial breakdowns, and order proposals.
 """
 
 from typing import Dict, List, Optional, Any

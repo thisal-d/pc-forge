@@ -76,24 +76,24 @@ class BuildSlotInfo {
       title: 'Storage (NVMe / SSD)',
       description: 'Fast M.2 NVMe or SATA SSD',
       icon: Icons.storage,
-      categoryId: null, // Any / Future Category
-      isRequired: false,
+      categoryId: 6, // Storage Category in DB
+      isRequired: true,
     ),
     BuildSlotInfo(
       type: BuildSlotType.pcCase,
       title: 'Case / Chassis',
       description: 'ATX or Micro-ATX chassis',
       icon: Icons.desktop_windows_outlined,
-      categoryId: null,
-      isRequired: false,
+      categoryId: 7, // Case Category in DB
+      isRequired: true,
     ),
     BuildSlotInfo(
       type: BuildSlotType.cooler,
       title: 'CPU Cooler',
       description: 'Air or Liquid AIO Cooler',
       icon: Icons.ac_unit,
-      categoryId: null,
-      isRequired: false,
+      categoryId: 8, // Cooler Category in DB
+      isRequired: true,
     ),
   ];
 }

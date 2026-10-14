@@ -1,14 +1,11 @@
 """
-PC Build & Compatibility Agent — PCForge (Member 03)
-====================================================
-Architecture:
-  - Lab 05: Tool calling via bind_tools(BUILD_TOOLS) & ReAct execution loop
-  - Lab 06: LangGraph StateGraph with messages reducer and ToolNode routing
-  - Lecture 07: Strict boundary isolation, bounded iterations, and deterministic clearance proof
+PC Build & Compatibility Agent for PCForge.
+Assembles complete, technically validated 8-component builds adhering to
+socket, memory, power wattage, and case clearance constraints.
 """
 
 import json
-from typing import Annotated, Any, Dict, List, Optional, TypedDict
+from typing import Annotated, Any, Dict, List, Optional, Tuple, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, START, StateGraph
@@ -33,19 +30,17 @@ from ai_service.agents.build_agent.tools import (
     submit_validated_build,
 )
 from ai_service.config import get_llm
+from ai_service.guardrails import SYSTEM_SECURITY_RULES, sanitize_and_delimit
 
-MAX_AGENT_ITERATIONS = 8  # Hard iteration cap (Lecture 07 Slide 122)
+MAX_AGENT_ITERATIONS = 8
 TOOLS_MAP = {t.name: t for t in BUILD_TOOLS}
 
 
-# ------------------------------------------------------------------------------
-# 1. State Definition (Lab 06 explicit StateGraph with add_messages)
-# ------------------------------------------------------------------------------
 class BuildAgentState(TypedDict):
     """Workflow state for the PC Build & Compatibility Agent."""
     messages: Annotated[list, add_messages]
     request: BuildGenerationRequest
-    target_budget_usd: float
+    target_budget: float
     selected_components: Dict[str, ComponentItem]
     checklist: CompatibilityChecklist
     iteration_count: int
@@ -56,11 +51,8 @@ class BuildAgentState(TypedDict):
     error_message: Optional[str]
 
 
-# ------------------------------------------------------------------------------
-# 2. System Prompt & Persona
-# ------------------------------------------------------------------------------
 BUILD_SYSTEM_PROMPT = """\
-You are the PC Build & Compatibility Agent (Member 03) for PCForge, an expert hardware systems architect.
+You are the PC Build & Compatibility Agent for PCForge, an expert hardware systems architect.
 
 YOUR MISSION:
 Select a complete, balanced, and 100% technically compatible 8-component PC build matching the customer's \
@@ -76,31 +68,24 @@ REQUIRED SLOTS:
   7. pc_case
   8. cooler
 
-REASONING WORKFLOW (ReAct):
-  1. Call `get_candidate_components` for the necessary categories to inspect current database hardware and prices.
-  2. Select 8 components tailored to the customer's purpose (e.g. Gaming, Workstation), target resolution, and budget.
-  3. Call deterministic clearance tools to prove physical and electrical fit:
-     - `check_socket_compatibility(cpu_socket, motherboard_socket)`
-     - `check_memory_compatibility(ram_type, motherboard_memory_type)`
-     - `check_psu_wattage(cpu_tdp, gpu_tdp, psu_wattage)`
-     - `check_case_fit(motherboard_form_factor, case_form_factor)`
-  4. Once all 4 checks pass, call `submit_validated_build` with the product IDs and your engineering rationale.
+REASONING WORKFLOW:
+  1. Inspect the PCForge store catalog for candidate components matching the workload, target resolution, and budget.
+  2. Select 8 balanced components covering all required slots.
+  3. Verify physical and electrical clearances using your compatibility verification tools (verifying CPU socket, RAM memory type, PSU wattage headroom, and case form factor).
+  4. Once all clearance checks pass, submit the validated build along with your engineering rationale.
 
-BOUNDARIES (Least Privilege — Lecture 07):
-  - You do NOT verify warehouse shelf inventory or reserve stock — that belongs to Member 02 (Inventory Agent).
-  - You do NOT apply discount vouchers or calculate shipping — that belongs to Member 04 (Order Planning Agent).
-"""
+OPERATIONAL BOUNDARIES:
+  - You do NOT verify warehouse shelf inventory or reserve stock (handled by Inventory Agent).
+  - You do NOT apply discount vouchers or calculate shipping (handled by Order Planning Agent).
+""" + "\n\n" + SYSTEM_SECURITY_RULES
 
 
 # ------------------------------------------------------------------------------
 # 3. Deterministic Safety Clearance Helpers
 # ------------------------------------------------------------------------------
-def _normalize_budget_to_usd(amount: float, currency: str) -> float:
-    """Normalizes customer budget to USD reference price for catalog matching."""
-    curr = (currency or "LKR").strip().upper()
-    if curr == "LKR" or amount > 5000:
-        return max(amount / 305.0, 350.0)
-    return amount
+def _normalize_budget(amount: float, currency: str) -> float:
+    """Normalizes customer budget amount to LKR reference price for catalog matching."""
+    return max(float(amount or 400000.0), 50000.0)
 
 
 def _run_compatibility_checks(components: Dict[str, ComponentItem]) -> CompatibilityChecklist:
@@ -166,12 +151,6 @@ def _run_compatibility_checks(components: Dict[str, ComponentItem]) -> Compatibi
     )
 
 
-
-
-
-# ------------------------------------------------------------------------------
-# 4. LangGraph ReAct Agent Nodes (Lab 05 Task 02 + Lab 06 StateGraph)
-# ------------------------------------------------------------------------------
 def agent_reasoning_node(state: BuildAgentState) -> Dict[str, Any]:
     """Calls the LLM with allow-listed tools bound to let it reason over hardware selections."""
     llm = get_llm()
@@ -179,8 +158,8 @@ def agent_reasoning_node(state: BuildAgentState) -> Dict[str, Any]:
     it_count = state.get("iteration_count", 0) + 1
 
     if llm is None:
-        err = "Google Gemini LLM is not configured for Build Agent. Please check GOOGLE_API_KEY in .env."
-        steps.append(f"[Member 03 Error] {err}")
+        err = "LLM is not configured for Build Agent. Please check GOOGLE_API_KEY in .env."
+        steps.append(f"[Build Agent Error] {err}")
         return {
             "error_message": err,
             "iteration_count": it_count,
@@ -188,15 +167,24 @@ def agent_reasoning_node(state: BuildAgentState) -> Dict[str, Any]:
         }
 
     llm_with_tools = llm.bind_tools(BUILD_TOOLS)
-    response = llm_with_tools.invoke(state["messages"])
+    try:
+        response = llm_with_tools.invoke(state["messages"])
+    except Exception as e:
+        err = f"Build Agent encountered external LLM or quota error: {str(e)}"
+        steps.append(f"[Build Agent Error] {err}")
+        return {
+            "error_message": err,
+            "iteration_count": it_count,
+            "trace_steps": steps
+        }
 
     if hasattr(response, "tool_calls") and response.tool_calls:
         tool_names = [tc["name"] for tc in response.tool_calls]
-        steps.append(f"[Member 03 LLM Decision #{it_count}] Invoking tools: {', '.join(tool_names)}")
+        steps.append(f"[Build Agent Decision #{it_count}] Invoking tools: {', '.join(tool_names)}")
     elif response.content:
         thought_str = response.content if isinstance(response.content, str) else str(response.content)
         if thought_str.strip():
-            steps.append(f"[Member 03 LLM Reasoning] {thought_str.strip()[:180]}")
+            steps.append(f"[Build Agent Reasoning] {thought_str.strip()[:180]}")
 
     return {
         "messages": [response],
@@ -230,7 +218,7 @@ def tools_execution_node(state: BuildAgentState) -> Dict[str, Any]:
 
             # Log execution summary
             if tname == "submit_validated_build":
-                steps.append(f"[Member 03 Proposal Submitted] Final 8-component build submitted for validation.")
+                steps.append(f"[Build Proposal Submitted] Final 8-component build submitted for validation.")
                 try:
                     submitted = json.loads(res_str)
                     live_prods = fetch_live_products()
@@ -255,9 +243,9 @@ def tools_execution_node(state: BuildAgentState) -> Dict[str, Any]:
                         is_valid = checklist.all_passed
                         summary = submitted.get("engineering_notes") or submitted.get("build_name", "")
                 except Exception as ex:
-                    steps.append(f"[Member 03 Warning] Failed parsing submitted build: {ex}")
+                    steps.append(f"[Build Agent Warning] Failed parsing submitted build: {ex}")
             else:
-                steps.append(f"[Member 03 Tool Execution] {tname} -> {res_str[:110]}...")
+                steps.append(f"[Tool Execution] {tname} -> {res_str[:110]}...")
 
             tool_messages.append(ToolMessage(
                 content=res_str,
@@ -277,6 +265,9 @@ def tools_execution_node(state: BuildAgentState) -> Dict[str, Any]:
 
 def should_continue(state: BuildAgentState) -> str:
     """Conditional Edge: Routes to tools if tool calls exist, or ends if complete."""
+    if state.get("error_message"):
+        return "finish"
+
     if state.get("is_validated", False):
         return "finish"
 
@@ -290,9 +281,7 @@ def should_continue(state: BuildAgentState) -> str:
     return "finish"
 
 
-# ------------------------------------------------------------------------------
-# 5. Build Graph Assembly (Lab 06)
-# ------------------------------------------------------------------------------
+# Build Graph Assembly
 workflow = StateGraph(BuildAgentState)
 workflow.add_node("agent", agent_reasoning_node)
 workflow.add_node("tools", tools_execution_node)
@@ -308,23 +297,23 @@ workflow.add_edge("tools", "agent")
 BUILD_GRAPH = workflow.compile()
 
 
-# ------------------------------------------------------------------------------
-# 6. Public Entry Point
-# ------------------------------------------------------------------------------
 def generate_compatible_build(request: BuildGenerationRequest) -> BuildGenerationResponse:
-    """Public function executing Member 03's Build & Compatibility Agent.
-    Invokes the Gemini LLM ReAct loop over live store inventory.
-    """
+    """Generates a complete, compatible 8-component PC build matching requirements."""
     build_context_var.set({"catalog": request.catalog or []})
-    budget_usd = _normalize_budget_to_usd(request.budget_amount, request.currency)
+    target_budget = _normalize_budget(request.budget_amount, request.currency)
+
+    raw_request_text = (
+        f"- Purpose / Workload: {request.purpose}\n"
+        f"- Target Resolution: {request.target_resolution}\n"
+        f"- Budget: {request.budget_amount} {request.currency}\n"
+        f"- Preferences: {', '.join(request.preferences) if request.preferences else 'None'}"
+    )
+    delimited_request = sanitize_and_delimit(raw_request_text, tag="customer_request")
 
     system_msg = SystemMessage(content=BUILD_SYSTEM_PROMPT)
     user_msg = HumanMessage(content=f"""\
 Customer PC Build Request:
-- Purpose / Workload: {request.purpose}
-- Target Resolution: {request.target_resolution}
-- Budget: {request.budget_amount} {request.currency} (~${budget_usd:.0f} USD)
-- Preferences: {', '.join(request.preferences) if request.preferences else 'None'}
+{delimited_request}
 
 Please:
 1. Call `get_candidate_components` to retrieve available hardware from the catalog.
@@ -336,7 +325,7 @@ Please:
     initial_state: BuildAgentState = {
         "messages": [system_msg, user_msg],
         "request": request,
-        "target_budget_usd": budget_usd,
+        "target_budget": target_budget,
         "selected_components": {},
         "checklist": CompatibilityChecklist(),
         "iteration_count": 0,
@@ -344,7 +333,7 @@ Please:
         "is_validated": False,
         "summary": "",
         "trace_steps": [
-            f"[Member 03 Agent Initiated] Target: {request.target_resolution} {request.purpose} Build "
+            f"[Build Agent Initiated] Target: {request.target_resolution} {request.purpose} Build "
             f"(Budget: {request.budget_amount} {request.currency})"
         ],
         "error_message": None,
@@ -363,18 +352,20 @@ Please:
         return BuildGenerationResponse(
             success=False,
             build=None,
-            summary="Build generation failed.",
+            summary=f"Build generation failed: {err_msg}",
             trace_steps=trace,
             error=err_msg
         )
 
     if len(components) < 8 or not is_valid:
+        fail_msg = f"Unable to assemble full 8-component build (selected {len(components)}/8 components, valid={is_valid})."
+        trace.append(f"[Build Agent Error] {fail_msg}")
         return BuildGenerationResponse(
             success=False,
             build=None,
-            summary="Build generation failed to find compatible components for all 8 required slots.",
+            summary="Build generation failed: could not assemble complete compatible configuration.",
             trace_steps=trace,
-            error="The Build Agent was unable to assemble a complete 100% compatible 8-component build."
+            error=fail_msg
         )
 
     total_price = sum(c.price for c in components.values())
@@ -398,7 +389,7 @@ Please:
 
     if not summary:
         summary = (
-            f"PCForge Member 03 Agent verified 100% technical compatibility across all 8 hardware slots. "
+            f"PCForge Build Agent verified 100% technical compatibility across all 8 hardware slots. "
             f"CPU/Motherboard socket verified ({checklist.socket_details}), RAM generation verified, "
             f"and PSU verified with +{checklist.headroom_watts}W transient safety headroom."
         )
@@ -409,3 +400,4 @@ Please:
         summary=summary,
         trace_steps=trace
     )
+

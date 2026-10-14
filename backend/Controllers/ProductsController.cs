@@ -163,7 +163,8 @@ public class ProductsController : ControllerBase
         var standardParams = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "categoryid", "brand", "search", "minprice", "maxprice", "instockonly", "sortby",
-            "socket", "chipset", "memorytype", "speed", "capacity", "vram", "efficiency", "status"
+            "socket", "chipset", "memorytype", "speed", "capacity", "vram", "efficiency", "status",
+            "pagesize", "page", "pagenumber", "limit", "offset"
         };
 
         foreach (var queryParam in Request.Query)

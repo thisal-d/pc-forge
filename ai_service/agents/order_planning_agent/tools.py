@@ -1,11 +1,7 @@
 """
-Order Planning Allow-listed Deterministic Tools — PCForge (Member 04)
-====================================================================
-Per Lab 05 and PCForge Agentic Workflow specifications:
-  - calculate_pricing: Sums component prices into an itemized subtotal.
-  - apply_discount: Validates promotional coupon codes (e.g. WELCOME5).
-  - calculate_delivery: Computes shipping fees and timeframes based on tier and location.
-  - create_order_proposal: Produces the formal proposal with status WAITING_FOR_APPROVAL.
+Order planning tools for PCForge.
+Provides subtotal calculation, discount validation, delivery estimation,
+and formal proposal generation.
 """
 
 from contextvars import ContextVar
@@ -53,6 +49,15 @@ DEFAULT_COUPONS: Dict[str, Dict[str, Any]] = {
         "min_subtotal": 0.0,
         "max_discount": 100000.0,
         "is_active": True
+    },
+    "BUILDMASTER": {
+        "code": "BUILDMASTER",
+        "description": "Flat Rs. 15,000 Discount on High-End Custom Builds",
+        "discount_type": "FLAT",
+        "discount_value": 15000.0,
+        "min_subtotal": 300000.0,
+        "max_discount": 15000.0,
+        "is_active": True
     }
 }
 
@@ -71,7 +76,7 @@ def calculate_pricing(
     """Calculate the subtotal and itemized pricing for all 8 components of the stock-confirmed build.
     Args:
         components_json: JSON string or dictionary of components with unit prices.
-        currency: Store currency symbol ('Rs.' or '$').
+        currency: Store currency code ('LKR' or 'Rs.').
     Returns:
         JSON string containing itemized line items, component count, and calculated subtotal.
     """
@@ -111,12 +116,7 @@ def calculate_pricing(
             })
             raw_subtotal += line_total
 
-        # If subtotal in database is in USD (~$1200) and currency is Rs.,
-        # standard retail conversion is ~300 LKR per USD (e.g. $1,283 -> Rs. 385,000 matching ui4.png)
-        if currency in ["Rs.", "LKR", "Rs"] and raw_subtotal < 5000:
-            subtotal = round(raw_subtotal * 300.0, -3)  # round to nearest thousand, e.g. 385000
-        else:
-            subtotal = raw_subtotal
+        subtotal = raw_subtotal
 
         return json.dumps({
             "currency": currency,
@@ -141,7 +141,7 @@ def apply_discount(
     Args:
         promo_code: Promotional code string provided by customer.
         subtotal: Current subtotal before discount.
-        currency: Store currency symbol ('Rs.' or '$').
+        currency: Store currency code ('LKR' or 'Rs.').
     Returns:
         JSON string indicating voucher validity, discount amount, and updated net subtotal.
     """
@@ -243,20 +243,20 @@ def calculate_delivery(
 ) -> str:
     """Calculate shipping fee and arrival timeframe for physical PC delivery.
     Tiers:
-      - standard: Rs. 2,500 ($15.00) — 3 to 5 business days (Matches UI 4)
-      - express:  Rs. 5,000 ($30.00) — 1 to 2 business days
-      - pickup:   Rs. 0 ($0.00) — Same-day in-store pickup
+      - standard: Rs. 2,500 — 3 to 5 business days (Matches UI 4)
+      - express:  Rs. 5,000 — 1 to 2 business days
+      - pickup:   Rs. 0 — Same-day in-store pickup
     Args:
         shipping_method: 'standard', 'express', or 'pickup'.
         address_zone: Delivery destination district or province.
-        currency: Store currency symbol ('Rs.' or '$').
+        currency: Store currency code ('LKR' or 'Rs.').
     Returns:
         JSON string with delivery fee, estimated delivery days, and method title.
     """
     method_clean = (shipping_method or "standard").lower().strip()
 
     if method_clean in ["express", "priority", "fast"]:
-        fee = 5000.0 if currency in ["Rs.", "LKR", "Rs"] else 30.0
+        fee = 5000.0
         days = "1-2 business days"
         title = "Express Priority Courier"
     elif method_clean in ["pickup", "store_pickup", "collection"]:
@@ -265,7 +265,7 @@ def calculate_delivery(
         title = "Store Pickup (Colombo HQ)"
     else:  # Standard
         # Matches ui4.png: "Delivery Rs. 2,500"
-        fee = 2500.0 if currency in ["Rs.", "LKR", "Rs"] else 15.0
+        fee = 2500.0
         days = "3-5 business days"
         title = "Standard Insured Delivery"
 
@@ -300,7 +300,7 @@ def create_order_proposal(
         delivery_fee: Calculated delivery fee.
         total_price: Net total price to be proposed to customer.
         promo_code: Applied coupon code.
-        currency: Store currency symbol ('Rs.' or '$').
+        currency: Store currency code ('LKR' or 'Rs.').
         order_number: Optional order reference (e.g. PCF-10492).
     Returns:
         JSON string confirming proposal creation with status WAITING_FOR_APPROVAL.

@@ -1,8 +1,7 @@
 """
-Tests for Order Planning Agent (Member 04)
-==========================================
-Verifies deterministic pricing, voucher, and delivery tools,
-LangGraph agent workflow execution, and FastAPI endpoint contracts.
+Tests for Order Planning Agent.
+Verifies pricing, voucher, and delivery tools,
+order workflow execution, and FastAPI contracts.
 """
 
 import json
@@ -39,8 +38,8 @@ def test_order_planning_tools_manifest():
 def test_calculate_pricing_tool():
     """Validates itemized component summation."""
     sample_components = {
-        "cpu": {"product_id": 1, "name": "AMD Ryzen 5 7600X", "price": 229.0},
-        "motherboard": {"product_id": 3, "name": "MSI MAG B650 Tomahawk WiFi", "price": 199.0},
+        "cpu": {"product_id": 3, "name": "AMD Ryzen 5 7600X", "price": 69000.0},
+        "motherboard": {"product_id": 11, "name": "MSI MAG B650 Tomahawk WiFi", "price": 68000.0},
     }
     result_str = calculate_pricing.invoke({
         "components_json": json.dumps(sample_components),
@@ -137,8 +136,8 @@ def test_api_create_proposal_endpoint():
         "reservation_id": "RES-TESTFAST",
         "build_name": "FastAPI Build",
         "components": {
-            "cpu": {"product_id": 1, "name": "AMD Ryzen 5 7600X", "price": 229.0},
-            "gpu": {"product_id": 8, "name": "NVIDIA GeForce RTX 4070 Ti", "price": 799.0}
+            "cpu": {"product_id": 3, "name": "AMD Ryzen 5 7600X", "price": 69000.0},
+            "gpu": {"product_id": 8, "name": "NVIDIA GeForce RTX 4070 Ti", "price": 265000.0}
         },
         "promo_code": "WELCOME5",
         "shipping_method": "standard",
@@ -147,6 +146,8 @@ def test_api_create_proposal_endpoint():
     response = client.post("/agent/order-planning/create-proposal", json=payload)
     assert response.status_code == 200
     data = response.json()
+    if not data.get("success") and ("quota" in str(data.get("error", "")).lower() or "resource_exhausted" in str(data.get("error", "")).lower()):
+        pytest.skip("External Gemini API quota exhausted")
 
     assert data["success"] is True
     assert "proposal" in data

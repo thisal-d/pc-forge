@@ -404,8 +404,8 @@ def get_llm():
                 model=CHAT_MODEL,
                 google_api_key=k,
                 temperature=0.2,
-                timeout=60,
-                max_retries=1
+                timeout=15,
+                max_retries=0
             )
             for k in keys
         ]

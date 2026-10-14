@@ -1,25 +1,8 @@
 """
-Allow-Listed Tools for Inventory Agent (Member 02)
-==================================================
-Corresponds strictly to project.md §7.2:
-  - get_stock_level(product_id)
-  - reserve_stock(product_ids, session_id, hold_minutes)
-  - find_compatible_substitute(category, failed_product_id, socket, memory_type, max_price)
-
-All queries target the live PostgreSQL database and backend API.
+Inventory query and reservation tools for PCForge.
+Provides real-time stock verification, compatible substitutions,
+and reservation holds against catalog data.
 """
-
-from datetime import datetime, timedelta, timezone
-import json
-import os
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-import urllib.request
-from langchain_core.tools import tool
-from dotenv import load_dotenv
-
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
-
 
 from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
@@ -161,7 +144,7 @@ def find_compatible_substitute(
         failed_product_id: ID of the out-of-stock product to replace.
         socket: Physical socket requirement (e.g. 'AM5', 'LGA1700').
         memory_type: Memory standard requirement (e.g. 'DDR5', 'DDR4').
-        max_price: Maximum allowed unit price in USD.
+        max_price: Maximum allowed unit price in LKR.
     Returns:
         JSON string list of in-stock substitute components.
     """

@@ -1,10 +1,5 @@
 """
-Data Contracts for Inventory Agent (Member 02)
-==============================================
-Pydantic contracts strictly corresponding to project.md §7.2:
-  - get_stock_level(product_id)
-  - find_compatible_substitute(...)
-  - reserve_stock(product_ids, session_id, hold_minutes)
+Data contracts for Inventory Agent requests, component statuses, and reservation holds.
 """
 
 from datetime import datetime, timezone
@@ -32,7 +27,7 @@ class ComponentStockStatus(BaseModel):
     name: str = Field(..., description="Product name")
     category: str = Field(..., description="Component category")
     brand: str = Field("", description="Manufacturer brand")
-    price: float = Field(0.0, description="Unit price in USD/LKR")
+    price: float = Field(0.0, description="Unit price in LKR")
     stock_quantity: int = Field(..., description="Current warehouse shelf count in PostgreSQL")
     status: str = Field(
         ...,

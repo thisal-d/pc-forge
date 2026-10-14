@@ -11,7 +11,7 @@ class RequirementProfile(BaseModel):
     )
     budget_raw: Optional[str] = Field(
         default=None,
-        description="Raw budget string stated by user (e.g., 'Rs. 400,000', '$2500', '400k LKR')."
+        description="Raw budget string stated by user (e.g., 'Rs. 400,000', '400k LKR', '400,000 LKR')."
     )
     budget_amount: Optional[float] = Field(
         default=None,
@@ -19,7 +19,7 @@ class RequirementProfile(BaseModel):
     )
     currency: str = Field(
         default="LKR",
-        description="Currency code (LKR, USD, etc.). Default is LKR for PCForge."
+        description="Currency code (LKR, Rs.). Default is LKR for PCForge."
     )
     target_resolution: Optional[str] = Field(
         default=None,
