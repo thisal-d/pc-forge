@@ -1,8 +1,7 @@
 """
-Tests for AI After-Sales Service Agent (Member 05)
-==================================================
-Verifies RAG knowledge base retrieval, allow-listed tools, order & warranty verification,
-safe troubleshooting guidance, attempt tracking, and Service Request creation.
+Tests for After-Sales Service Agent.
+Verifies knowledge base retrieval, warranty inspection,
+troubleshooting guidance, and service request creation.
 """
 
 import json

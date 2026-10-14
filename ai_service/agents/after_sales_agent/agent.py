@@ -1,9 +1,7 @@
 """
-After-Sales Service Agent Implementation — PCForge (Member 05)
-===============================================================
-Autonomous LangGraph StateGraph agent utilizing Google Gemini and RAG knowledge.
-Guides customers through safe, non-technical troubleshooting (max 5 attempts),
-verifies real purchase and warranty from PostgreSQL, and creates Service Requests.
+After-Sales Service Agent for PCForge.
+Guides customers through safe troubleshooting, checks warranty eligibility,
+and creates or reschedules in-store service appointments.
 """
 
 from datetime import datetime, timezone
@@ -401,7 +399,7 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
         "preferred_time": prev_pref_time
     })
 
-    # Defense Layer 2: Delimit untrusted input & neutralize delimiter breakouts (Lab 07 Part 5)
+    # Delimit untrusted input & neutralize delimiter breakouts
     delimited_user_msg = sanitize_and_delimit(user_msg_clean, tag="customer_input")
 
     # Input message with iteration_count explicitly reset to 0 for this user turn
@@ -590,7 +588,7 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
         except Exception:
             pass
 
-        # Defense Layer 1: Runtime validation in Python (Lab 07 Part 5)
+        # Runtime validation filter
         is_safe, validated_reply = validate_runtime_safety(reply_text)
         if not is_safe:
             reply_text = validated_reply

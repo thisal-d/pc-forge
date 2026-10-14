@@ -1,11 +1,7 @@
 """
-Order Planning Allow-listed Deterministic Tools — PCForge (Member 04)
-====================================================================
-Per Lab 05 and PCForge Agentic Workflow specifications:
-  - calculate_pricing: Sums component prices into an itemized subtotal.
-  - apply_discount: Validates promotional coupon codes (e.g. WELCOME5).
-  - calculate_delivery: Computes shipping fees and timeframes based on tier and location.
-  - create_order_proposal: Produces the formal proposal with status WAITING_FOR_APPROVAL.
+Order planning tools for PCForge.
+Provides subtotal calculation, discount validation, delivery estimation,
+and formal proposal generation.
 """
 
 from contextvars import ContextVar

@@ -1,15 +1,7 @@
 """
-Allow-Listed Tools for PC Build & Compatibility Agent (Member 03)
-==================================================================
-Corresponds strictly to project.md §7.2:
-  - get_candidate_components(category, filters)
-  - check_socket_compatibility(cpu, motherboard)
-  - check_memory_compatibility(ram, motherboard)
-  - check_psu_wattage(cpu, gpu, psu)
-  - check_case_fit(motherboard, gpu, case)
-
-"The docstring is the interface" — Lab 05; Lecture 05 Slide 736
-All tools output structured JSON dictionaries, never unstructured prose.
+Hardware compatibility verification and catalog query tools for PCForge.
+Provides socket, memory, PSU wattage, and case clearance checks.
+All tools output structured JSON dictionaries.
 """
 
 from contextvars import ContextVar

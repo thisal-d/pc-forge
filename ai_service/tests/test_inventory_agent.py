@@ -1,8 +1,7 @@
 """
-Tests for Inventory Agent (Member 02)
-=====================================
-Verifies deterministic warehouse inventory tools, LangGraph agent workflow execution,
-15-minute reservation hold creation, and FastAPI endpoint contracts.
+Tests for Inventory Agent.
+Verifies warehouse inventory tools, stock verification workflow,
+reservation hold creation, and API contracts.
 """
 
 import json

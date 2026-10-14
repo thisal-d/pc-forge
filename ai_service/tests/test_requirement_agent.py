@@ -1,6 +1,6 @@
 """
-Tests for the Requirement & Product Discovery Agent (Member 01).
-Uses the real Gemini model to validate the true ReAct agent loop.
+Tests for the Requirement & Product Discovery Agent.
+Validates the ReAct loop and profile extraction.
 """
 import pytest
 from ai_service.agents.requirement_agent.agent import (
@@ -20,7 +20,7 @@ from ai_service.agents.requirement_agent.models import RequirementProfile
 # --------------------------------------------------------------------------
 
 def test_update_requirement_profile_tool_schema():
-    """Verify the tool's docstring and args are correctly exposed (Lab 05 pattern)."""
+    """Verify the tool's docstring and args are correctly exposed."""
     assert update_requirement_profile.name == "update_requirement_profile"
     assert "budget" in update_requirement_profile.description.lower()
     assert "purpose" in update_requirement_profile.description.lower()
@@ -189,13 +189,10 @@ def test_boundary_guardrail_no_part_recommendations():
 
 
 def test_checkpointer_state_persistence():
-    """Verifies that the checkpointer retains state across invocations (Lab 06 pattern).
+    """Verifies that the checkpointer retains state across invocations.
 
-    In CI the GEMINI_API_KEY is a placeholder so the LLM returns a plain text
-    reply instead of a tool call — meaning the profile field may not be
-    populated.  The important invariant is that the checkpointer persisted the
-    graph state (snapshot exists + messages recorded).  Profile extraction is
-    covered by the LLM-skipped integration tests.
+    The important invariant is that the checkpointer persisted the
+    graph state (snapshot exists + messages recorded).
     """
     import os
     session_id = "test_react_checkpointer"

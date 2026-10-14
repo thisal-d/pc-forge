@@ -1,11 +1,6 @@
 """
-PC Build & Compatibility Agent Models — PCForge (Member 03)
-===========================================================
-Defines structured data contracts for:
-  - Hardware components (CPU, Motherboard, RAM, GPU, PSU, Storage, Case, Cooler)
-  - Deterministic compatibility clearance checklist (Socket, Memory, Wattage, Case-fit)
-  - Validated build proposals
-  - API request & response schemas
+Data contracts for hardware components, compatibility clearance checklists,
+and validated PC build proposals.
 """
 
 from typing import Dict, List, Optional, Any

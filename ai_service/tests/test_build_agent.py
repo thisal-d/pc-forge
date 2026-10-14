@@ -1,8 +1,7 @@
 """
-Tests for PC Build & Compatibility Agent (Member 03)
-====================================================
-Verifies deterministic compatibility tools, LangGraph workflow execution,
-and FastAPI endpoint contracts.
+Tests for PC Build & Compatibility Agent.
+Verifies compatibility clearance tools, build workflow execution,
+and API endpoint contracts.
 """
 
 import json
@@ -25,7 +24,7 @@ client = TestClient(app)
 
 
 # ------------------------------------------------------------------------------
-# 1. Deterministic Tool Tests (Lab 05 Tool Contract Verification)
+# 1. Deterministic Tool Tests
 # ------------------------------------------------------------------------------
 def test_socket_compatibility_tool():
     """Validates CPU to Motherboard socket matching logic."""
@@ -105,7 +104,7 @@ def test_get_candidate_components_filter():
 
 
 # ------------------------------------------------------------------------------
-# 2. Agent Workflow & Clearance Tests (Member 03 ReAct / LangGraph)
+# 2. Agent Workflow & Clearance Tests
 # ------------------------------------------------------------------------------
 def test_generate_compatible_build_gaming_1440p():
     """Verifies complete build generation for 1440p Gaming rig."""
@@ -166,7 +165,7 @@ def test_generate_compatible_build_high_end_4k():
 # 3. FastAPI Endpoint Integration Tests
 # ------------------------------------------------------------------------------
 def test_get_build_tools_endpoint():
-    """Verify GET /agent/build/tools exposes schemas for Lab 05 compliance."""
+    """Verify GET /agent/build/tools exposes registered tools."""
     response = client.get("/agent/build/tools")
     assert response.status_code == 200
     data = response.json()

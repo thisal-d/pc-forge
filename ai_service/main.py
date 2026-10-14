@@ -51,7 +51,7 @@ from ai_service.agents.after_sales_agent import (
 
 app = FastAPI(
     title="PCForge Agentic AI Service",
-    description="Internal microservice hosting the 5 AI agents for PCForge (Member 01-05).",
+    description="Internal microservice hosting the AI agents for PCForge.",
     version="1.0.0",
 )
 
@@ -75,17 +75,15 @@ def health_check():
         "chat_model": CHAT_MODEL,
         "gemini_api_configured": has_gemini_key,
         "active_agents": [
-            "Requirement & Product Discovery Agent (Member 01)",
-            "PC Build & Compatibility Agent (Member 03)",
+            "Requirement & Product Discovery Agent",
+            "PC Build & Compatibility Agent",
         ],
     }
 
 
 @app.get("/agent/requirements/tools")
 def get_tools():
-    """Returns schemas of allow-listed tools advertised to the model (Lab 05 Task 05).
-    These are the tools the LLM can call via native tool calling.
-    """
+    """Returns schemas of allow-listed tools advertised to the model."""
     return {
         "agent": "requirement_agent",
         "tools": [
@@ -148,7 +146,7 @@ def get_requirement_session(session_id: str):
 
 @app.get("/agent/build/tools")
 def get_build_tools():
-    """Returns schemas of allow-listed tools for Member 03 PC Build & Compatibility Agent (Lab 05 Task 05)."""
+    """Returns schemas of allow-listed tools for PC Build & Compatibility Agent."""
     return {
         "agent": "build_compatibility_agent",
         "member": "Member 03",
@@ -165,7 +163,7 @@ def get_build_tools():
 
 @app.post("/agent/build/generate", response_model=BuildGenerationResponse)
 def generate_build(request: BuildGenerationRequest):
-    """Executes Member 03's PC Build & Compatibility Agent.
+    """Executes PC Build & Compatibility Agent.
     Produces an 8-component hardware BOM validated against socket, memory, wattage, and chassis rules.
     """
     try:
@@ -178,7 +176,7 @@ def generate_build(request: BuildGenerationRequest):
 
 @app.get("/agent/inventory/tools")
 def get_inventory_tools():
-    """Returns schemas of allow-listed tools for Member 02 Inventory Agent (Lab 05 Task 05)."""
+    """Returns schemas of allow-listed tools for Inventory Agent."""
     return {
         "agent": "inventory_agent",
         "member": "Member 02",
@@ -195,7 +193,7 @@ def get_inventory_tools():
 
 @app.post("/agent/inventory/verify-stock", response_model=StockVerificationResult)
 def verify_inventory(request: InventoryCheckRequest):
-    """Executes Member 02's Inventory Agent.
+    """Executes Inventory Agent.
     Verifies real shelf stock for all 8 components, applies substitutes if any are out of stock,
     and locks a 15-minute reservation hold.
     """
@@ -209,7 +207,7 @@ def verify_inventory(request: InventoryCheckRequest):
 
 @app.get("/agent/order-planning/tools")
 def get_order_planning_tools():
-    """Returns schemas of allow-listed tools for Member 04 Order Planning Agent (Lab 05 Task 05)."""
+    """Returns schemas of allow-listed tools for Order Planning Agent."""
     return {
         "agent": "order_planning_agent",
         "member": "Member 04",
@@ -226,7 +224,7 @@ def get_order_planning_tools():
 
 @app.post("/agent/order-planning/create-proposal", response_model=OrderProposalResponse)
 def create_order_proposal_endpoint(request: OrderPlanningRequest):
-    """Executes Member 04's Order Planning Agent.
+    """Executes Order Planning Agent.
     Calculates subtotal, applies promotional discounts, computes delivery,
     and produces an order proposal holding status WAITING_FOR_APPROVAL.
     """
@@ -240,7 +238,7 @@ def create_order_proposal_endpoint(request: OrderPlanningRequest):
 
 @app.get("/agent/after-sales/tools")
 def get_after_sales_tools():
-    """Returns schemas of allow-listed tools for Member 05 After-Sales Agent (Lab 05 Task 05)."""
+    """Returns schemas of allow-listed tools for After-Sales Agent."""
     return {
         "agent": "after_sales_agent",
         "member": "Member 05",
@@ -257,9 +255,9 @@ def get_after_sales_tools():
 
 @app.post("/agent/after-sales/chat", response_model=AfterSalesChatResponse)
 def after_sales_chat_endpoint(request: AfterSalesChatRequest):
-    """Executes Member 05's After-Sales Agent.
+    """Executes After-Sales Agent.
     Answers post-purchase questions, checks hardware warranty terms,
-    and opens RMA support tickets for staff technician inspection (UI 8).
+    and opens RMA support tickets for staff technician inspection.
     """
     try:
         response = run_after_sales_chat(request)
@@ -280,7 +278,7 @@ class InjectionDrillRequest(BaseModel):
 
 @app.post("/agent/drill")
 def injection_drill_endpoint(request: InjectionDrillRequest):
-    """Executes the Injection Drill from Lab 07 (Part 5) in 'naive', 'defended', or 'least_privilege' mode."""
+    """Executes the Injection Drill in 'naive', 'defended', or 'least_privilege' mode."""
     try:
         return run_injection_drill(mode=request.mode, custom_payload=request.custom_payload)
     except Exception as e:

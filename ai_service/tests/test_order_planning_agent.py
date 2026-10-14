@@ -1,8 +1,7 @@
 """
-Tests for Order Planning Agent (Member 04)
-==========================================
-Verifies deterministic pricing, voucher, and delivery tools,
-LangGraph agent workflow execution, and FastAPI endpoint contracts.
+Tests for Order Planning Agent.
+Verifies pricing, voucher, and delivery tools,
+order workflow execution, and FastAPI contracts.
 """
 
 import json

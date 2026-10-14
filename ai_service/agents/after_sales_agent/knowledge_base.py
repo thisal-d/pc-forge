@@ -1,9 +1,6 @@
 """
-RAG Knowledge Base for PCForge After-Sales Service Agent (Member 05)
-===================================================================
-Contains comprehensive troubleshooting guides, safety protocols, and warranty
-inspection procedures for PC hardware components and desktop systems.
-Retrieved dynamically during conversational diagnosis.
+Knowledge base and retrieval utilities for after-sales hardware troubleshooting,
+safety protocols, and warranty inspection.
 """
 
 from typing import Any, Dict, List, Optional

@@ -1,18 +1,7 @@
 """
-Order Planning Agent Implementation — PCForge (Member 04)
-=========================================================
-Autonomous LangGraph StateGraph agent utilizing Google Gemini.
-Responsible for:
-  1. Inspecting the stock-confirmed build configuration from Member 02.
-  2. Calculating itemized component subtotal via `calculate_pricing`.
-  3. Validating and applying promotional discount codes via `apply_discount`.
-  4. Sizing courier logistics via `calculate_delivery`.
-  5. Generating formal order proposal with status 'WAITING_FOR_APPROVAL' (UI 4).
-
-Guarantees:
-  - NO mock fallback data.
-  - Zero hardcoded heuristics bypassing the LLM.
-  - Strict human checkpoints: No payment processing occurs here; only proposal submission.
+Order Planning Agent for PCForge.
+Computes itemized pricing, validates promotional discounts,
+calculates delivery logistics, and generates order proposals for review.
 """
 
 import json
@@ -39,11 +28,10 @@ from ai_service.agents.order_planning_agent.tools import (
     order_planning_context_var,
 )
 
-# Tool lookup table for deterministic execution node
 TOOLS_BY_NAME = {t.name: t for t in ORDER_PLANNING_TOOLS}
 
-SYSTEM_PROMPT = """You are Member 04 (Order Planning Agent) of the PCForge Multi-Agent AI Subsystem.
-Your mission is to take an approved, stock-verified PC build from Member 02 (Inventory Agent) and produce a full, transparent order proposal matching Screen UI 4.
+SYSTEM_PROMPT = """You are the Order Planning Agent for the PCForge Multi-Agent AI Subsystem.
+Your mission is to take an approved, stock-verified PC build and produce a full, transparent order proposal.
 
 YOUR RESPONSIBILITIES:
 1. Examine the components provided in the customer's build.
@@ -53,16 +41,15 @@ YOUR RESPONSIBILITIES:
 5. Create the formal order proposal holding status 'WAITING_FOR_APPROVAL'.
 
 STRICT RULES & CONSTRAINTS:
-- You CANNOT select, swap, or replace hardware components (that was Member 03 and Member 02's job).
+- You CANNOT select, swap, or replace hardware components (handled during build assembly and inventory verification).
 - You CANNOT process payments or charge customer credit cards.
 - The order status MUST be 'WAITING_FOR_APPROVAL'.
 - Ensure all numbers reconcile correctly before submitting the proposal.
 """ + "\n\n" + SYSTEM_SECURITY_RULES
 
 
-
 class OrderPlanningState(TypedDict):
-    """LangGraph state representation for Member 04."""
+    """Workflow state for Order Planning Agent."""
     messages: Annotated[List[BaseMessage], add_messages]
     request_data: Dict
     proposal_payload: Optional[Dict]
@@ -165,7 +152,7 @@ def should_continue(state: OrderPlanningState) -> str:
 
 
 def build_order_planning_graph():
-    """Assembles and compiles the LangGraph StateGraph for Member 04."""
+    """Assembles and compiles the StateGraph for Order Planning."""
     workflow = StateGraph(OrderPlanningState)
 
     workflow.add_node("agent", agent_reasoning_node)
@@ -189,7 +176,7 @@ ORDER_PLANNING_GRAPH = build_order_planning_graph()
 
 
 def generate_order_proposal(request: OrderPlanningRequest) -> OrderProposalResponse:
-    """Public execution entry point for Member 04 Order Planning Agent."""
+    """Computes order pricing, evaluates discounts, and generates a reviewable proposal."""
     order_planning_context_var.set({"coupons": request.coupons or []})
     components_payload = json.dumps(request.components, indent=2) if request.components else "{}"
     raw_order_details = (
