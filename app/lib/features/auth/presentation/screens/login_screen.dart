@@ -26,14 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _quickFillCustomer() {
-    setState(() {
-      _emailController.text = 'customer@pcforge.com';
-      _passwordController.text = 'Cust123!';
-      _errorMessage = null;
-    });
-  }
-
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -210,22 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 12),
-
-                  // Demo Quick-Fill Helper
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: OutlinedButton.icon(
-                      key: const Key('login_quick_fill_btn'),
-                      onPressed: _isLoading ? null : _quickFillCustomer,
-                      icon: const Icon(Icons.flash_on, size: 16),
-                      label: const Text('Quick Fill Demo (Customer)', style: TextStyle(fontSize: 12)),
-                      style: OutlinedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
                   // Login Button
                   ElevatedButton(

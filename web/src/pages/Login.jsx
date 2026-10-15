@@ -54,12 +54,6 @@ export const Login = () => {
     }
   };
 
-  const fillCredentials = (quickEmail, quickPassword) => {
-    setEmail(quickEmail);
-    setPassword(quickPassword);
-    setError('');
-  };
-
   return (
     <div className="auth-container">
       <div className="auth-card">
@@ -77,7 +71,7 @@ export const Login = () => {
             <input
               id="email"
               type="email"
-              placeholder="user@pcforge.com"
+              placeholder="staff@pcforge.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -100,33 +94,6 @@ export const Login = () => {
             {submitting ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        <div className="demo-credentials-box">
-          <span className="demo-title">Quick Test Credentials:</span>
-          <div className="demo-chips">
-            <button
-              type="button"
-              className="chip chip-admin"
-              onClick={() => fillCredentials('admin@pcforge.com', 'Admin123!')}
-            >
-              Admin
-            </button>
-            <button
-              type="button"
-              className="chip chip-staff"
-              onClick={() => fillCredentials('staff@pcforge.com', 'Staff123!')}
-            >
-              Staff
-            </button>
-            <button
-              type="button"
-              className="chip chip-customer"
-              onClick={() => fillCredentials('customer@pcforge.com', 'Cust123!')}
-            >
-              Customer
-            </button>
-          </div>
-        </div>
 
         <p className="auth-footer">
           Don't have an account? <Link to="/register">Create one here</Link>

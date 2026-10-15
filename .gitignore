@@ -23,7 +23,11 @@ your-part
 **/.flutter-plugins-dependencies
 **/.pub-cache/
 **/.pub/
-app/android/
+app/android/.gradle/
+app/android/.kotlin/
+app/android/local.properties
+app/android/**/build/
+app/android/.cxx/
 app/ios/
 app/linux/
 app/macos/
