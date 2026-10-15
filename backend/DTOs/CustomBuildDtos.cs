@@ -19,6 +19,7 @@ public class CustomBuildSummaryDto
     public int ItemCount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public bool ClearancePassed { get; set; } = true;
     public List<CustomBuildComponentDto> Components { get; set; } = new();
 }
 
@@ -62,6 +63,7 @@ public class CustomBuildDetailDto
     public int? PsuCapacityWatts { get; set; }
     public int? PsuHeadroomWatts { get; set; }
     public int? PsuHeadroomPercentage { get; set; }
+    public bool ClearancePassed { get; set; } = true;
 
     public List<CustomBuildComponentDto> Components { get; set; } = new();
 }

@@ -277,39 +277,33 @@ export const CouponManagement = () => {
   };
 
   return (
-    <div className="coupons-page">
-      {/* Toast Notification */}
-      {notification && (
-        <div className={`coupons-toast ${notification.type}`}>
-          <span>{notification.message}</span>
-        </div>
-      )}
-
+    <div className="page-container">
       {/* Header */}
-      <div className="coupons-header">
+      <div className="dashboard-header">
         <div>
-          <h1 className="coupons-header-title">Promotions & Coupons</h1>
-          <p className="coupons-header-subtitle">
+          <h1>Promotions & Coupons</h1>
+          <p className="subtitle">
             Configure store vouchers, discount rates, and spend thresholds. Synced live with PostgreSQL and the AI Order Planning Agent.
           </p>
         </div>
-        <div className="coupons-header-actions">
+        <div className="header-actions">
           <button
-            className="btn-secondary"
+            type="button"
+            className="btn btn-outline"
             onClick={() => loadCoupons(true)}
             disabled={refreshing}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
             </svg>
-            {refreshing ? 'Refreshing...' : 'Refresh'}
+            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
-          <button className="btn-primary" onClick={handleOpenCreate}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button type="button" className="btn btn-primary" onClick={handleOpenCreate}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            Create Coupon
+            <span>Create Coupon</span>
           </button>
         </div>
       </div>
@@ -330,115 +324,143 @@ export const CouponManagement = () => {
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="coupons-kpi-grid">
-        <div className="coupons-kpi-card">
-          <div className="coupons-kpi-icon indigo">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-              <line x1="7" y1="7" x2="7.01" y2="7" />
-            </svg>
-          </div>
-          <div className="coupons-kpi-content">
-            <div className="coupons-kpi-label">Total Coupons</div>
-            <div className="coupons-kpi-value">{kpis.total}</div>
-            <div className="coupons-kpi-subtext">Configured store vouchers</div>
-          </div>
-        </div>
-
-        <div className="coupons-kpi-card">
-          <div className="coupons-kpi-icon green">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </div>
-          <div className="coupons-kpi-content">
-            <div className="coupons-kpi-label">Active Campaigns</div>
-            <div className="coupons-kpi-value">{kpis.active}</div>
-            <div className="coupons-kpi-subtext">Currently usable at checkout</div>
-          </div>
-        </div>
-
-        <div className="coupons-kpi-card">
-          <div className="coupons-kpi-icon amber">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="10" y1="15" x2="10" y2="9" />
-              <line x1="14" y1="15" x2="14" y2="9" />
-            </svg>
-          </div>
-          <div className="coupons-kpi-content">
-            <div className="coupons-kpi-label">Paused / Inactive</div>
-            <div className="coupons-kpi-value">{kpis.inactive}</div>
-            <div className="coupons-kpi-subtext">Temporarily deactivated</div>
-          </div>
-        </div>
-
-        <div className="coupons-kpi-card">
-          <div className="coupons-kpi-icon purple">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-              <line x1="8" y1="21" x2="16" y2="21" />
-              <line x1="12" y1="17" x2="12" y2="21" />
-            </svg>
-          </div>
-          <div className="coupons-kpi-content">
-            <div className="coupons-kpi-label">AI Agent Integration</div>
-            <div className="coupons-kpi-value" style={{ fontSize: '18px', color: '#7c3aed' }}>
-              Order Planning Agent
+      {/* KPI Stats Cards */}
+      <div className="stats-grid">
+        <div className="stat-card stat-card-total">
+          <div className="metric-card-top">
+            <div className="metric-icon-circle icon-circle-blue">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
+              </svg>
             </div>
-            <div className="coupons-kpi-subtext">Live queries via LangGraph</div>
+            <div className="metric-details">
+              <span className="stat-label">Total Coupons</span>
+              <span className="stat-value">{kpis.total}</span>
+              <span className="stat-subtext">Configured vouchers</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card stat-card-active">
+          <div className="metric-card-top">
+            <div className="metric-icon-circle icon-circle-green">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <div className="metric-details">
+              <span className="stat-label">Active Campaigns</span>
+              <span className="stat-value">{kpis.active}</span>
+              <span className="stat-subtext">Usable at checkout</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card stat-card-inactive">
+          <div className="metric-card-top">
+            <div className="metric-icon-circle icon-circle-amber">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="10" y1="15" x2="10" y2="9" />
+                <line x1="14" y1="15" x2="14" y2="9" />
+              </svg>
+            </div>
+            <div className="metric-details">
+              <span className="stat-label">Paused / Inactive</span>
+              <span className="stat-value">{kpis.inactive}</span>
+              <span className="stat-subtext">Temporarily inactive</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card stat-card-tech">
+          <div className="metric-card-top">
+            <div className="metric-icon-circle icon-circle-purple">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+            </div>
+            <div className="metric-details">
+              <span className="stat-label">AI Agent Integration</span>
+              <span className="stat-value" style={{ fontSize: '1.25rem', color: 'var(--accent-purple)' }}>
+                Order Agent
+              </span>
+              <span className="stat-subtext">LangGraph live sync</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Toolbar & Filters */}
-      <div className="coupons-toolbar">
-        <div className="coupons-search-box">
-          <svg className="coupons-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            type="text"
-            className="coupons-search-input"
-            placeholder="Search coupon code or description..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+      <div className="toolbar-card">
+        <div className="search-filter-row">
+          <div className="toolbar-search-wrapper">
+            <span className="toolbar-search-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              type="text"
+              className="toolbar-search-input"
+              placeholder="Search coupon code or description..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="toolbar-clear-btn"
+                onClick={() => setSearchQuery('')}
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-        <div className="coupons-filter-group">
-          <select
-            className="coupons-select"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="all">All Discount Types</option>
-            <option value="PERCENTAGE">Percentage (%)</option>
-            <option value="FLAT">Flat Amount (Rs.)</option>
-          </select>
+          <div className="toolbar-filters-group">
+            <div className="toolbar-select-item">
+              <select
+                className="toolbar-select"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="all">All Discount Types</option>
+                <option value="PERCENTAGE">Percentage (%)</option>
+                <option value="FLAT">Flat Amount (Rs.)</option>
+              </select>
+            </div>
 
-          <select
-            className="coupons-select"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active Only</option>
-            <option value="inactive">Inactive Only</option>
-          </select>
+            <div className="toolbar-select-item">
+              <select
+                className="toolbar-select"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">All Statuses</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+              </select>
+            </div>
 
-          <select
-            className="coupons-select"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-          >
-            <option value="code-asc">Sort: Code (A-Z)</option>
-            <option value="code-desc">Sort: Code (Z-A)</option>
-            <option value="discount-desc">Sort: Discount (High-Low)</option>
-            <option value="discount-asc">Sort: Discount (Low-High)</option>
-          </select>
+            <div className="toolbar-select-item">
+              <select
+                className="toolbar-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="code-asc">Sort: Code (A-Z)</option>
+                <option value="code-desc">Sort: Code (Z-A)</option>
+                <option value="discount-desc">Sort: Discount (High-Low)</option>
+                <option value="discount-asc">Sort: Discount (Low-High)</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -471,15 +493,15 @@ export const CouponManagement = () => {
                   <td colSpan="7" style={{ padding: 0 }}>
                     {loadError ? (
                       <div className="empty-state error-state" style={{ padding: '40px 24px', textAlign: 'center' }}>
-                        <div className="empty-state-icon" style={{ color: '#ef4444', marginBottom: '12px' }}>
+                        <div className="empty-state-icon" style={{ color: 'var(--danger)', marginBottom: '12px' }}>
                           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <circle cx="12" cy="12" r="10" />
                             <line x1="12" y1="8" x2="12" y2="12" />
                             <line x1="12" y1="16" x2="12.01" y2="16" />
                           </svg>
                         </div>
-                        <h4 style={{ color: '#991b1b', marginBottom: '6px' }}>Failed to load coupons from backend</h4>
-                        <p style={{ color: '#64748b', maxWidth: '440px', margin: '0 auto 16px', fontSize: '13px' }}>
+                        <h4 style={{ color: 'var(--danger-text)', marginBottom: '6px' }}>Failed to load coupons from backend</h4>
+                        <p style={{ color: 'var(--text-muted)', maxWidth: '440px', margin: '0 auto 16px', fontSize: '13px' }}>
                           {loadError}. Please verify that the backend API server is running on port 5000 and try again.
                         </p>
                         <button
@@ -528,7 +550,7 @@ export const CouponManagement = () => {
                       </span>
                     </td>
                     <td>
-                      <div style={{ fontWeight: 600, color: '#0f172a' }}>{coupon.description}</div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{coupon.description}</div>
                     </td>
                     <td>
                       {(coupon.discountType || 'PERCENTAGE').toUpperCase() === 'PERCENTAGE' ? (
@@ -553,7 +575,8 @@ export const CouponManagement = () => {
                     </td>
                     <td>
                       <button
-                        className={`status-pill ${coupon.isActive ? 'active' : 'inactive'}`}
+                        className={`status-pill ${coupon.isActive ? 'status-pill-in' : 'status-pill-low'}`}
+                        style={{ border: 'none', cursor: 'pointer' }}
                         onClick={() => handleToggleStatus(coupon)}
                         title="Click to toggle status"
                       >
@@ -561,24 +584,24 @@ export const CouponManagement = () => {
                         <span>{coupon.isActive ? 'Active' : 'Inactive'}</span>
                       </button>
                     </td>
-                    <td>
-                      <div className="coupon-actions">
+                    <td style={{ textAlign: 'right' }}>
+                      <div className="coupon-actions" style={{ justifyContent: 'flex-end' }}>
                         <button
-                          className="action-btn"
+                          className="btn btn-outline-sm"
                           title="Edit Coupon"
                           onClick={() => handleOpenEdit(coupon)}
                         >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                           </svg>
                         </button>
                         <button
-                          className="action-btn delete"
+                          className="btn btn-danger-sm"
                           title="Delete Coupon"
                           onClick={() => setDeleteCandidate(coupon)}
                         >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="3 6 5 6 21 6" />
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                           </svg>
@@ -608,48 +631,48 @@ export const CouponManagement = () => {
       {/* Create / Edit Modal */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-dialog" style={{ maxWidth: '580px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">
-                {isEditing ? `Edit Coupon: ${currentCoupon?.code}` : 'Create New Promotional Coupon'}
-              </h2>
-              <button className="modal-close-btn" onClick={() => setIsModalOpen(false)}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+              <div>
+                <h3 className="modal-title">
+                  {isEditing ? `Edit Coupon: ${currentCoupon?.code}` : 'Create New Promotional Coupon'}
+                </h3>
+                <span className="modal-subtitle">Configure discount parameters and checkout eligibility</span>
+              </div>
+              <button className="modal-close-btn" onClick={() => setIsModalOpen(false)} aria-label="Close modal">
+                <CloseIcon size={16} />
               </button>
             </div>
 
             <form onSubmit={handleFormSubmit}>
               <div className="modal-body">
                 {formError && (
-                  <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', fontWeight: 600 }}>
+                  <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
                     {formError}
                   </div>
                 )}
 
                 <div className="form-group">
-                  <label className="form-label">Coupon Code (Uppercase)</label>
+                  <label className="form-label-saas">Coupon Code (Uppercase) *</label>
                   <input
                     type="text"
-                    className="form-input"
+                    className="form-input-saas"
                     placeholder="e.g. FORGE10"
                     value={formData.code}
-                    disabled={isEditing} // code cannot be changed once created to preserve order history integrity
+                    disabled={isEditing}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                     required
                   />
-                  <div className="form-hint">
-                    Unique uppercase voucher code that customers type in mobile (e.g. Screen UI 4).
+                  <div className="form-help-text">
+                    Unique uppercase voucher code that customers apply in checkout.
                   </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Campaign Description</label>
+                  <label className="form-label-saas">Campaign Description *</label>
                   <input
                     type="text"
-                    className="form-input"
+                    className="form-input-saas"
                     placeholder="e.g. 10% Custom Rig Hardware Discount"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -657,11 +680,11 @@ export const CouponManagement = () => {
                   />
                 </div>
 
-                <div className="form-row">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Discount Type</label>
+                    <label className="form-label-saas">Discount Type</label>
                     <select
-                      className="form-select"
+                      className="form-select-saas"
                       value={formData.discountType}
                       onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
                     >
@@ -671,13 +694,13 @@ export const CouponManagement = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">
-                      {formData.discountType === 'PERCENTAGE' ? 'Discount Percentage (%)' : 'Discount Amount (Rs.)'}
+                    <label className="form-label-saas">
+                      {formData.discountType === 'PERCENTAGE' ? 'Discount Percentage (%) *' : 'Discount Amount (Rs.) *'}
                     </label>
                     <input
                       type="number"
                       step="0.01"
-                      className="form-input"
+                      className="form-input-saas"
                       placeholder={formData.discountType === 'PERCENTAGE' ? '10' : '10000'}
                       value={formData.discountValue}
                       onChange={(e) => setFormData({ ...formData, discountValue: e.target.value })}
@@ -686,55 +709,55 @@ export const CouponManagement = () => {
                   </div>
                 </div>
 
-                <div className="form-row">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Min Subtotal (Rs.)</label>
+                    <label className="form-label-saas">Min Subtotal (Rs.)</label>
                     <input
                       type="number"
                       step="1"
-                      className="form-input"
+                      className="form-input-saas"
                       placeholder="e.g. 50000 (0 for no min)"
                       value={formData.minSubtotal}
                       onChange={(e) => setFormData({ ...formData, minSubtotal: e.target.value })}
                     />
-                    <div className="form-hint">Cart must reach this amount to qualify.</div>
+                    <div className="form-help-text">Cart must reach this amount to qualify.</div>
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Max Discount Cap (Rs.)</label>
+                    <label className="form-label-saas">Max Discount Cap (Rs.)</label>
                     <input
                       type="number"
                       step="1"
-                      className="form-input"
+                      className="form-input-saas"
                       placeholder="e.g. 15000 (optional)"
                       value={formData.maxDiscount}
                       onChange={(e) => setFormData({ ...formData, maxDiscount: e.target.value })}
                     />
-                    <div className="form-hint">Ceiling on percentage deductions.</div>
+                    <div className="form-help-text">Ceiling on percentage deductions.</div>
                   </div>
                 </div>
 
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '0.5rem' }}>
                   <input
                     type="checkbox"
                     id="isActiveCoupon"
                     checked={formData.isActive}
                     onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--primary)' }}
                   />
-                  <label htmlFor="isActiveCoupon" style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b', cursor: 'pointer' }}>
+                  <label htmlFor="isActiveCoupon" style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer' }}>
                     Active and usable by customers immediately
                   </label>
                 </div>
 
                 {/* Real-time receipt simulation */}
                 <div className="receipt-preview-card">
-                  <div className="receipt-preview-title">Receipt Preview (UI 4 Simulation)</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569' }}>
-                    <span>Subtotal (example):</span>
+                  <div className="receipt-preview-title">Receipt Calculation Simulation</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-body)' }}>
+                    <span>Example Subtotal:</span>
                     <span>Rs. 150,000</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#059669', fontWeight: 700, marginTop: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--success-text)', fontWeight: 700, marginTop: '0.25rem' }}>
                     <span>Discount ({formData.code || 'CODE'}):</span>
                     <span>
                       - Rs.{' '}
@@ -752,13 +775,13 @@ export const CouponManagement = () => {
               <div className="modal-footer">
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="btn btn-secondary"
                   onClick={() => setIsModalOpen(false)}
                   disabled={formSubmitting}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" disabled={formSubmitting}>
+                <button type="submit" className="btn btn-primary" disabled={formSubmitting}>
                   {formSubmitting ? 'Saving...' : isEditing ? 'Update Coupon' : 'Create Coupon'}
                 </button>
               </div>
@@ -770,31 +793,28 @@ export const CouponManagement = () => {
       {/* Delete Confirmation Modal */}
       {deleteCandidate && (
         <div className="modal-overlay" onClick={() => setDeleteCandidate(null)}>
-          <div className="modal-content" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-dialog" style={{ maxWidth: '440px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title" style={{ color: '#dc2626' }}>Delete Coupon?</h3>
-              <button className="modal-close-btn" onClick={() => setDeleteCandidate(null)}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+              <h3 className="modal-title" style={{ color: 'var(--danger-text)' }}>Delete Coupon?</h3>
+              <button className="modal-close-btn" onClick={() => setDeleteCandidate(null)} aria-label="Close modal">
+                <CloseIcon size={16} />
               </button>
             </div>
             <div className="modal-body">
-              <p style={{ margin: 0, color: '#334155', fontSize: '14px', lineHeight: 1.5 }}>
+              <p style={{ margin: 0, color: 'var(--text-body)', fontSize: '0.875rem', lineHeight: 1.5 }}>
                 Are you sure you want to permanently delete coupon <strong>"{deleteCandidate.code}"</strong>? Customers will no longer be able to use it in checkout proposals.
               </p>
             </div>
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setDeleteCandidate(null)}>
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteCandidate(null)}>
                 Cancel
               </button>
               <button
-                className="btn-primary"
-                style={{ background: '#dc2626' }}
+                type="button"
+                className="btn btn-danger"
                 onClick={handleDeleteConfirm}
               >
-                Delete
+                Delete Coupon
               </button>
             </div>
           </div>
@@ -805,3 +825,4 @@ export const CouponManagement = () => {
 };
 
 export default CouponManagement;
+

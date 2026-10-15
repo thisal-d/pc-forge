@@ -218,7 +218,7 @@ export const AddProductModal = ({
               loading={filtersLoading}
               onChange={onDynamicFilterChange}
               containerId="dynamic-category-filters-container"
-              titleColor="#a78bfa"
+              titleColor="var(--text-main, #0f172a)"
             />
           </div>
 

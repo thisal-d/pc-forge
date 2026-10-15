@@ -19,6 +19,12 @@ export const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  const userRoleLower = (role || '').trim().toLowerCase();
+  // Customer accounts are strictly prohibited from accessing any web portal route
+  if (userRoleLower === 'customer') {
+    return <Navigate to="/login" replace />;
+  }
+
   if (allowedRoles.length > 0) {
     const userRoleLower = (role || '').trim().toLowerCase();
     // Admin is a superuser with full access to any Staff/Customer-authorized route

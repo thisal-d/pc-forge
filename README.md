@@ -94,6 +94,7 @@ A full-stack, cross-platform e-commerce and custom PC building ecosystem modeled
 - **Autonomous Multi-Agent AI (LangGraph)**: 5 specialized agents orchestrating customer requirement extraction, live stock lookups with alternative substitutions, deterministic hardware clearance, pricing proposals in LKR, and after-sales service appointment scheduling.
 - **Multi-Key LLM Cascading Failover**: Enterprise key rotation mechanism supporting up to 6 Gemini API keys with automatic exponential backoff, health tracking, and zero downtime during quota exhaustion.
 - **Store Operations & Staff Workbenches**: Dedicated React web portal for store managers and technicians, featuring real-time KPI metrics, custom build review queues with automated compatibility meters, inventory adjusters, order fulfillment tabs, and service request intake.
+- **Automated Customer Email Notifications (EmailJS)**: Responsive, branded HTML email notifications for custom build approvals, order fulfillment with store pickup coordinates, and after-sales service appointment reminders. See [docs/email-templates/](docs/email-templates/).
 - **Reactive Mobile Client (Flutter)**: Material 3 mobile application featuring reactive state management (`Provider` + `ChangeNotifier`), faceted catalog search, hardware camera scanner, and customer appointment management.
 - **Zero-Hallucination Database Isolation**: AI microservice operates statelessly; all database persistence and stock updates are authoritatively validated and committed exclusively through the ASP.NET Core backend.
 
@@ -257,12 +258,28 @@ pc-forge/
 │   ├── lib/core/              # Routing, themes, auth session, common widgets
 │   ├── lib/features/          # auth, catalog, cart, checkout, orders, support, build_pc, scanner
 │   └── test/                  # Flutter unit & widget test suite
+├── docs/                      # Architectural governance & integration guides
+│   ├── email-templates/       # Responsive EmailJS notification templates & deployment guide
+│   └── performance/           # Locust load testing benchmarks
 └── web/                       # React 19 + Vite Staff & Admin Portal
     ├── src/pages/             # Staff, BuildReviews, Orders, ServiceRequests, Products, Categories
     ├── src/components/        # Modular workbenches, inspection modals, tables
     ├── src/services/          # API client services
     └── src/__tests__/         # Vitest unit test suite
 ```
+
+---
+
+## 📧 Customer Email Notifications (EmailJS)
+
+PCForge features an automated customer email notification subsystem powered by EmailJS REST API. All production-ready HTML source templates and the complete deployment guide are maintained in [`docs/email-templates/`](docs/email-templates/).
+
+### Notification Workflows:
+* **Custom PC Builds:** Configuration submitted, technician review started, build approved with component clearance notes, modifications requested with feedback, and cancellation.
+* **Order Fulfillment:** Order confirmed, PC assembly & bench-testing started, ready for store pickup (with verified store hub coordinates and hours), and courier dispatch.
+* **After-Sales Services:** Service appointment booked, technician assigned / in-progress, and hardware repair completed.
+
+> 💡 **EmailJS Free-Tier Friendly:** Designed with a 2-template master architecture (`01_master_custom_builds_template.html` and `02_master_order_status_template.html`) that dynamically populates subjects, badges, and details with automatic fallback.
 
 ---
 

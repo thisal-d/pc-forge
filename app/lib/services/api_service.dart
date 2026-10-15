@@ -68,6 +68,95 @@ class ApiService {
               (X509Certificate cert, String host, int port) => true);
   }
 
+  /// Extracts a human-friendly error message from API response or status code.
+  /// Never leaks raw HTTP status codes, technical exceptions, or stack traces.
+  static String extractErrorMessage(dynamic data, int? statusCode) {
+    if (data is Map) {
+      // 1. Check for ASP.NET ModelState validation errors dictionary: { "errors": { "field": ["msg"] } }
+      if (data['errors'] is Map) {
+        final errors = data['errors'] as Map;
+        for (final entry in errors.entries) {
+          final val = entry.value;
+          if (val is List && val.isNotEmpty) {
+            final firstMsg = val.first.toString().trim();
+            final normalized = _normalizeMessage(firstMsg);
+            if (normalized.isNotEmpty) return normalized;
+          } else if (val is String && val.trim().isNotEmpty) {
+            final normalized = _normalizeMessage(val.trim());
+            if (normalized.isNotEmpty) return normalized;
+          }
+        }
+      }
+
+      // 2. Check for explicit backend message / error / title
+      final rawMsg = data['message'] ?? data['error'] ?? data['title'];
+      if (rawMsg is String && rawMsg.trim().isNotEmpty) {
+        final normalized = _normalizeMessage(rawMsg.trim());
+        if (normalized.isNotEmpty) return normalized;
+      }
+    }
+
+    // 3. Fallback to clean, human-friendly messages based on standard HTTP status codes
+    return _fallbackForStatusCode(statusCode);
+  }
+
+  static String _normalizeMessage(String msg) {
+    final lower = msg.toLowerCase();
+
+    if (lower.contains('password must be at least 8 characters')) {
+      return 'Password must be at least 8 characters long.';
+    }
+    if (lower.contains('email already exists') || lower.contains('already registered')) {
+      return 'An account with this email already exists.';
+    }
+    if (lower.contains('valid email')) {
+      return 'Please enter a valid email address.';
+    }
+    if (lower.contains('last name is required')) {
+      return 'Last name is required.';
+    }
+    if (lower.contains('first name is required')) {
+      return 'Please enter your first name.';
+    }
+
+    // Avoid leaking stack traces, runtime exceptions or raw status messages
+    if (lower.contains('exception') ||
+        lower.contains('stack trace') ||
+        lower.contains('server error') ||
+        lower.contains('request failed with status code') ||
+        lower.contains('one or more validation errors')) {
+      return '';
+    }
+
+    return msg;
+  }
+
+  static String _fallbackForStatusCode(int? statusCode) {
+    switch (statusCode) {
+      case 400:
+        return 'Please check your information and try again.';
+      case 401:
+        return 'Invalid credentials or session expired. Please sign in again.';
+      case 403:
+        return 'You do not have permission to perform this action.';
+      case 404:
+        return 'The requested resource was not found.';
+      case 409:
+        return 'An account with this email already exists.';
+      case 422:
+        return 'Invalid information provided. Please check your inputs.';
+      case 429:
+        return 'Too many requests. Please wait a moment and try again.';
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        return 'Something went wrong. Please try again later.';
+      default:
+        return 'Something went wrong. Please try again later.';
+    }
+  }
+
   /// Helper to send HTTP GET requests
   Future<dynamic> get(
     String path, {
@@ -108,9 +197,7 @@ class ApiService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return data;
       } else {
-        final errorMsg = (data is Map && data['message'] != null)
-            ? data['message'] as String
-            : 'Request failed with status code ${response.statusCode}';
+        final errorMsg = extractErrorMessage(data, response.statusCode);
         throw ApiException(
           errorMsg,
           statusCode: response.statusCode,
@@ -119,17 +206,17 @@ class ApiService {
       }
     } on SocketException catch (e) {
       throw ApiException(
-        'Cannot connect to server at $baseUrl.\nPlease ensure the backend API is running.',
+        'Unable to connect. Please check your internet connection and try again.',
         originalError: e,
       );
     } on TimeoutException catch (e) {
       throw ApiException(
-        'Connection timed out while contacting $baseUrl.',
+        'Unable to connect. Please check your internet connection and try again.',
         originalError: e,
       );
     } catch (e) {
       if (e is ApiException) rethrow;
-      throw ApiException('Unexpected network error: $e', originalError: e);
+      throw ApiException('Something went wrong. Please try again later.', originalError: e);
     }
   }
 
@@ -138,6 +225,7 @@ class ApiService {
     String path,
     Map<String, dynamic> body, {
     String? token,
+    Duration timeout = const Duration(seconds: 90),
   }) async {
     final uri = Uri.parse('$baseUrl$path');
     try {
@@ -151,7 +239,7 @@ class ApiService {
       }
       request.write(jsonEncode(body));
 
-      final response = await request.close().timeout(const Duration(seconds: 60));
+      final response = await request.close().timeout(timeout);
       final responseBody = await response.transform(utf8.decoder).join();
 
       Map<String, dynamic> data = {};
@@ -166,8 +254,7 @@ class ApiService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return data;
       } else {
-        final errorMsg = data['message'] as String? ??
-            'Request failed with status code ${response.statusCode}';
+        final errorMsg = extractErrorMessage(data, response.statusCode);
         throw ApiException(
           errorMsg,
           statusCode: response.statusCode,
@@ -176,17 +263,17 @@ class ApiService {
       }
     } on SocketException catch (e) {
       throw ApiException(
-        'Cannot connect to server at $baseUrl.\nPlease ensure the backend API is running.',
+        'Unable to connect. Please check your internet connection and try again.',
         originalError: e,
       );
     } on TimeoutException catch (e) {
       throw ApiException(
-        'Connection timed out while contacting $baseUrl.',
+        'Unable to connect. Please check your internet connection and try again.',
         originalError: e,
       );
     } catch (e) {
       if (e is ApiException) rethrow;
-      throw ApiException('Unexpected network error: $e', originalError: e);
+      throw ApiException('Something went wrong. Please try again later.', originalError: e);
     }
   }
 
@@ -223,8 +310,7 @@ class ApiService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return data;
       } else {
-        final errorMsg = data['message'] as String? ??
-            'Request failed with status code ${response.statusCode}';
+        final errorMsg = extractErrorMessage(data, response.statusCode);
         throw ApiException(
           errorMsg,
           statusCode: response.statusCode,
@@ -233,17 +319,70 @@ class ApiService {
       }
     } on SocketException catch (e) {
       throw ApiException(
-        'Cannot connect to server at $baseUrl.\nPlease ensure the backend API is running.',
+        'Unable to connect. Please check your internet connection and try again.',
         originalError: e,
       );
     } on TimeoutException catch (e) {
       throw ApiException(
-        'Connection timed out while contacting $baseUrl.',
+        'Unable to connect. Please check your internet connection and try again.',
         originalError: e,
       );
     } catch (e) {
       if (e is ApiException) rethrow;
-      throw ApiException('Unexpected network error: $e', originalError: e);
+      throw ApiException('Something went wrong. Please try again later.', originalError: e);
+    }
+  }
+
+  /// Helper to send HTTP DELETE requests
+  Future<Map<String, dynamic>> delete(
+    String path, {
+    String? token,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    try {
+      final request = await _client.deleteUrl(uri);
+      final effectiveToken = (token != null && token.isNotEmpty)
+          ? token
+          : AuthSession.instance.token;
+      if (effectiveToken != null && effectiveToken.isNotEmpty) {
+        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $effectiveToken');
+      }
+
+      final response = await request.close().timeout(const Duration(seconds: 15));
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      Map<String, dynamic> data = {};
+      if (responseBody.trim().isNotEmpty) {
+        try {
+          data = jsonDecode(responseBody) as Map<String, dynamic>;
+        } catch (_) {
+          data = {'raw': responseBody};
+        }
+      }
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return data;
+      } else {
+        final errorMsg = extractErrorMessage(data, response.statusCode);
+        throw ApiException(
+          errorMsg,
+          statusCode: response.statusCode,
+          responseData: data,
+        );
+      }
+    } on SocketException catch (e) {
+      throw ApiException(
+        'Unable to connect. Please check your internet connection and try again.',
+        originalError: e,
+      );
+    } on TimeoutException catch (e) {
+      throw ApiException(
+        'Unable to connect. Please check your internet connection and try again.',
+        originalError: e,
+      );
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Something went wrong. Please try again later.', originalError: e);
     }
   }
 
@@ -390,6 +529,8 @@ class ApiService {
     required String shippingAddress,
     required String paymentMethod,
     required List<Map<String, dynamic>> items,
+    String? couponCode,
+    double? discountAmount,
     String? token,
   }) async {
     return await post(
@@ -398,6 +539,8 @@ class ApiService {
         'shippingAddress': shippingAddress,
         'paymentMethod': paymentMethod,
         'items': items,
+        if (couponCode != null && couponCode.isNotEmpty) 'couponCode': couponCode,
+        if (discountAmount != null && discountAmount > 0) 'discountAmount': discountAmount,
       },
       token: token,
     );
@@ -466,6 +609,15 @@ class ApiService {
     return await post('/ServiceRequests/$id/cancel', {}, token: token);
   }
 
+  /// Fetch Configured Time Slots for a Specific Date
+  Future<List<Map<String, dynamic>>> fetchTimeSlotsForDate(String date, {String? token}) async {
+    final res = await get('/ServiceRequests/slots?date=$date', token: token);
+    if (res is List) {
+      return res.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return [];
+  }
+
   /// Create and Submit a new Service Request
   Future<Map<String, dynamic>> createServiceRequest({
     String? title,
@@ -480,6 +632,7 @@ class ApiService {
     String warrantyStatus = 'Active',
     String? preferredDate,
     String? preferredTime,
+    int? slotId,
     String priority = 'Normal',
     String? attachmentUrl,
     String? token,
@@ -494,6 +647,7 @@ class ApiService {
       if (orderId != null) 'orderId': orderId,
       if (preferredDate != null) 'preferredDate': preferredDate,
       if (preferredTime != null) 'preferredTime': preferredTime,
+      if (slotId != null) 'slotId': slotId,
     };
     return await post(
       '/ServiceRequests',
@@ -579,5 +733,10 @@ class ApiService {
       return Map<String, dynamic>.from(res);
     }
     return null;
+  }
+
+  /// Delete a custom build from customer side (DELETE /CustomBuilds/{id})
+  Future<void> deleteCustomBuild(int buildId, {String? token}) async {
+    await delete('/CustomBuilds/$buildId', token: token);
   }
 }

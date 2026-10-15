@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../../core/app_routes.dart';
 import '../../../cart/data/cart_service.dart';
 import '../../../catalog/data/catalog_repository.dart';
@@ -21,15 +22,12 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
   final _repository = CatalogRepository();
 
   bool _isSearching = false;
+  bool _isProcessingScan = false;
+  bool _isTorchOn = false;
+
   late AnimationController _animController;
   late Animation<double> _laserAnimation;
-
-  final List<Map<String, String>> _sampleBarcodes = [
-    {'code': 'BAR-GPU-4070', 'label': 'RTX 4070 Ti', 'sub': 'GPU - LKR 245,000'},
-    {'code': 'BAR-CPU-7800X', 'label': 'Ryzen 7 7800X3D', 'sub': 'CPU - LKR 145,000'},
-    {'code': 'BAR-MB-B650', 'label': 'ASUS ROG B650', 'sub': 'Motherboard - LKR 72,000'},
-    {'code': 'BAR-RAM-32GB', 'label': 'Corsair 32GB DDR5', 'sub': 'RAM - LKR 39,000'},
-  ];
+  late MobileScannerController _scannerController;
 
   @override
   void initState() {
@@ -42,10 +40,54 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
     _laserAnimation = Tween<double>(begin: 0.1, end: 0.9).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
+
+    _scannerController = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+      torchEnabled: false,
+    );
+  }
+
+  Future<void> _toggleTorch() async {
+    try {
+      await _scannerController.toggleTorch();
+      if (mounted) {
+        setState(() => _isTorchOn = !_isTorchOn);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Flashlight is not supported or camera is unavailable'),
+            duration: Duration(milliseconds: 700),
+          ),
+        );
+      }
+    }
+  }
+
+  void _onBarcodeDetected(BarcodeCapture capture) {
+    if (_isProcessingScan || _isSearching) return;
+    for (final barcode in capture.barcodes) {
+      final raw = barcode.rawValue?.trim();
+      if (raw != null && raw.isNotEmpty) {
+        _isProcessingScan = true;
+        _barcodeController.text = raw;
+        _lookupBarcode(raw).then((_) {
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              setState(() => _isProcessingScan = false);
+            }
+          });
+        });
+        break;
+      }
+    }
   }
 
   @override
   void dispose() {
+    _scannerController.dispose();
     _animController.dispose();
     _barcodeController.dispose();
     super.dispose();
@@ -455,16 +497,12 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
             onPressed: _pasteFromClipboard,
           ),
           IconButton(
-            icon: const Icon(Icons.flash_on),
-            tooltip: 'Flashlight',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Flashlight toggled'),
-                  duration: Duration(milliseconds: 600),
-                ),
-              );
-            },
+            icon: Icon(
+              _isTorchOn ? Icons.flash_on : Icons.flash_off,
+              color: _isTorchOn ? Colors.amberAccent : Colors.white,
+            ),
+            tooltip: 'Toggle Flashlight',
+            onPressed: _toggleTorch,
           ),
         ],
       ),
@@ -482,18 +520,21 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
 
             // 1. Camera Viewfinder Frame
             Expanded(
-              flex: 5,
               child: Padding(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Viewfinder background
+                    // Viewfinder background & Live Camera Preview
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.black38,
+                        color: const Color(0xFF1E293B).withValues(alpha: 0.65),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: Colors.white24, width: 2),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: _buildCameraContent(),
                       ),
                     ),
 
@@ -588,79 +629,147 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
               ),
             ),
 
-            // 2. Quick Barcode Simulator Chips (For headless testing & instant simulation)
-            Expanded(
-              flex: 4,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'Simulate Barcode Scan (Tap any component):',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _sampleBarcodes.map((item) {
-                          return ActionChip(
-                            avatar: const Icon(Icons.qr_code, size: 16, color: Color(0xFF0F172A)),
-                            label: Text('${item['label']} (${item['sub']})'),
-                            onPressed: () => _lookupBarcode(item['code']!),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 16),
-                      const Divider(),
-                      const SizedBox(height: 8),
+            // 2. Barcode & QR Input Panel
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.qr_code_2, size: 20, color: Color(0xFF0F172A)),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'QR & Barcode Lookup',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
 
-                      // Manual Barcode / QR Input
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _barcodeController,
-                              decoration: InputDecoration(
-                                hintText: 'Enter barcode, SKU or QR code...',
-                                border: const OutlineInputBorder(),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                prefixIcon: const Icon(Icons.qr_code),
-                                suffixIcon: IconButton(
-                                  icon: const Icon(Icons.content_paste, size: 20),
-                                  tooltip: 'Paste from clipboard',
-                                  onPressed: _pasteFromClipboard,
-                                ),
+                    // Manual Barcode / QR Input
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _barcodeController,
+                            decoration: InputDecoration(
+                              hintText: 'Enter barcode, SKU or QR code...',
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              prefixIcon: const Icon(Icons.qr_code),
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.content_paste, size: 20),
+                                tooltip: 'Paste from clipboard',
+                                onPressed: _pasteFromClipboard,
                               ),
-                              onSubmitted: (val) => _lookupBarcode(val),
                             ),
+                            onSubmitted: (val) => _lookupBarcode(val),
                           ),
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            key: const Key('scan_lookup_btn'),
-                            onPressed: () => _lookupBarcode(_barcodeController.text),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            ),
-                            icon: const Icon(Icons.search, size: 18),
-                            label: const Text('Scan'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          key: const Key('scan_lookup_btn'),
+                          onPressed: () => _lookupBarcode(_barcodeController.text),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                          icon: const Icon(Icons.search, size: 18),
+                          label: const Text('Scan'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCameraContent() {
+    return MobileScanner(
+      controller: _scannerController,
+      onDetect: _onBarcodeDetected,
+      errorBuilder: (context, error) {
+        if (error.errorCode == MobileScannerErrorCode.permissionDenied) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.no_photography_outlined, size: 48, color: Colors.amberAccent),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Camera Permission Required',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Camera permission is required to scan barcodes live. Please allow camera access.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Retry / Grant Camera'),
+                    onPressed: () {
+                      _scannerController.start();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Headless test, desktop, or camera not ready fallback
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.qr_code_scanner, size: 48, color: Colors.tealAccent.withValues(alpha: 0.7)),
+                const SizedBox(height: 10),
+                const Text(
+                  'Scanner Viewfinder',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                const SizedBox(height: 4),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Align component barcode / QR inside the frame, or use paste/manual lookup below.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

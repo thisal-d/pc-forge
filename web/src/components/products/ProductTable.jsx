@@ -20,6 +20,7 @@ export const ProductTable = ({
   onEditProduct,
   onToggleStatus,
   onDeleteProduct,
+  onShowQr,
 }) => {
   // If paginatedProducts wasn't passed, fall back to filteredProducts
   const displayedItems = paginatedProducts.length > 0 || filteredProducts.length === 0
@@ -39,15 +40,15 @@ export const ProductTable = ({
         <table className="data-table" id="products-table">
           <thead>
             <tr>
-              <th>Product ID</th>
-              <th>Product Name</th>
-              <th>Category</th>
-              <th>Brand</th>
-              <th>Price</th>
-              <th>Stock</th>
-              <th>Status</th>
-              <th>Created Date</th>
-              <th style={{ textAlign: 'right' }}>Actions</th>
+              <th style={{ width: '85px', whiteSpace: 'nowrap' }}>Product ID</th>
+              <th style={{ minWidth: '180px' }}>Product Name</th>
+              <th style={{ width: '100px', whiteSpace: 'nowrap' }}>Category</th>
+              <th style={{ width: '90px', whiteSpace: 'nowrap' }}>Brand</th>
+              <th style={{ width: '115px', whiteSpace: 'nowrap' }}>Price</th>
+              <th style={{ width: '95px', whiteSpace: 'nowrap' }}>Stock</th>
+              <th style={{ width: '80px', whiteSpace: 'nowrap' }}>Status</th>
+              <th style={{ width: '105px', whiteSpace: 'nowrap' }}>Created Date</th>
+              <th style={{ textAlign: 'right', width: '320px', minWidth: '320px', whiteSpace: 'nowrap', paddingRight: '1.25rem' }}>Actions</th>
             </tr>
           </thead>
           {loading ? (
@@ -87,6 +88,7 @@ export const ProductTable = ({
                   onEdit={onEditProduct}
                   onToggleStatus={onToggleStatus}
                   onDelete={onDeleteProduct}
+                  onShowQr={onShowQr}
                 />
               ))}
             </tbody>

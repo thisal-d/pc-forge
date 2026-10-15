@@ -7,7 +7,7 @@ export const ProductDynamicSpecs = ({
   loading,
   onChange,
   containerId = 'dynamic-category-filters-container',
-  titleColor = '#a78bfa',
+  titleColor = 'var(--text-main, #0f172a)',
 }) => {
   const renderInput = (filter) => {
     const currentVal = filterValues[filter.filterId]?.rawValue || filterValues[filter.filterKey]?.rawValue || '';

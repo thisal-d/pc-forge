@@ -103,8 +103,14 @@ public class ServiceRequestContextDto
     [JsonPropertyName("preferred_time")]
     public string? PreferredTime { get; set; }
 
+    [JsonPropertyName("slot_id")]
+    public int? SlotId { get; set; }
+
+    [JsonPropertyName("slot_label")]
+    public string? SlotLabel { get; set; }
+
     [JsonPropertyName("status")]
-    public string Status { get; set; } = "PENDING";
+    public string Status { get; set; } = "BOOKED";
 
     [JsonPropertyName("priority")]
     public string Priority { get; set; } = "Normal";
@@ -138,6 +144,33 @@ public class AfterSalesChatRequestDto
 
     [JsonPropertyName("service_requests")]
     public List<ServiceRequestContextDto>? ServiceRequests { get; set; }
+
+    [JsonPropertyName("time_slots")]
+    public List<TimeSlotContextDto>? TimeSlots { get; set; }
+}
+
+public class TimeSlotContextDto
+{
+    [JsonPropertyName("slot_id")]
+    public int SlotId { get; set; }
+
+    [JsonPropertyName("start_time")]
+    public string StartTime { get; set; } = string.Empty;
+
+    [JsonPropertyName("end_time")]
+    public string EndTime { get; set; } = string.Empty;
+
+    [JsonPropertyName("label")]
+    public string Label { get; set; } = string.Empty;
+
+    [JsonPropertyName("default_capacity")]
+    public int DefaultCapacity { get; set; } = 5;
+
+    [JsonPropertyName("is_active")]
+    public bool IsActive { get; set; } = true;
+
+    [JsonPropertyName("display_order")]
+    public int DisplayOrder { get; set; } = 0;
 }
 
 public class ServiceRequestInfoDto
@@ -196,8 +229,14 @@ public class ServiceRequestInfoDto
     [JsonPropertyName("preferred_time")]
     public string? PreferredTime { get; set; }
 
+    [JsonPropertyName("slot_id")]
+    public int? SlotId { get; set; }
+
+    [JsonPropertyName("slot_label")]
+    public string? SlotLabel { get; set; }
+
     [JsonPropertyName("status")]
-    public string Status { get; set; } = "PENDING";
+    public string Status { get; set; } = "BOOKED";
 
     [JsonPropertyName("priority")]
     public string Priority { get; set; } = "Normal";

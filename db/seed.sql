@@ -482,17 +482,17 @@ INSERT INTO Products (ProductId, CategoryId, Name, Brand, Model, Price, StockQua
  'Compact single-sided M.2 2280 design offering Gen 4x4 NVMe read speeds up to 3500 MB/s for budget-conscious gamers.',
  '{"capacity": "1TB", "interface": "PCIe 4.0 NVMe", "seqRead": "3500 MB/s", "seqWrite": "2100 MB/s", "formFactor": "M.2 2280"}'::jsonb),
 
-(48, 6, 'WD_BLACK SN850X 2TB PCIe 4.0 NVMe M.2 SSD with Heatsink', 'Western Digital', 'WDBB9G0020BNC-WRSN', 58000.00, 20, None, None, 8, 'M.2 2280', 60, 'Active',
+(48, 6, 'WD_BLACK SN850X 2TB PCIe 4.0 NVMe M.2 SSD with Heatsink', 'Western Digital', 'WDBB9G0020BNC-WRSN', 58000.00, 20, NULL, NULL, 8, 'M.2 2280', 60, 'Active',
  'https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=600&auto=format&fit=crop&q=80',
  'Elite top-tier gaming storage with integrated low-profile heatsink delivering blistering read speeds up to 7300 MB/s.',
  '{"capacity": "2TB", "interface": "PCIe 4.0 NVMe", "seqRead": "7300 MB/s", "seqWrite": "6600 MB/s", "formFactor": "M.2 2280"}'::jsonb),
 
-(49, 6, 'Samsung 990 PRO 4TB PCIe 4.0 NVMe M.2 SSD', 'Samsung', 'MZ-V9P4T0B/AM', 115000.00, 10, None, None, 9, 'M.2 2280', 60, 'Active',
+(49, 6, 'Samsung 990 PRO 4TB PCIe 4.0 NVMe M.2 SSD', 'Samsung', 'MZ-V9P4T0B/AM', 115000.00, 10, NULL, NULL, 9, 'M.2 2280', 60, 'Active',
  'https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=600&auto=format&fit=crop&q=80',
  'Colossal 4TB capacity with Samsung in-house Pascal controller and thermal management for extreme content creation.',
  '{"capacity": "4TB", "interface": "PCIe 4.0 NVMe", "seqRead": "7450 MB/s", "seqWrite": "6900 MB/s", "formFactor": "M.2 2280"}'::jsonb),
 
-(50, 6, 'Lexar NM790 1TB PCIe 4.0 NVMe M.2 SSD', 'Lexar', 'LNM790X001T-RNNNG', 24000.00, 30, None, None, 6, 'M.2 2280', 60, 'Active',
+(50, 6, 'Lexar NM790 1TB PCIe 4.0 NVMe M.2 SSD', 'Lexar', 'LNM790X001T-RNNNG', 24000.00, 30, NULL, NULL, 6, 'M.2 2280', 60, 'Active',
  'https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=600&auto=format&fit=crop&q=80',
  'High-speed DRAM-less Gen 4x4 SSD hitting up to 7400 MB/s read speed with HMB 3.0 technology.',
  '{"capacity": "1TB", "interface": "PCIe 4.0 NVMe", "seqRead": "7400 MB/s", "seqWrite": "6500 MB/s", "formFactor": "M.2 2280"}'::jsonb),
@@ -730,5 +730,24 @@ BEGIN
         ON CONFLICT (code) DO NOTHING;
     END IF;
 END $$;
+
+-- 10. POPULATE MASTER FILTERS AND MASTER FILTER OPTIONS
+INSERT INTO filters (filterkey, displayname, filtertype, unit, createdat)
+SELECT DISTINCT ON (LOWER(filterkey))
+    LOWER(filterkey), displayname, filtertype, unit, NOW()
+FROM categoryfilters
+WHERE NOT EXISTS (SELECT 1 FROM filters WHERE LOWER(filters.filterkey) = LOWER(categoryfilters.filterkey));
+
+UPDATE categoryfilters cf
+SET masterfilterid = f.filterid
+FROM filters f
+WHERE LOWER(f.filterkey) = LOWER(cf.filterkey) AND cf.masterfilterid IS NULL;
+
+INSERT INTO master_filter_options (filterid, optionvalue, displayorder)
+SELECT DISTINCT f.filterid, fo.optionvalue, fo.displayorder
+FROM filteroptions fo
+JOIN categoryfilters cf ON fo.filterid = cf.filterid
+JOIN filters f ON LOWER(f.filterkey) = LOWER(cf.filterkey)
+ON CONFLICT (filterid, optionvalue) DO NOTHING;
 
 COMMIT;

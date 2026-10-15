@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your PCForge Order #{{order_id}} is Ready for Pickup!</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e2e8f0; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #0b0f19; width: 100%; padding: 40px 15px;">
+    <tr>
+      <td align="center">
+        <!-- Main Container -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; background-color: #111827; border-radius: 16px; border: 1px solid #1f293d; overflow: hidden; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);">
+          
+          <!-- Header & Brand Logo -->
+          <tr>
+            <td style="padding: 36px 36px 24px; text-align: center; background: linear-gradient(180deg, rgba(16, 185, 129, 0.15) 0%, rgba(17, 24, 39, 0) 100%); border-bottom: 1px solid #1e293b;">
+              <a href="{{action_url}}" target="_blank" style="text-decoration: none; display: inline-block;">
+                <img src="https://pc-forge-admin.pages.dev/logo.png" alt="PCForge Logo" width="165" style="border: 0; outline: none; display: block; margin: 0 auto;" />
+              </a>
+              <div style="margin-top: 14px; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #10b981;">
+                Store Pickup & Collection Verification
+              </div>
+            </td>
+          </tr>
+
+          <!-- Hero Notification -->
+          <tr>
+            <td style="padding: 32px 36px 12px; text-align: left;">
+              <div style="display: inline-block; padding: 5px 12px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; border-radius: 6px; background-color: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); margin-bottom: 14px;">
+                READY FOR PICKUP
+              </div>
+              <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #ffffff; line-height: 1.35;">
+                Your Order #{{order_id}} is Ready for Collection!
+              </h1>
+              <p style="margin: 12px 0 0; font-size: 15px; color: #94a3b8; line-height: 1.6;">
+                Dear <strong style="color: #f1f5f9;">{{customer_name}}</strong>,
+              </p>
+              <p style="margin: 10px 0 0; font-size: 14px; color: #cbd5e1; line-height: 1.6;">
+                Exciting news! Your PC hardware order <strong>#{{order_id}}</strong> has passed quality control and is now packed, sealed, and waiting for you at the PCForge Central Hub counter.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Verified Pickup Location Card -->
+          <tr>
+            <td style="padding: 16px 36px 20px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #172033; border: 1px solid #10b981; border-radius: 12px; padding: 20px;">
+                <tr>
+                  <td colspan="2" style="padding-bottom: 12px; border-bottom: 1px solid #23334e;">
+                    <div style="font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: #10b981;">
+                      Verified Pickup Location
+                    </div>
+                    <div style="font-size: 16px; font-weight: 700; color: #ffffff; margin-top: 4px;">
+                      {{pickup_store_name}}
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 0 4px; font-size: 13px; color: #64748b; width: 35%;">Street Address:</td>
+                  <td style="padding: 10px 0 4px; font-size: 13px; font-weight: 600; color: #f8fafc; text-align: right;">
+                    {{pickup_address}}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Operating Hours:</td>
+                  <td style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #38bdf8; text-align: right;">
+                    {{pickup_hours}}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Total Amount Due:</td>
+                  <td style="padding: 6px 0; font-size: 14px; font-weight: 800; color: #10b981; text-align: right;">
+                    {{total_amount}} ({{payment_method}})
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Important Collection Requirements -->
+          <tr>
+            <td style="padding: 0 36px 24px;">
+              <div style="background-color: rgba(30, 41, 59, 0.7); border-left: 4px solid #38bdf8; border-radius: 4px 8px 8px 4px; padding: 16px 18px;">
+                <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">
+                  What to Bring for Collection
+                </div>
+                <div style="font-size: 13px; color: #cbd5e1; line-height: 1.6;">
+                  1. <strong>Order Reference:</strong> Quote Order <strong>#{{order_id}}</strong> at the counter.<br />
+                  2. <strong>Photo ID:</strong> A valid government photo ID (NIC, Driving License, or Passport).<br />
+                  3. <strong>Payment:</strong> Cash or debit/credit card if paying at the counter.
+                </div>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Primary CTA Button -->
+          <tr>
+            <td style="padding: 8px 36px 36px; text-align: center;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                <tr>
+                  <td align="center" style="border-radius: 8px; background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <a href="{{action_url}}" target="_blank" style="font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; display: inline-block; letter-spacing: 0.5px;">
+                      View Order & Directions &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <div style="margin-top: 14px; font-size: 12px; color: #64748b;">
+                Need directions or someone else picking up? Let us know at <a href="mailto:{{support_email}}" style="color: #10b981; text-decoration: underline;">{{support_email}}</a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer Information -->
+          <tr>
+            <td style="background-color: #090d16; padding: 24px 36px; text-align: center; border-top: 1px solid #1e293b;">
+              <p style="margin: 0; font-size: 12px; color: #475569; line-height: 1.5;">
+                <strong style="color: #64748b;">{{pickup_store_name}}</strong><br />
+                {{pickup_address}}<br />
+                Operating Hours: {{pickup_hours}}
+              </p>
+              <p style="margin: 12px 0 0; font-size: 11px; color: #334155;">
+                &copy; {{current_year}} PCForge Ltd. All rights reserved. Automated order fulfillment notice.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -1,7 +1,7 @@
 """
 Tests for After-Sales Service Agent.
-Verifies knowledge base retrieval, warranty inspection,
-troubleshooting guidance, and service request creation.
+Verifies knowledge base retrieval, troubleshooting guidance,
+appointment scheduling, and service request creation.
 """
 
 import json
@@ -13,12 +13,13 @@ from ai_service.main import app
 from ai_service.agents.after_sales_agent.tools import (
     AFTER_SALES_TOOLS,
     after_sales_context_var,
-    check_warranty,
     create_service_request,
+    get_available_time_slots,
     get_customer,
-    get_order,
-    get_order_products,
+    get_customer_service_requests,
+    get_service_request,
     search_troubleshooting_knowledge,
+    update_service_appointment,
     validate_service_appointment,
 )
 from ai_service.agents.after_sales_agent.models import AfterSalesChatRequest
@@ -35,13 +36,32 @@ def test_after_sales_tools_manifest():
     tool_names = [t.name for t in AFTER_SALES_TOOLS]
     assert "search_troubleshooting_knowledge" in tool_names
     assert "get_customer" in tool_names
-    assert "get_order" in tool_names
-    assert "get_order_products" in tool_names
-    assert "check_warranty" in tool_names
+    assert "get_available_time_slots" in tool_names
     assert "validate_service_appointment" in tool_names
+    assert "update_service_appointment" in tool_names
     assert "create_service_request" in tool_names
     assert "get_service_request" in tool_names
     assert "get_customer_service_requests" in tool_names
+    assert len(tool_names) == 8
+
+
+def test_get_available_time_slots_tool():
+    """Validates that configured service time slots are returned with availability."""
+    target_date = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d")
+    res_raw = get_available_time_slots.invoke({"preferred_date": target_date})
+    data = json.loads(res_raw)
+    assert data["date"] == target_date
+    assert len(data["slots"]) == 5
+    slot1 = data["slots"][0]
+    assert slot1["slot_id"] == 1
+    assert slot1["start_time"] == "09:00"
+    assert slot1["end_time"] == "11:00"
+    assert slot1["max_capacity"] == 5
+    assert slot1["is_available"] is True
+
+    slot_ids = [s["slot_id"] for s in data["slots"]]
+    assert 6 in slot_ids
+
 
 
 def test_search_troubleshooting_knowledge_tool():
@@ -59,38 +79,30 @@ def test_search_troubleshooting_knowledge_tool():
     assert "disconnect" in res_hazard["hazard_instructions"].lower() or "power" in res_hazard["hazard_instructions"].lower()
 
 
-def test_get_order_and_warranty_tools():
-    """Validates order retrieval and computed manufacturer warranty status."""
+def test_get_customer_and_service_requests_tools():
+    """Validates customer profile and service requests context retrieval."""
     from ai_service.agents.after_sales_agent.tools import after_sales_context_var
     after_sales_context_var.set({
-        "orders": [
+        "customer": {
+            "name": "Jane Doe",
+            "email": "jane@example.com"
+        },
+        "service_requests": [
             {
-                "order_id": 1,
-                "order_number": "PCF-10001",
-                "purchase_date": "2025-08-15",
-                "items": [
-                    {
-                        "product_id": 8,
-                        "product_name": "NVIDIA GeForce RTX 4070 Ti 12GB",
-                        "category": "GPU",
-                        "unit_price": 799.0,
-                        "quantity": 1
-                    }
-                ]
+                "service_request_id": 101,
+                "service_request_number": "SR-000101",
+                "title": "GPU Overheating",
+                "status": "Booked"
             }
         ]
     })
-    warranty_raw = check_warranty.invoke({
-        "order_id": 1,
-        "product_name_or_id": "RTX 4070"
-    })
-    data = json.loads(warranty_raw)
+    cust_data = json.loads(get_customer.invoke({"user_id": 1}))
+    assert cust_data["customer_name"] == "Jane Doe"
+    assert cust_data["email"] == "jane@example.com"
 
-    assert "order_id" in data
-    assert "warranty_status" in data
-    assert data["warranty_status"] in ("Active", "Expired")
-    assert "warranty_expiry_date" in data
-    assert "warranty_period" in data
+    srs_data = json.loads(get_customer_service_requests.invoke({"user_id": 1}))
+    assert srs_data["count"] == 1
+    assert srs_data["service_requests"][0]["service_request_number"] == "SR-000101"
 
 
 def test_validate_service_appointment_tool():
@@ -211,7 +223,7 @@ def test_create_service_request_tool():
     assert data["success"] is True
     assert "service_request_id" in data
     assert data["service_request_number"].startswith("SR-")
-    assert data["status"] == "PENDING"
+    assert data["status"] == "BOOKED"
     assert data["attempt_count"] == 3
     assert "title" in data
     assert "description" in data
@@ -233,7 +245,7 @@ def test_create_service_request_with_title_and_description():
     assert data["success"] is True
     assert data["title"] == "GPU Artifacting under load"
     assert data["description"] == "Green squares and lines appear on screen during 3D gaming."
-    assert data["status"] == "PENDING"
+    assert data["status"] == "BOOKED"
 
 
 def test_validate_and_create_service_request_max_capacity():
@@ -242,7 +254,7 @@ def test_validate_and_create_service_request_max_capacity():
     target_date = (datetime.now() + timedelta(days=20)).strftime("%Y-%m-%d")
     # Populate context with 10 appointments on target_date
     fake_srs = [
-        {"service_request_id": i, "service_request_number": f"SR-{i:06d}", "preferred_date": f"{target_date}T10:00:00Z", "status": "PENDING"}
+        {"service_request_id": i, "service_request_number": f"SR-{i:06d}", "preferred_date": f"{target_date}T10:00:00Z", "status": "BOOKED"}
         for i in range(1, 11)
     ]
     after_sales_context_var.set({"service_requests": fake_srs})
@@ -278,7 +290,7 @@ def test_api_after_sales_tools_endpoint():
     data = response.json()
     assert data["agent"] == "after_sales_agent"
     assert data["member"] == "Member 05"
-    assert len(data["tools"]) >= 9
+    assert len(data["tools"]) == 8
 
 
 def _check_after_sales_quota(data: dict):

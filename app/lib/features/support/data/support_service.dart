@@ -121,6 +121,15 @@ class SupportService extends ChangeNotifier {
     return tickets;
   }
 
+  /// Fetch Available Time Slots for a given date
+  Future<List<Map<String, dynamic>>> fetchTimeSlotsForDate(String date, {String? token}) async {
+    try {
+      return await _apiService.fetchTimeSlotsForDate(date, token: token);
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Create and submit a new Service Request to backend API
   Future<ServiceRequestModel> createServiceRequest({
     String? title,
@@ -135,6 +144,7 @@ class SupportService extends ChangeNotifier {
     String warrantyStatus = 'Active',
     String? preferredDate,
     String? preferredTime,
+    int? slotId,
     String priority = 'Normal',
     String? attachmentUrl,
     String? token,
@@ -157,6 +167,7 @@ class SupportService extends ChangeNotifier {
       warrantyStatus: warrantyStatus,
       preferredDate: preferredDate,
       preferredTime: preferredTime,
+      slotId: slotId,
       priority: priority,
       attachmentUrl: attachmentUrl,
       token: token,

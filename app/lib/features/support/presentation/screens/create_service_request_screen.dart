@@ -21,25 +21,13 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
 
   bool _isSubmitting = false;
 
-  // Appointment Date & Time (Optional, 9 AM - 6 PM, max 10 per day)
+  // Appointment Date & Time (Loaded from configured master slots)
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  String _selectedTime = '10:00 AM';
-  bool _includeAppointment = true;
+  int? _selectedSlotId;
+  String? _selectedTime;
+  List<Map<String, dynamic>> _availableSlots = [];
   bool _isCheckingAvailability = false;
   Map<String, dynamic>? _availability;
-
-  final List<String> _timeSlots = [
-    '09:00 AM',
-    '10:00 AM',
-    '11:00 AM',
-    '12:00 PM',
-    '01:00 PM',
-    '02:00 PM',
-    '03:00 PM',
-    '04:00 PM',
-    '05:00 PM',
-    '06:00 PM',
-  ];
 
   String get _formattedSelectedDate {
     final y = _selectedDate.year.toString().padLeft(4, '0');
@@ -51,9 +39,7 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
   @override
   void initState() {
     super.initState();
-    if (_includeAppointment) {
-      _checkDateAvailability(_formattedSelectedDate);
-    }
+    _checkDateAvailability(_formattedSelectedDate);
   }
 
   @override
@@ -67,9 +53,37 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
     setState(() => _isCheckingAvailability = true);
     try {
       final info = await SupportService.instance.checkAvailability(dateStr);
+      List<Map<String, dynamic>> slots = [];
+      if (info['slots'] is List && (info['slots'] as List).isNotEmpty) {
+        slots = (info['slots'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      } else {
+        slots = await SupportService.instance.fetchTimeSlotsForDate(dateStr);
+      }
+
+      int? autoSlotId;
+      String? autoTime = _selectedTime;
+
+      final openSlots = slots.where((s) => s['isAvailable'] == true && s['isClosed'] != true).toList();
+      if (openSlots.isNotEmpty) {
+        final existingMatch = openSlots.where((s) => s['slotId'] == _selectedSlotId).firstOrNull;
+        final chosen = existingMatch ?? openSlots.first;
+        autoSlotId = chosen['slotId'] as int?;
+        autoTime = (chosen['label'] as String?)?.isNotEmpty == true
+            ? chosen['label'] as String
+            : '${chosen['startTime']} - ${chosen['endTime']}';
+      } else if (slots.isNotEmpty) {
+        autoSlotId = null;
+        autoTime = null;
+      }
+
       if (mounted) {
         setState(() {
           _availability = info;
+          _availableSlots = slots;
+          _selectedSlotId = autoSlotId;
+          _selectedTime = autoTime ?? _selectedTime ?? '10:00 AM';
           _isCheckingAvailability = false;
         });
       }
@@ -107,10 +121,20 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
   }
 
   Future<void> _submitServiceRequest() async {
-    if (_includeAppointment && _availability != null && _availability!['isAvailable'] == false) {
+    if (_availability != null && _availability!['isAvailable'] == false) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Selected date is fully booked (10/10 slots filled). Please pick another date.'),
+          content: Text('Selected date is fully booked. Please pick another date.'),
+          backgroundColor: AppColors.alertRed,
+        ),
+      );
+      return;
+    }
+
+    if (_availableSlots.isNotEmpty && _selectedSlotId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select an available time slot.'),
           backgroundColor: AppColors.alertRed,
         ),
       );
@@ -131,14 +155,15 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
       await SupportService.instance.createServiceRequest(
         title: finalTitle,
         description: rawDesc.isNotEmpty ? rawDesc : null,
-        preferredDate: _includeAppointment ? _formattedSelectedDate : null,
-        preferredTime: _includeAppointment ? _selectedTime : null,
+        preferredDate: _formattedSelectedDate,
+        preferredTime: _selectedTime ?? 'Standard',
+        slotId: _selectedSlotId,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Service Request submitted successfully! Status: Pending'),
+            content: Text('Service Request submitted successfully! Status: Booked'),
             backgroundColor: AppColors.stockGreen,
           ),
         );
@@ -163,7 +188,7 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
   @override
   Widget build(BuildContext context) {
     final isAvailable = _availability == null || _availability!['isAvailable'] == true;
-    final remainingSlots = _availability?['remainingSlots'] ?? 10;
+    final remainingSlots = _availability?['remainingSlots'] ?? (_availableSlots.isNotEmpty ? _availableSlots.fold<int>(0, (acc, s) => acc + ((s['remainingSlots'] as int?) ?? 0)) : 10);
     final bookedCount = _availability?['bookedCount'] ?? 0;
 
     return Scaffold(
@@ -279,124 +304,245 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
 
               const SizedBox(height: 18),
 
-              // Preferred Appointment Date & Time (Optional)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Appointment Date & Time (Required)
+              const Row(
                 children: [
-                  const Text(
-                    'Preferred Appointment (Optional)',
+                  Text(
+                    'Appointment Date & Time',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.primaryDark),
                   ),
-                  Switch(
-                    value: _includeAppointment,
-                    activeThumbColor: AppColors.primaryBlue,
-                    onChanged: (val) {
-                      setState(() {
-                        _includeAppointment = val;
-                        if (val && _availability == null) {
-                          _checkDateAvailability(_formattedSelectedDate);
-                        }
-                      });
-                    },
+                  SizedBox(width: 4),
+                  Text(
+                    '*',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.alertRed),
                   ),
                 ],
               ),
 
-              if (_includeAppointment) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: InkWell(
-                        onTap: _pickDate,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: isAvailable ? AppColors.border : AppColors.alertRed),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.calendar_month_rounded, size: 20, color: AppColors.primaryBlue),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _formattedSelectedDate,
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.primaryDark),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _selectedTime,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          filled: true,
-                          fillColor: AppColors.surface,
-                        ),
-                        items: _timeSlots.map((time) {
-                          return DropdownMenuItem<String>(
-                            value: time,
-                            child: Text(time, style: const TextStyle(fontSize: 12)),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) setState(() => _selectedTime = val);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                if (_isCheckingAvailability)
-                  const Row(
+              const SizedBox(height: 8),
+
+              // Date Picker Card
+              InkWell(
+                onTap: _pickDate,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isAvailable ? AppColors.border : AppColors.alertRed),
+                  ),
+                  child: Row(
                     children: [
-                      SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
-                      SizedBox(width: 8),
-                      Text('Checking appointment capacity...', style: TextStyle(fontSize: 12, color: AppColors.secondaryText)),
-                    ],
-                  )
-                else if (_availability != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isAvailable ? AppColors.stockGreen.withValues(alpha: 0.08) : AppColors.alertRed.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isAvailable ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
-                          size: 16,
-                          color: isAvailable ? AppColors.stockGreen : AppColors.alertRed,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            isAvailable
-                                ? '$remainingSlots of 10 slots available on this date'
-                                : 'Fully booked ($bookedCount/10 slots used). Max 10 requests allowed per day.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isAvailable ? AppColors.stockGreen : AppColors.alertRed,
+                      const Icon(Icons.calendar_month_rounded, size: 22, color: AppColors.primaryBlue),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Appointment Date (Tap to change)',
+                              style: TextStyle(fontSize: 11, color: AppColors.secondaryText, fontWeight: FontWeight.w500),
                             ),
-                          ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _formattedSelectedDate,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.primaryDark),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
+                      const Icon(Icons.arrow_drop_down_rounded, size: 24, color: AppColors.secondaryText),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Capacity and Status Banner
+              if (_isCheckingAvailability)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 8),
+                      Text('Checking slot availability...', style: TextStyle(fontSize: 12, color: AppColors.secondaryText)),
+                    ],
+                  ),
+                )
+              else if (_availability != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isAvailable ? AppColors.stockGreen.withValues(alpha: 0.08) : AppColors.alertRed.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isAvailable ? AppColors.stockGreen.withValues(alpha: 0.25) : AppColors.alertRed.withValues(alpha: 0.25),
                     ),
                   ),
-              ],
+                  child: Row(
+                    children: [
+                      Icon(
+                        isAvailable ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
+                        size: 16,
+                        color: isAvailable ? AppColors.stockGreen : AppColors.alertRed,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          isAvailable
+                              ? '$remainingSlots capacity available on this date'
+                              : 'Fully booked ($bookedCount slots used). Please pick another date.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isAvailable ? AppColors.stockGreen : AppColors.alertRed,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 16),
+
+              // Configured Time Slots Section
+              const Text(
+                'Available Time Slots',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primaryDark),
+              ),
+              const SizedBox(height: 8),
+
+              if (_availableSlots.isNotEmpty)
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: _availableSlots.map((slot) {
+                    final slotId = slot['slotId'] as int?;
+                    final isSelected = _selectedSlotId != null && _selectedSlotId == slotId;
+                    final isSlotAvail = slot['isAvailable'] == true && slot['isClosed'] != true;
+                    final remaining = slot['remainingSlots'] ?? 0;
+                    final label = (slot['label'] as String?)?.isNotEmpty == true
+                        ? slot['label'] as String
+                        : '${slot['startTime']} - ${slot['endTime']}';
+
+                    return InkWell(
+                      onTap: isSlotAvail
+                          ? () {
+                              setState(() {
+                                _selectedSlotId = slotId;
+                                _selectedTime = label;
+                              });
+                            }
+                          : null,
+                      borderRadius: BorderRadius.circular(12),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.primaryBlue
+                              : !isSlotAvail
+                                  ? const Color(0xFFF1F5F9)
+                                  : AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.primaryBlue
+                                : !isSlotAvail
+                                    ? const Color(0xFFE2E8F0)
+                                    : AppColors.border,
+                            width: isSelected ? 1.5 : 1,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primaryBlue.withValues(alpha: 0.25),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.access_time_rounded,
+                              size: 16,
+                              color: isSelected
+                                  ? Colors.white
+                                  : !isSlotAvail
+                                      ? AppColors.secondaryText
+                                      : AppColors.primaryBlue,
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : !isSlotAvail
+                                            ? AppColors.secondaryText
+                                            : AppColors.primaryDark,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  !isSlotAvail
+                                      ? (slot['isClosed'] == true ? 'Closed' : 'Full')
+                                      : '$remaining slots left',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isSelected
+                                        ? Colors.white.withValues(alpha: 0.9)
+                                        : !isSlotAvail
+                                            ? AppColors.alertRed
+                                            : AppColors.stockGreen,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (isSelected) ...[
+                              const SizedBox(width: 8),
+                              const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                )
+              else if (!_isCheckingAvailability)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.schedule_rounded, size: 20, color: AppColors.primaryBlue),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _selectedTime ?? 'Standard Appointment (10:00 AM)',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.primaryDark),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
               const SizedBox(height: 28),
 

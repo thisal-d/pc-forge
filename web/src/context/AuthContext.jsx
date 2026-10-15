@@ -14,14 +14,26 @@ export const AuthProvider = ({ children }) => {
     const storedUser = authService.getCurrentUser();
 
     if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(storedUser);
+      const userRole = (storedUser.role || '').trim().toLowerCase();
+      if (userRole === 'customer') {
+        authService.logout();
+        setToken(null);
+        setUser(null);
+      } else {
+        setToken(storedToken);
+        setUser(storedUser);
+      }
     }
     setLoading(false);
   }, []);
 
   const login = async (email, password) => {
     const data = await authService.login(email, password);
+    const userRole = (data?.role || '').trim().toLowerCase();
+    if (userRole === 'customer') {
+      logout();
+      throw new Error('Access denied. Customer accounts are not permitted to log into the Web Portal. Please use the PCForge mobile application.');
+    }
     setToken(data.token);
     setUser({
       userId: data.userId,
@@ -35,6 +47,11 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     const data = await authService.register(userData);
+    const userRole = (data?.role || '').trim().toLowerCase();
+    if (userRole === 'customer') {
+      logout();
+      throw new Error('Access denied. Customer accounts cannot access the Web Portal.');
+    }
     setToken(data.token);
     setUser({
       userId: data.userId,

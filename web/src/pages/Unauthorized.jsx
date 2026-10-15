@@ -9,11 +9,11 @@ export const Unauthorized = () => {
   return (
     <div className="auth-container">
       <div className="auth-card" style={{ textAlign: 'center' }}>
-        <div style={{ marginBottom: '1rem', color: '#ef4444' }}>
+        <div style={{ marginBottom: '1rem', color: 'var(--danger)' }}>
           <OctagonAlertIcon size={56} />
         </div>
         <h2>403 - Access Denied</h2>
-        <p style={{ color: '#64748b', marginTop: '0.5rem', marginBottom: '1.5rem' }}>
+        <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', marginBottom: '1.5rem' }}>
           Your current role (<strong>{role || 'Unauthenticated'}</strong>) is not authorized to access this protected area.
         </p>
         <div className="alert alert-error" style={{ textAlign: 'left', marginBottom: '1.5rem' }}>

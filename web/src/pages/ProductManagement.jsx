@@ -10,6 +10,7 @@ import {
   EditProductModal,
   ViewProductModal,
   DeleteProductModal,
+  QrCodeModal,
 } from '../components/products/index.js';
 import { CloseIcon } from '../components/icons/index.js';
 
@@ -254,6 +255,22 @@ export const ProductManagement = () => {
   // ==========================================
   const [deleteCandidate, setDeleteCandidate] = useState(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  // ==========================================
+  // QR CODE MODAL STATE
+  // ==========================================
+  const [selectedQrProduct, setSelectedQrProduct] = useState(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+
+  const handleOpenQrModal = (product) => {
+    setSelectedQrProduct(product);
+    setIsQrModalOpen(true);
+  };
+
+  const handleCloseQrModal = () => {
+    setIsQrModalOpen(false);
+    setSelectedQrProduct(null);
+  };
 
   // ==========================================
   // HANDLERS: ADD PRODUCT
@@ -743,6 +760,7 @@ export const ProductManagement = () => {
         onEditProduct={handleOpenEditModal}
         onToggleStatus={handleToggleStatus}
         onDeleteProduct={handleOpenDeleteModal}
+        onShowQr={handleOpenQrModal}
       />
 
       {/* ADD PRODUCT MODAL */}
@@ -813,6 +831,13 @@ export const ProductManagement = () => {
         onClose={handleCloseDeleteModal}
         onConfirm={handleConfirmDelete}
         submitting={deleteSubmitting}
+      />
+
+      {/* QR CODE GENERATOR MODAL */}
+      <QrCodeModal
+        product={selectedQrProduct}
+        isOpen={isQrModalOpen}
+        onClose={handleCloseQrModal}
       />
     </div>
   );

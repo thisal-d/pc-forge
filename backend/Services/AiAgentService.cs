@@ -145,7 +145,8 @@ public class AiAgentService : IAiAgentService
                         Socket = p.Socket,
                         MemoryType = p.MemoryType,
                         PowerWattage = p.PowerWattage,
-                        FormFactor = p.FormFactor
+                        FormFactor = p.FormFactor,
+                        StockQuantity = p.StockQuantity
                     }).ToList();
                 }
                 finally
@@ -207,7 +208,8 @@ public class AiAgentService : IAiAgentService
                         Socket = p.Socket,
                         MemoryType = p.MemoryType,
                         PowerWattage = p.PowerWattage,
-                        FormFactor = p.FormFactor
+                        FormFactor = p.FormFactor,
+                        StockQuantity = p.StockQuantity
                     }).ToList();
                 }
                 finally
@@ -321,52 +323,13 @@ public class AiAgentService : IAiAgentService
                 }
             }
 
-            if ((request.Orders == null || request.Orders.Count == 0) && request.UserId > 0)
-            {
-                var userOrders = await db.Orders
-                    .AsNoTracking()
-                    .Include(o => o.Items)
-                        .ThenInclude(i => i.Product)
-                            .ThenInclude(p => p!.Category)
-                    .Where(o => o.UserId == request.UserId)
-                    .OrderByDescending(o => o.CreatedAt)
-                    .ToListAsync();
 
-                request.Orders = userOrders.Select(o => new OrderContextDto
-                {
-                    OrderId = o.OrderId,
-                    OrderNumber = $"PCF-10{o.OrderId:03d}",
-                    PurchaseDate = o.CreatedAt.ToString("yyyy-MM-dd"),
-                    Status = o.Status,
-                    TotalAmount = o.TotalAmount,
-                    Items = o.Items.Select(i =>
-                    {
-                        var catName = i.Product?.Category?.Name ?? "Hardware";
-                        var months = (i.Product != null && i.Product.WarrantyMonths > 0)
-                            ? i.Product.WarrantyMonths
-                            : GetWarrantyMonths(catName, i.Product?.Specifications);
-                        var expiry = o.CreatedAt.AddMonths(months);
-                        return new OrderContextItemDto
-                        {
-                            ProductId = i.ProductId,
-                            ProductName = i.Product?.Name ?? $"Product #{i.ProductId}",
-                            Category = catName,
-                            UnitPrice = i.UnitPrice,
-                            Quantity = i.Quantity,
-                            Specifications = i.Product?.Specifications,
-                            WarrantyPeriod = FormatWarrantyPeriod(months),
-                            WarrantyMonths = months,
-                            WarrantyExpiryDate = expiry.ToString("yyyy-MM-dd"),
-                            IsUnderWarranty = expiry >= DateTime.UtcNow
-                        };
-                    }).ToList()
-                }).ToList();
-            }
 
             if ((request.ServiceRequests == null || request.ServiceRequests.Count == 0) && request.UserId > 0)
             {
                 var userSrs = await db.ServiceRequests
                     .AsNoTracking()
+                    .Include(sr => sr.Slot)
                     .Where(sr => sr.UserId == request.UserId)
                     .OrderByDescending(sr => sr.CreatedAt)
                     .ToListAsync();
@@ -379,9 +342,33 @@ public class AiAgentService : IAiAgentService
                     Description = sr.Description,
                     PreferredDate = sr.PreferredDate?.ToString("yyyy-MM-dd"),
                     PreferredTime = sr.PreferredTime,
+                    SlotId = sr.SlotId,
+                    SlotLabel = sr.Slot?.Label ?? sr.PreferredTime,
                     Status = sr.Status,
                     CreatedAt = sr.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
                 }).ToList();
+            }
+
+            if (request.TimeSlots == null || request.TimeSlots.Count == 0)
+            {
+                var activeSlots = await db.ServiceTimeSlots
+                    .AsNoTracking()
+                    .Where(s => s.IsActive)
+                    .OrderBy(s => s.StartTime)
+                    .ThenBy(s => s.EndTime)
+                    .Select(s => new TimeSlotContextDto
+                    {
+                        SlotId = s.SlotId,
+                        StartTime = s.StartTime,
+                        EndTime = s.EndTime,
+                        Label = s.Label ?? $"{s.StartTime} - {s.EndTime}",
+                        DefaultCapacity = s.DefaultCapacity,
+                        IsActive = s.IsActive,
+                        DisplayOrder = s.DisplayOrder
+                    })
+                    .ToListAsync();
+
+                request.TimeSlots = activeSlots;
             }
 
             // 2. Call the stateless Python AI agent
@@ -493,17 +480,30 @@ public class AiAgentService : IAiAgentService
                                 };
                             }
 
+                            ServiceTimeSlot? fallbackSlot = null;
+                            var cleanFallbackTime = (extractedTime ?? "").ToLowerInvariant();
+                            fallbackSlot = await db.ServiceTimeSlots.FirstOrDefaultAsync(s =>
+                                s.IsActive &&
+                                ((s.Label != null && s.Label.ToLower().Contains(cleanFallbackTime)) ||
+                                 s.StartTime.ToLower() == cleanFallbackTime ||
+                                 (s.StartTime + " - " + s.EndTime).ToLower() == cleanFallbackTime));
+                            if (fallbackSlot == null)
+                            {
+                                fallbackSlot = await db.ServiceTimeSlots.Where(s => s.IsActive).OrderBy(s => s.DisplayOrder).FirstOrDefaultAsync();
+                            }
+
                             var maxId = await db.ServiceRequests.MaxAsync(sr => (int?)sr.ServiceRequestId) ?? 100;
                             var srNumber = $"SR-{(maxId + 1):D6}";
                             var newSr = new ServiceRequest
                             {
                                 ServiceRequestNumber = srNumber,
                                 UserId = request.UserId > 0 ? request.UserId : 1,
+                                SlotId = fallbackSlot?.SlotId,
                                 Title = generatedTitle,
                                 Description = generatedDescription,
                                 PreferredDate = extractedDate,
-                                PreferredTime = extractedTime,
-                                Status = "Pending",
+                                PreferredTime = fallbackSlot?.Label ?? extractedTime,
+                                Status = "Booked",
                                 CreatedAt = DateTime.UtcNow,
                                 UpdatedAt = DateTime.UtcNow
                             };
@@ -513,7 +513,7 @@ public class AiAgentService : IAiAgentService
                             return new AfterSalesChatResponseDto
                             {
                                 Success = true,
-                                Reply = $"Your Service Request has been created successfully.\n\nService Request ID: {srNumber}\nTitle: {newSr.Title}\nPreferred Date: {extractedDate.Value:yyyy-MM-dd}\nPreferred Time: {extractedTime}\nStatus: Pending\n\nPlease bring your PC or affected component to our service center for technician inspection.",
+                                Reply = $"Your Service Request has been created successfully.\n\nService Request ID: {srNumber}\nTitle: {newSr.Title}\nDescription: {newSr.Description}\nPreferred Date: {extractedDate.Value:yyyy-MM-dd}\nTime Slot: {newSr.PreferredTime}\nStatus: Booked\n\nPlease bring your PC or affected component to our service center for technician inspection.",
                                 ServiceRequestMode = true,
                                 ServiceRequestRequired = true,
                                 ServiceRequest = new ServiceRequestInfoDto
@@ -523,6 +523,8 @@ public class AiAgentService : IAiAgentService
                                     ServiceRequestNumber = newSr.ServiceRequestNumber,
                                     Title = newSr.Title,
                                     Description = newSr.Description,
+                                    SlotId = newSr.SlotId,
+                                    SlotLabel = fallbackSlot?.Label ?? newSr.PreferredTime,
                                     PreferredDate = newSr.PreferredDate?.ToString("yyyy-MM-dd"),
                                     PreferredTime = newSr.PreferredTime,
                                     Status = newSr.Status,
@@ -586,14 +588,30 @@ public class AiAgentService : IAiAgentService
             if (result.ServiceRequest != null)
             {
                 var srDto = result.ServiceRequest;
-                var action = srDto.Action?.ToLowerInvariant() ?? "";
+                var action = (srDto.Action ?? "").Trim().ToLowerInvariant();
+                bool isUpdate = action == "update" 
+                             || action == "update_appointment" 
+                             || action.Contains("update") 
+                             || action.Contains("reschedule");
+                bool isCreate = action == "create" 
+                             || action == "create_service_request" 
+                             || action.Contains("create") 
+                             || (!isUpdate && (!string.IsNullOrWhiteSpace(srDto.ProblemDescription) || !string.IsNullOrWhiteSpace(srDto.Title)));
 
-                if (action == "create" || (srDto.ServiceRequestId == null && !string.IsNullOrWhiteSpace(srDto.ProblemDescription)))
+                if (isCreate)
                 {
                     // Deterministic Validation Rules
                     var validationErrors = new List<string>();
 
-                    if (string.IsNullOrWhiteSpace(srDto.ProblemDescription))
+                    var problemDesc = !string.IsNullOrWhiteSpace(srDto.ProblemDescription)
+                        ? srDto.ProblemDescription.Trim()
+                        : (!string.IsNullOrWhiteSpace(srDto.Description)
+                            ? srDto.Description.Trim()
+                            : (!string.IsNullOrWhiteSpace(srDto.Title)
+                                ? srDto.Title.Trim()
+                                : (!string.IsNullOrWhiteSpace(request.Message) ? request.Message.Trim() : "Customer reported hardware issue")));
+
+                    if (string.IsNullOrWhiteSpace(problemDesc))
                     {
                         validationErrors.Add("Problem description is required.");
                     }
@@ -601,7 +619,19 @@ public class AiAgentService : IAiAgentService
                     DateTime? parsedPreferredDate = null;
                     if (!string.IsNullOrWhiteSpace(srDto.PreferredDate))
                     {
-                        if (DateTime.TryParse(srDto.PreferredDate, out var dt))
+                        var rawDate = srDto.PreferredDate.Trim();
+                        var lowerDate = rawDate.ToLowerInvariant();
+                        if (lowerDate.Contains("tomorrow"))
+                        {
+                            var cand = DateTime.UtcNow.Date.AddDays(1);
+                            if (cand.DayOfWeek == DayOfWeek.Sunday) cand = cand.AddDays(1);
+                            parsedPreferredDate = DateTime.SpecifyKind(cand, DateTimeKind.Utc);
+                        }
+                        else if (lowerDate.Contains("today"))
+                        {
+                            parsedPreferredDate = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+                        }
+                        else if (DateTime.TryParse(rawDate, out var dt))
                         {
                             if (dt.Date < DateTime.UtcNow.Date)
                             {
@@ -612,7 +642,30 @@ public class AiAgentService : IAiAgentService
                                 validationErrors.Add("Service center is closed on Sundays. Please select Monday - Saturday.");
                             }
                             parsedPreferredDate = DateTime.SpecifyKind(dt.Date, DateTimeKind.Utc);
+                        }
+                        else
+                        {
+                            string[] formats = { "yyyy-MM-dd", "dd/MM/yyyy", "MM/dd/yyyy", "dd-MM-yyyy", "yyyy/MM/dd" };
+                            if (DateTime.TryParseExact(rawDate, formats, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dtExact))
+                            {
+                                if (dtExact.Date < DateTime.UtcNow.Date)
+                                {
+                                    validationErrors.Add("Preferred appointment date cannot be in the past.");
+                                }
+                                if (dtExact.DayOfWeek == DayOfWeek.Sunday)
+                                {
+                                    validationErrors.Add("Service center is closed on Sundays. Please select Monday - Saturday.");
+                                }
+                                parsedPreferredDate = DateTime.SpecifyKind(dtExact.Date, DateTimeKind.Utc);
+                            }
+                            else
+                            {
+                                validationErrors.Add($"Invalid preferred date format: '{srDto.PreferredDate}'");
+                            }
+                        }
 
+                        if (parsedPreferredDate.HasValue)
+                        {
                             // Storewide maximum capacity check: Max 10 appointments per date
                             var dateCount = await db.ServiceRequests.CountAsync(sr =>
                                 sr.PreferredDate.HasValue &&
@@ -625,10 +678,12 @@ public class AiAgentService : IAiAgentService
                                 validationErrors.Add($"The selected date ({parsedPreferredDate.Value:yyyy-MM-dd}) has reached its maximum capacity of 10 service appointments. Please select another date.");
                             }
                         }
-                        else
-                        {
-                            validationErrors.Add($"Invalid preferred date format: '{srDto.PreferredDate}'");
-                        }
+                    }
+                    else
+                    {
+                        var cand = DateTime.UtcNow.Date.AddDays(2);
+                        if (cand.DayOfWeek == DayOfWeek.Sunday) cand = cand.AddDays(1);
+                        parsedPreferredDate = DateTime.SpecifyKind(cand, DateTimeKind.Utc);
                     }
 
                     if (!string.IsNullOrWhiteSpace(srDto.PreferredTime))
@@ -649,34 +704,7 @@ public class AiAgentService : IAiAgentService
                         }
                     }
 
-                    // Deterministic warranty calculation from DB (never trust AI hallucination alone)
-                    DateTime? verifiedExpiryDate = null;
-                    string verifiedWarrantyStatus = "Expired";
-                    if (srDto.OrderId.HasValue && srDto.OrderId.Value > 0)
-                    {
-                        var order = await db.Orders
-                            .AsNoTracking()
-                            .Include(o => o.Items)
-                                .ThenInclude(i => i.Product)
-                                    .ThenInclude(p => p!.Category)
-                            .FirstOrDefaultAsync(o => o.OrderId == srDto.OrderId.Value);
 
-                        if (order != null)
-                        {
-                            var targetItem = srDto.ProductId.HasValue && srDto.ProductId.Value > 0
-                                ? order.Items.FirstOrDefault(i => i.ProductId == srDto.ProductId.Value)
-                                : order.Items.FirstOrDefault();
-
-                            if (targetItem?.Product != null)
-                            {
-                                var months = targetItem.Product.WarrantyMonths > 0
-                                    ? targetItem.Product.WarrantyMonths
-                                    : GetWarrantyMonths(targetItem.Product.Category?.Name, targetItem.Product.Specifications);
-                                verifiedExpiryDate = order.CreatedAt.AddMonths(months);
-                                verifiedWarrantyStatus = verifiedExpiryDate >= DateTime.UtcNow ? "Active" : "Expired";
-                            }
-                        }
-                    }
 
                     if (validationErrors.Count > 0)
                     {
@@ -700,23 +728,51 @@ public class AiAgentService : IAiAgentService
 
                         var resolvedTitle = !string.IsNullOrWhiteSpace(srDto.Title)
                             ? srDto.Title.Trim()
-                            : (!string.IsNullOrWhiteSpace(srDto.ProblemDescription)
-                                ? srDto.ProblemDescription.Trim()
+                            : (!string.IsNullOrWhiteSpace(problemDesc)
+                                ? (problemDesc.Length > 50 ? problemDesc[..47] + "..." : problemDesc)
                                 : "Service Request");
 
                         var resolvedDesc = !string.IsNullOrWhiteSpace(srDto.Description)
                             ? srDto.Description.Trim()
-                            : srDto.ProblemDescription?.Trim();
+                            : problemDesc;
+
+                        ServiceTimeSlot? matchedSlot = null;
+                        if (srDto.SlotId.HasValue && srDto.SlotId.Value > 0)
+                        {
+                            matchedSlot = await db.ServiceTimeSlots.FirstOrDefaultAsync(s => s.SlotId == srDto.SlotId.Value);
+                        }
+                        if (matchedSlot == null && !string.IsNullOrWhiteSpace(srDto.PreferredTime))
+                        {
+                            var cleanTime = srDto.PreferredTime.Trim().ToLowerInvariant();
+                            matchedSlot = await db.ServiceTimeSlots.FirstOrDefaultAsync(s =>
+                                s.IsActive &&
+                                ((s.Label != null && s.Label.ToLower().Contains(cleanTime)) ||
+                                 s.StartTime.ToLower() == cleanTime ||
+                                 (s.StartTime + " - " + s.EndTime).ToLower() == cleanTime));
+                        }
+                        if (matchedSlot == null)
+                        {
+                            matchedSlot = await db.ServiceTimeSlots.Where(s => s.IsActive).OrderBy(s => s.DisplayOrder).FirstOrDefaultAsync();
+                        }
+
+                        var targetUserId = request.UserId > 0 ? request.UserId : 1;
+                        var userExists = await db.Users.AnyAsync(u => u.UserId == targetUserId);
+                        if (!userExists)
+                        {
+                            var fallbackUser = await db.Users.Select(u => u.UserId).FirstOrDefaultAsync();
+                            targetUserId = fallbackUser > 0 ? fallbackUser : 1;
+                        }
 
                         var newServiceRequest = new ServiceRequest
                         {
                             ServiceRequestNumber = authoritativeSrNumber,
-                            UserId = request.UserId > 0 ? request.UserId : 1,
+                            UserId = targetUserId,
+                            SlotId = matchedSlot?.SlotId,
                             Title = resolvedTitle,
                             Description = resolvedDesc,
                             PreferredDate = parsedPreferredDate,
-                            PreferredTime = srDto.PreferredTime,
-                            Status = "Pending",
+                            PreferredTime = matchedSlot?.Label ?? srDto.PreferredTime,
+                            Status = "Booked",
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };
@@ -724,13 +780,15 @@ public class AiAgentService : IAiAgentService
                         db.ServiceRequests.Add(newServiceRequest);
                         await db.SaveChangesAsync();
 
-                        _logger.LogInformation("ASP.NET Core successfully persisted ServiceRequest #{Id} ({SrNumber}) for User {UserId}",
-                            newServiceRequest.ServiceRequestId, newServiceRequest.ServiceRequestNumber, newServiceRequest.UserId);
+                        _logger.LogInformation("ASP.NET Core successfully persisted ServiceRequest #{Id} ({SrNumber}) with Slot #{SlotId} for User {UserId}",
+                            newServiceRequest.ServiceRequestId, newServiceRequest.ServiceRequestNumber, newServiceRequest.SlotId, newServiceRequest.UserId);
 
                         // Update AI DTO response with authoritative DB identifiers
                         srDto.Id = newServiceRequest.ServiceRequestId;
                         srDto.ServiceRequestId = newServiceRequest.ServiceRequestId;
                         srDto.ServiceRequestNumber = newServiceRequest.ServiceRequestNumber;
+                        srDto.SlotId = newServiceRequest.SlotId;
+                        srDto.SlotLabel = matchedSlot?.Label ?? newServiceRequest.PreferredTime;
                         srDto.Title = newServiceRequest.Title;
                         srDto.Description = newServiceRequest.Description;
                         srDto.Status = newServiceRequest.Status;
@@ -740,7 +798,7 @@ public class AiAgentService : IAiAgentService
                         {
                             result.Ticket.TicketId = newServiceRequest.ServiceRequestId;
                             result.Ticket.RmaNumber = newServiceRequest.ServiceRequestNumber;
-                            result.Ticket.Status = "Pending";
+                            result.Ticket.Status = "Booked";
                             result.Ticket.CreatedAt = newServiceRequest.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ssZ");
                         }
 
@@ -751,7 +809,7 @@ public class AiAgentService : IAiAgentService
                         }
                     }
                 }
-                else if (action == "update")
+                else if (isUpdate)
                 {
                     // Find existing Service Request by ID or SR-Number
                     var existing = await db.ServiceRequests.FirstOrDefaultAsync(sr =>
@@ -760,23 +818,62 @@ public class AiAgentService : IAiAgentService
 
                     if (existing != null)
                     {
-                        if (!string.IsNullOrWhiteSpace(srDto.PreferredDate) && DateTime.TryParse(srDto.PreferredDate, out var dt))
+                        if (!string.IsNullOrWhiteSpace(srDto.PreferredDate))
                         {
-                            existing.PreferredDate = DateTime.SpecifyKind(dt.Date, DateTimeKind.Utc);
+                            var rawDate = srDto.PreferredDate.Trim();
+                            var lowerDate = rawDate.ToLowerInvariant();
+                            if (lowerDate.Contains("tomorrow"))
+                            {
+                                var cand = DateTime.UtcNow.Date.AddDays(1);
+                                if (cand.DayOfWeek == DayOfWeek.Sunday) cand = cand.AddDays(1);
+                                existing.PreferredDate = DateTime.SpecifyKind(cand, DateTimeKind.Utc);
+                            }
+                            else if (lowerDate.Contains("today"))
+                            {
+                                existing.PreferredDate = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+                            }
+                            else if (DateTime.TryParse(rawDate, out var dt))
+                            {
+                                existing.PreferredDate = DateTime.SpecifyKind(dt.Date, DateTimeKind.Utc);
+                            }
                         }
-                        if (!string.IsNullOrWhiteSpace(srDto.PreferredTime))
+
+                        if (!string.IsNullOrWhiteSpace(srDto.PreferredTime) || srDto.SlotId.HasValue)
                         {
-                            existing.PreferredTime = srDto.PreferredTime.Trim();
+                            ServiceTimeSlot? updateSlot = null;
+                            if (srDto.SlotId.HasValue && srDto.SlotId.Value > 0)
+                            {
+                                updateSlot = await db.ServiceTimeSlots.FirstOrDefaultAsync(s => s.SlotId == srDto.SlotId.Value);
+                            }
+                            if (updateSlot == null && !string.IsNullOrWhiteSpace(srDto.PreferredTime))
+                            {
+                                var cleanTime = srDto.PreferredTime.Trim().ToLowerInvariant();
+                                updateSlot = await db.ServiceTimeSlots.FirstOrDefaultAsync(s =>
+                                    s.IsActive &&
+                                    ((s.Label != null && s.Label.ToLower().Contains(cleanTime)) ||
+                                     s.StartTime.ToLower() == cleanTime ||
+                                     (s.StartTime + " - " + s.EndTime).ToLower() == cleanTime));
+                            }
+                            if (updateSlot != null)
+                            {
+                                existing.SlotId = updateSlot.SlotId;
+                                existing.PreferredTime = updateSlot.Label ?? srDto.PreferredTime.Trim();
+                            }
+                            else if (!string.IsNullOrWhiteSpace(srDto.PreferredTime))
+                            {
+                                existing.PreferredTime = srDto.PreferredTime.Trim();
+                            }
                         }
 
                         existing.Status = "SCHEDULED";
                         existing.UpdatedAt = DateTime.UtcNow;
                         await db.SaveChangesAsync();
 
-                        _logger.LogInformation("ASP.NET Core successfully updated appointment for ServiceRequest {SrNumber}", existing.ServiceRequestNumber);
+                        _logger.LogInformation("ASP.NET Core successfully updated appointment for ServiceRequest {SrNumber} to Slot #{SlotId}", existing.ServiceRequestNumber, existing.SlotId);
 
                         srDto.ServiceRequestId = existing.ServiceRequestId;
                         srDto.ServiceRequestNumber = existing.ServiceRequestNumber;
+                        srDto.SlotId = existing.SlotId;
                         srDto.Status = existing.Status;
                     }
                 }

@@ -42,3 +42,11 @@ export const HourglassIcon = (props) => React.createElement(Icon, { name: 'hourg
 export const HammerIcon = (props) => React.createElement(Icon, { name: 'hammer', ...props });
 export const TrendingUpIcon = (props) => React.createElement(Icon, { name: 'trendingUp', ...props });
 export const TrendingDownIcon = (props) => React.createElement(Icon, { name: 'trendingDown', ...props });
+export const CalendarIcon = (props) => React.createElement(Icon, { name: 'calendar', ...props });
+export const ClockIcon = (props) => React.createElement(Icon, { name: 'clock', ...props });
+export const InfoIcon = (props) => React.createElement(Icon, { name: 'info', ...props });
+export const ChevronUpIcon = (props) => React.createElement(Icon, { name: 'chevronUp', ...props });
+export const ChevronDownIcon = (props) => React.createElement(Icon, { name: 'chevronDown', ...props });
+export const QrCodeIcon = (props) => React.createElement(Icon, { name: 'qrCode', ...props });
+
+

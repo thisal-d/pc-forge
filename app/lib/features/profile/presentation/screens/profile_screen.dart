@@ -618,19 +618,32 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       Container(
                         padding:
-                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Text(
-                          'ID #${user?.userId ?? 1}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.secondaryText,
+                          color: AppColors.primaryBlue.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.primaryBlue.withValues(alpha: 0.25),
                           ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(
+                              Icons.verified_user_rounded,
+                              size: 13,
+                              color: AppColors.primaryBlue,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Verified Member',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primaryBlue,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

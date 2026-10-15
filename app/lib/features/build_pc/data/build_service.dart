@@ -99,6 +99,7 @@ class BuildService extends ChangeNotifier {
     final mobo = _activeSlots[BuildSlotType.motherboard];
     final ram = _activeSlots[BuildSlotType.ram];
     final psu = _activeSlots[BuildSlotType.psu];
+    final pcCase = _activeSlots[BuildSlotType.pcCase];
 
     // Check Socket Match (AM5 vs LGA1700)
     if (cpu != null && mobo != null) {
@@ -133,6 +134,21 @@ class BuildService extends ChangeNotifier {
       if (psu.powerWattage! < estimatedWattage) {
         warnings.add(
             'Underpowered PSU: Estimated system draw is ${estimatedWattage}W, which exceeds ${psu.powerWattage}W.');
+      }
+    }
+
+    // Check Case Physical Form Factor Clearance
+    if (mobo != null && pcCase != null) {
+      final moboForm = mobo.formFactor?.trim().toUpperCase();
+      final caseForm = pcCase.formFactor?.trim().toUpperCase();
+      if (moboForm != null && caseForm != null) {
+        if (caseForm.contains('MINI-ITX') &&
+            (moboForm == 'ATX' || moboForm == 'E-ATX' || moboForm.contains('MICRO-ATX') || moboForm.contains('MATX'))) {
+          warnings.add('Form Factor Mismatch: $moboForm Motherboard does not fit in $caseForm case.');
+        } else if ((caseForm.contains('MICRO-ATX') || caseForm.contains('MATX')) &&
+            (moboForm == 'ATX' || moboForm == 'E-ATX')) {
+          warnings.add('Form Factor Mismatch: $moboForm Motherboard does not fit in $caseForm case.');
+        }
       }
     }
 
@@ -256,6 +272,16 @@ class BuildService extends ChangeNotifier {
     clearDraft();
     notifyListeners();
     return updatedBuild;
+  }
+
+  /// 6. Delete a custom build from customer side
+  Future<void> deleteBuild(int buildId, {String? token}) async {
+    await _apiService.deleteCustomBuild(buildId, token: token);
+    _myBuilds.removeWhere((b) => b.buildId == buildId);
+    if (_editingBuildId == buildId) {
+      clearDraft();
+    }
+    notifyListeners();
   }
 
   /// Build the JSON payload for submit/resubmit API calls

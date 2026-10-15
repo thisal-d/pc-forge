@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/app_routes.dart';
+import '../../../../services/api_service.dart';
 import '../../data/auth_repository.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -23,8 +24,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscureConfirmPassword = true;
   String? _errorMessage;
 
+  static final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+  @override
+  void initState() {
+    super.initState();
+    _firstNameController.addListener(_onFieldChanged);
+    _lastNameController.addListener(_onFieldChanged);
+    _emailController.addListener(_onFieldChanged);
+    _passwordController.addListener(_onFieldChanged);
+    _confirmPasswordController.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    if (_errorMessage != null) {
+      setState(() {
+        _errorMessage = null;
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
+    _firstNameController.removeListener(_onFieldChanged);
+    _lastNameController.removeListener(_onFieldChanged);
+    _emailController.removeListener(_onFieldChanged);
+    _passwordController.removeListener(_onFieldChanged);
+    _confirmPasswordController.removeListener(_onFieldChanged);
+
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
@@ -33,7 +62,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  bool get _isFormValid {
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (firstName.isEmpty || firstName.length < 2) return false;
+    if (lastName.isEmpty) return false;
+    if (email.isEmpty || !_emailRegex.hasMatch(email)) return false;
+    if (password.length < 8) return false;
+    if (confirmPassword.isEmpty || confirmPassword != password) return false;
+
+    return true;
+  }
+
   Future<void> _handleRegister() async {
+    if (!_isFormValid || _isLoading) {
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -68,8 +117,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      final msg = e is ApiException
+          ? e.message
+          : e.toString().replaceFirst('Exception: ', '').trim();
       setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage = msg;
       });
     } finally {
       if (mounted) {
@@ -92,6 +144,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             padding: const EdgeInsets.all(24.0),
             child: Form(
               key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -141,6 +194,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Error Message banner
                   if (_errorMessage != null) ...[
                     Container(
+                      key: const Key('register_error_banner'),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.red.shade50,
@@ -165,6 +219,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                   // First Name & Last Name row
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: TextFormField(
@@ -173,9 +228,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           textInputAction: TextInputAction.next,
                           textCapitalization: TextCapitalization.words,
                           decoration: const InputDecoration(
-                            labelText: 'First Name',
+                            labelText: 'First Name *',
                             border: OutlineInputBorder(),
                           ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) {
+                              return 'Please enter your first name.';
+                            }
+                            if (val.trim().length < 2) {
+                              return 'First name must be at least 2 characters.';
+                            }
+                            return null;
+                          },
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -186,9 +250,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           textInputAction: TextInputAction.next,
                           textCapitalization: TextCapitalization.words,
                           decoration: const InputDecoration(
-                            labelText: 'Last Name',
+                            labelText: 'Last Name *',
                             border: OutlineInputBorder(),
                           ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) {
+                              return 'Last name is required.';
+                            }
+                            return null;
+                          },
                         ),
                       ),
                     ],
@@ -209,10 +279,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     validator: (val) {
                       if (val == null || val.trim().isEmpty) {
-                        return 'Please enter an email';
+                        return 'Please enter your email address.';
                       }
-                      if (!val.contains('@') || !val.contains('.')) {
-                        return 'Please enter a valid email address';
+                      if (!_emailRegex.hasMatch(val.trim())) {
+                        return 'Please enter a valid email address.';
                       }
                       return null;
                     },
@@ -226,7 +296,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     obscureText: _obscurePassword,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
-                      labelText: 'Password * (min 6 chars)',
+                      labelText: 'Password *',
+                      helperText: 'Password must be at least 8 characters long.',
+                      helperMaxLines: 2,
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
@@ -244,8 +316,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (val == null || val.isEmpty) {
                         return 'Please enter a password';
                       }
-                      if (val.length < 6) {
-                        return 'Password must be at least 6 characters';
+                      if (val.length < 8) {
+                        return 'Password must be at least 8 characters long.';
                       }
                       return null;
                     },
@@ -289,7 +361,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Register Button
                   ElevatedButton(
                     key: const Key('register_submit_btn'),
-                    onPressed: _isLoading ? null : _handleRegister,
+                    onPressed: (!_isFormValid || _isLoading) ? null : _handleRegister,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),

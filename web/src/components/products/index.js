@@ -8,3 +8,5 @@ export { AddProductModal } from './AddProductModal.jsx';
 export { EditProductModal } from './EditProductModal.jsx';
 export { ViewProductModal } from './ViewProductModal.jsx';
 export { DeleteProductModal } from './DeleteProductModal.jsx';
+export { QrCodeModal } from './QrCodeModal.jsx';
+

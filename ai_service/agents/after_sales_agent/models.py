@@ -1,5 +1,5 @@
 """
-Data schemas for after-sales troubleshooting conversations, warranty checks,
+Data schemas for after-sales troubleshooting conversations
 and service request creation.
 """
 
@@ -9,41 +9,45 @@ from pydantic import BaseModel, Field
 
 class ServiceRequestDetails(BaseModel):
     """Structured service request details for persistence and customer communication."""
+    action: str = Field(default="create", description="Action to perform: create or update")
     id: Optional[int] = Field(default=None, description="Primary database ID")
     service_request_id: Optional[int] = Field(default=None, description="Service Request primary key")
     service_request_number: str = Field(default="", description="Generated Service Request Number, e.g. SR-000108")
     user_id: int = Field(default=1, description="Authenticated customer ID")
     customer_name: Optional[str] = Field(default=None, description="Customer full name")
-    order_id: Optional[int] = Field(default=None, description="Linked order ID")
-    order_number: Optional[str] = Field(default=None, description="Linked order code: PCF-10XXX")
-    product_id: Optional[int] = Field(default=None, description="Target component product ID")
-    product_name: Optional[str] = Field(default=None, description="Component name: e.g. NVIDIA RTX 4070 Ti")
     title: Optional[str] = Field(default=None, description="Brief title/summary of the service request")
     description: Optional[str] = Field(default=None, description="Detailed problem description (optional)")
     problem_description: str = Field(default="", description="Customer-reported symptom")
     problem_category: str = Field(default="General", description="Troubleshooting category")
     troubleshooting_summary: Optional[str] = Field(default=None, description="Steps attempted and AI assessment")
     attempt_count: int = Field(default=0, description="Number of troubleshooting attempts made (0-5)")
-    warranty_status: str = Field(default="Active", description="Active or Expired")
-    warranty_expiry_date: Optional[str] = Field(default=None, description="Expiration date string")
     preferred_date: Optional[str] = Field(default=None, description="Preferred appointment date")
     preferred_time: Optional[str] = Field(default=None, description="Preferred appointment time slot")
-    status: str = Field(default="PENDING", description="Status: PENDING, UNDER_REVIEW, SCHEDULED, IN_SERVICE, RESOLVED")
+    slot_id: Optional[int] = Field(default=None, description="Service time slot ID configured in store database")
+    slot_label: Optional[str] = Field(default=None, description="Time slot label, e.g. 09:00 AM - 11:00 AM")
+    status: str = Field(default="BOOKED", description="Status: BOOKED, IN_PROGRESS, SCHEDULED, IN_SERVICE, RESOLVED")
     priority: str = Field(default="Normal", description="Priority: Low, Normal, High, Urgent")
     created_at: str = Field(default="", description="ISO timestamp")
+    # Optional legacy fields for backward compatibility
+    order_id: Optional[int] = Field(default=None, description="Legacy field")
+    order_number: Optional[str] = Field(default=None, description="Legacy field")
+    product_id: Optional[int] = Field(default=None, description="Legacy field")
+    product_name: Optional[str] = Field(default=None, description="Legacy field")
+    warranty_status: Optional[str] = Field(default=None, description="Legacy field")
+    warranty_expiry_date: Optional[str] = Field(default=None, description="Legacy field")
 
 
 class RmaTicketDetails(BaseModel):
     """Backward-compatible RMA ticket model for legacy components."""
-    ticket_id: int = Field(default=2231, description="Primary ticket ID")
-    rma_number: str = Field(default="SR-000101", description="Formatted reference number")
+    ticket_id: int = Field(default=108, description="Primary ticket ID")
+    rma_number: str = Field(default="SR-000108", description="Formatted reference number")
     order_id: Optional[int] = Field(default=None, description="Linked order ID")
-    order_number: Optional[str] = Field(default="PCF-10492", description="Linked order reference")
-    product_id: Optional[int] = Field(default=None, description="Faulty hardware product ID")
-    component_name: str = Field(default="RTX 4070", description="Commercial component name")
+    order_number: Optional[str] = Field(default=None, description="Linked order reference")
+    product_id: Optional[int] = Field(default=None, description="Target product ID")
+    component_name: str = Field(default="PC System", description="Commercial component name")
     issue_type: str = Field(default="Hardware fault", description="Issue category")
-    status: str = Field(default="PENDING", description="Status pill")
-    priority: str = Field(default="High", description="Ticket priority")
+    status: str = Field(default="BOOKED", description="Status pill")
+    priority: str = Field(default="Normal", description="Ticket priority")
     description: str = Field(default="", description="Customer-reported symptom")
     attachment_url: Optional[str] = Field(default=None, description="Photo proof URL")
     created_at: str = Field(default="", description="ISO timestamp")
@@ -54,10 +58,13 @@ class AfterSalesChatRequest(BaseModel):
     user_id: int = Field(default=1, description="Authenticated customer User ID")
     message: str = Field(description="Customer question or symptom report")
     session_id: Optional[str] = Field(default=None, description="Conversational thread ID")
-    order_id: Optional[int] = Field(default=None, description="Specific order context if known")
-    customer: Optional[Dict[str, Any]] = Field(default=None, description="Authenticated customer profile context from ASP.NET Core")
-    orders: Optional[List[Dict[str, Any]]] = Field(default=None, description="Recent customer orders and purchased components from ASP.NET Core")
-    service_requests: Optional[List[Dict[str, Any]]] = Field(default=None, description="Customer active and past service requests from ASP.NET Core")
+    problem_category: Optional[str] = Field(default=None, description="Optional problem category")
+    customer: Optional[Dict[str, Any]] = Field(default=None, description="Authenticated customer profile context")
+    service_requests: Optional[List[Dict[str, Any]]] = Field(default=None, description="Customer active and past service requests")
+    time_slots: Optional[List[Dict[str, Any]]] = Field(default=None, description="Active Service Time Slots configured in database")
+    # Legacy optional context
+    order_id: Optional[int] = Field(default=None, description="Legacy field")
+    orders: Optional[List[Dict[str, Any]]] = Field(default=None, description="Legacy field")
 
 
 class AfterSalesChatResponse(BaseModel):

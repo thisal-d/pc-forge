@@ -43,6 +43,8 @@ class OrderService extends ChangeNotifier {
     required String paymentMethod,
     required List<CartItemModel> cartItems,
     required double totalAmount,
+    String? couponCode,
+    double? discountAmount,
     String? token,
   }) async {
     final itemsPayload = cartItems.map((cartItem) => {
@@ -55,6 +57,8 @@ class OrderService extends ChangeNotifier {
       shippingAddress: shippingAddress,
       paymentMethod: paymentMethod,
       items: itemsPayload,
+      couponCode: couponCode,
+      discountAmount: discountAmount,
       token: token,
     );
 

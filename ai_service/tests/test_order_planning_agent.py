@@ -16,6 +16,7 @@ from ai_service.agents.order_planning_agent.tools import (
     calculate_delivery,
     calculate_pricing,
     create_order_proposal,
+    order_planning_context_var,
 )
 from ai_service.agents.order_planning_agent.agent import generate_order_proposal
 
@@ -55,6 +56,17 @@ def test_calculate_pricing_tool():
 
 def test_apply_discount_tool_welcome5():
     """Validates WELCOME5 promotional coupon deduction matching ui4.png."""
+    order_planning_context_var.set({
+        "coupons": [{
+            "code": "WELCOME5",
+            "description": "5% Welcome Discount on your first PC build",
+            "discount_type": "PERCENTAGE",
+            "discount_value": 5.0,
+            "min_subtotal": 0.0,
+            "max_discount": 8000.0,
+            "is_active": True
+        }]
+    })
     result_str = apply_discount.invoke({
         "promo_code": "WELCOME5",
         "subtotal": 385000.0,

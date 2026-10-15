@@ -1,5 +1,5 @@
 import React from 'react';
-import { ZapIcon, ShieldCheckIcon } from '../icons/index.js';
+import { ZapIcon, ShieldCheckIcon, QrCodeIcon } from '../icons/index.js';
 
 export const ProductTableRow = ({
   product,
@@ -7,6 +7,7 @@ export const ProductTableRow = ({
   onEdit,
   onToggleStatus,
   onDelete,
+  onShowQr,
 }) => {
   const prodId = product.productId || product.id;
   const isActive = (product.status || 'Active').toLowerCase() === 'active';
@@ -140,8 +141,19 @@ export const ProductTableRow = ({
       </td>
 
       {/* Actions */}
-      <td>
-        <div className="action-btn-group" style={{ justifyContent: 'flex-end' }}>
+      <td style={{ textAlign: 'right', whiteSpace: 'nowrap', width: '320px', minWidth: '320px', paddingRight: '1.25rem' }}>
+        <div className="product-actions-group action-btn-group" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.35rem', whiteSpace: 'nowrap' }}>
+          <button
+            type="button"
+            onClick={() => onShowQr && onShowQr(product)}
+            className="btn btn-outline-sm"
+            title="Generate QR code for mobile scanner"
+            id={`qr-product-btn-${prodId}`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+          >
+            <QrCodeIcon size={14} />
+            QR Code
+          </button>
           <button
             onClick={() => onView(product)}
             className="btn btn-outline-sm"

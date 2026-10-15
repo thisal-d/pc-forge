@@ -29,7 +29,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task CreateServiceRequest_InitialStatusIsPending_AndTitleIsSaved()
+    public async Task CreateServiceRequest_InitialStatusIsPending_AndSlotIsSaved()
     {
         var customerClient = CreateAuthenticatedClient(10, "customer10@pcforge.com", "Customer");
 
@@ -38,7 +38,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
             Title = "PC won't boot into BIOS",
             Description = "Pressing power button turns fans on for 2 seconds then shuts down.",
             PreferredDate = DateTime.UtcNow.Date.AddDays(2),
-            PreferredTime = "10:30 AM"
+            SlotId = 1
         };
 
         var response = await customerClient.PostAsJsonAsync("/api/ServiceRequests", payload);
@@ -47,82 +47,333 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
         var detail = await response.Content.ReadFromJsonAsync<ServiceRequestDetailDto>();
         Assert.NotNull(detail);
         Assert.Equal("PC won't boot into BIOS", detail.Title);
-        Assert.Equal("Pending", detail.Status);
-        Assert.Equal("10:30 AM", detail.PreferredTime);
+        Assert.Equal("Booked", detail.Status);
+        Assert.Equal(1, detail.SlotId);
+        Assert.Equal("09:00 AM - 11:00 AM", detail.TimeSlotLabel);
     }
 
     [Fact]
-    public async Task CreateServiceRequest_TimeOutside9AmTo6Pm_IsRejected()
-    {
-        var customerClient = CreateAuthenticatedClient(11, "customer11@pcforge.com", "Customer");
-
-        // 8:00 AM is too early
-        var earlyPayload = new CreateServiceRequestDto
-        {
-            Title = "Early appointment test",
-            PreferredDate = DateTime.UtcNow.Date.AddDays(3),
-            PreferredTime = "08:00 AM"
-        };
-        var earlyRes = await customerClient.PostAsJsonAsync("/api/ServiceRequests", earlyPayload);
-        Assert.Equal(HttpStatusCode.BadRequest, earlyRes.StatusCode);
-
-        // 7:00 PM (19:00) is too late
-        var latePayload = new CreateServiceRequestDto
-        {
-            Title = "Late appointment test",
-            PreferredDate = DateTime.UtcNow.Date.AddDays(3),
-            PreferredTime = "07:00 PM"
-        };
-        var lateRes = await customerClient.PostAsJsonAsync("/api/ServiceRequests", latePayload);
-        Assert.Equal(HttpStatusCode.BadRequest, lateRes.StatusCode);
-    }
-
-    [Fact]
-    public async Task CreateServiceRequest_Max10CapacityPerDate_IsStrictlyEnforced()
+    public async Task CreateServiceRequest_SlotCapacity_IsStrictlyEnforced_AndOld10LimitRemoved()
     {
         var targetDate = DateTime.UtcNow.Date.AddDays(15);
+        int slotId = 1; // Default capacity = 5
 
-        // Pre-fill 10 service requests on targetDate directly in database
+        // 1. Pre-fill 5 service requests for Slot 1 on targetDate directly in database
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            for (int i = 1; i <= 10; i++)
+            for (int i = 1; i <= 5; i++)
             {
                 db.ServiceRequests.Add(new ServiceRequest
                 {
-                    ServiceRequestNumber = $"SR-CAPTEST-{i}-{Guid.NewGuid().ToString("N")[..4]}",
+                    ServiceRequestNumber = $"SR-SLOTCAP1-{i}-{Guid.NewGuid().ToString("N")[..4]}",
                     UserId = 1,
-                    Title = $"Existing Appointment {i}",
+                    SlotId = slotId,
+                    Title = $"Slot 1 Booking {i}",
                     Description = "Issue",
                     PreferredDate = targetDate,
-                    PreferredTime = "11:00 AM",
+                    PreferredTime = "09:00 AM - 11:00 AM",
                     Status = "Pending"
                 });
             }
             await db.SaveChangesAsync();
         }
 
-        // Check availability endpoint returns 0 remaining slots
-        var availRes = await _client.GetFromJsonAsync<ServiceAvailabilityDto>($"/api/ServiceRequests/availability?date={targetDate:yyyy-MM-dd}");
-        Assert.NotNull(availRes);
-        Assert.Equal(10, availRes.BookedCount);
-        Assert.Equal(0, availRes.RemainingSlots);
-        Assert.False(availRes.IsAvailable);
+        // 2. Check slots endpoint: Slot 1 is full, but Slot 2 is available
+        var slotsRes = await _client.GetFromJsonAsync<List<SlotAvailabilityDto>>($"/api/ServiceRequests/slots?date={targetDate:yyyy-MM-dd}");
+        Assert.NotNull(slotsRes);
+        var s1 = slotsRes.FirstOrDefault(s => s.SlotId == 1);
+        var s2 = slotsRes.FirstOrDefault(s => s.SlotId == 2);
 
-        // Customer attempts to create 11th request on targetDate -> Must be rejected with 400
+        Assert.NotNull(s1);
+        Assert.Equal(5, s1.BookedCount);
+        Assert.Equal(0, s1.RemainingSlots);
+        Assert.False(s1.IsAvailable);
+
+        Assert.NotNull(s2);
+        Assert.Equal(0, s2.BookedCount);
+        Assert.Equal(5, s2.RemainingSlots);
+        Assert.True(s2.IsAvailable);
+
+        // 3. Customer attempts 6th booking on Slot 1 -> Must be rejected with 400
         var customerClient = CreateAuthenticatedClient(12, "customer12@pcforge.com", "Customer");
-        var attemptPayload = new CreateServiceRequestDto
+        var attemptSlot1 = new CreateServiceRequestDto
         {
-            Title = "11th Appointment Attempt",
+            Title = "6th booking attempt for Slot 1",
             PreferredDate = targetDate,
-            PreferredTime = "02:00 PM"
+            SlotId = 1
         };
+        var resSlot1 = await customerClient.PostAsJsonAsync("/api/ServiceRequests", attemptSlot1);
+        Assert.Equal(HttpStatusCode.BadRequest, resSlot1.StatusCode);
+        var errSlot1 = await resSlot1.Content.ReadAsStringAsync();
+        Assert.Contains("is full", errSlot1);
 
-        var response = await customerClient.PostAsJsonAsync("/api/ServiceRequests", attemptPayload);
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        // 4. Booking Slot 2 on the same date succeeds (proving per-slot limit)
+        var attemptSlot2 = new CreateServiceRequestDto
+        {
+            Title = "Booking for Slot 2",
+            PreferredDate = targetDate,
+            SlotId = 2
+        };
+        var resSlot2 = await customerClient.PostAsJsonAsync("/api/ServiceRequests", attemptSlot2);
+        Assert.Equal(HttpStatusCode.Created, resSlot2.StatusCode);
+    }
 
-        var errContent = await response.Content.ReadAsStringAsync();
-        Assert.Contains("maximum capacity of 10", errContent);
+    [Fact]
+    public async Task Admin_CanOverrideSlotCapacity_AndCloseSlotForSpecificDate()
+    {
+        var adminClient = CreateAuthenticatedClient(1, "admin@pcforge.com", "Admin");
+        var customerClient = CreateAuthenticatedClient(20, "customer20@pcforge.com", "Customer");
+        var targetDate = DateTime.UtcNow.Date.AddDays(18);
+
+        // 1. Admin overrides Slot 3: Increases capacity to 10 for targetDate
+        var overrideCapPayload = new SetTimeSlotOverrideDto
+        {
+            Date = targetDate,
+            CustomCapacity = 10,
+            IsClosed = false
+        };
+        var overrideRes = await adminClient.PostAsJsonAsync("/api/ServiceRequests/admin/slots/3/override", overrideCapPayload);
+        Assert.Equal(HttpStatusCode.OK, overrideRes.StatusCode);
+        var overrideDto = await overrideRes.Content.ReadFromJsonAsync<SlotAvailabilityDto>();
+        Assert.NotNull(overrideDto);
+        Assert.Equal(10, overrideDto.MaxCapacity);
+        Assert.Equal(10, overrideDto.RemainingSlots);
+        Assert.True(overrideDto.IsOverridden);
+
+        // 2. Admin overrides Slot 4: Closes slot 4 for targetDate (e.g., maintenance)
+        var closePayload = new SetTimeSlotOverrideDto
+        {
+            Date = targetDate,
+            IsClosed = true,
+            Reason = "Facility maintenance"
+        };
+        var closeRes = await adminClient.PostAsJsonAsync("/api/ServiceRequests/admin/slots/4/override", closePayload);
+        Assert.Equal(HttpStatusCode.OK, closeRes.StatusCode);
+        var closedDto = await closeRes.Content.ReadFromJsonAsync<SlotAvailabilityDto>();
+        Assert.NotNull(closedDto);
+        Assert.True(closedDto.IsClosed);
+        Assert.False(closedDto.IsAvailable);
+        Assert.Equal(0, closedDto.RemainingSlots);
+
+        // 3. Customer attempts to book closed Slot 4 -> Rejected with 400
+        var attemptClosed = new CreateServiceRequestDto
+        {
+            Title = "Attempt booking closed slot",
+            PreferredDate = targetDate,
+            SlotId = 4
+        };
+        var resAttempt = await customerClient.PostAsJsonAsync("/api/ServiceRequests", attemptClosed);
+        Assert.Equal(HttpStatusCode.BadRequest, resAttempt.StatusCode);
+        var errAttempt = await resAttempt.Content.ReadAsStringAsync();
+        Assert.Contains("closed", errAttempt);
+    }
+
+    [Fact]
+    public async Task Admin_CannotReduceCapacityBelowExistingBookings()
+    {
+        var adminClient = CreateAuthenticatedClient(1, "admin@pcforge.com", "Admin");
+        var targetDate = DateTime.UtcNow.Date.AddDays(22);
+        int slotId = 2;
+
+        // Pre-fill 3 bookings for Slot 2
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            for (int i = 1; i <= 3; i++)
+            {
+                db.ServiceRequests.Add(new ServiceRequest
+                {
+                    ServiceRequestNumber = $"SR-REDUCE-{i}-{Guid.NewGuid().ToString("N")[..4]}",
+                    UserId = 1,
+                    SlotId = slotId,
+                    Title = $"Booking {i}",
+                    PreferredDate = targetDate,
+                    Status = "Pending"
+                });
+            }
+            await db.SaveChangesAsync();
+        }
+
+        // Admin attempts date override with CustomCapacity = 2 (< 3 booked) -> Must fail
+        var overridePayload = new SetTimeSlotOverrideDto
+        {
+            Date = targetDate,
+            CustomCapacity = 2
+        };
+        var overrideRes = await adminClient.PostAsJsonAsync($"/api/ServiceRequests/admin/slots/{slotId}/override", overridePayload);
+        Assert.Equal(HttpStatusCode.BadRequest, overrideRes.StatusCode);
+        var err = await overrideRes.Content.ReadAsStringAsync();
+        Assert.Contains("Cannot reduce capacity", err);
+
+        // Admin attempts to reduce default capacity to 2 (< 3 active bookings) -> Must fail
+        var updatePayload = new UpdateServiceTimeSlotDto
+        {
+            DefaultCapacity = 2
+        };
+        var updateRes = await adminClient.PutAsJsonAsync($"/api/ServiceRequests/admin/slots/{slotId}", updatePayload);
+        Assert.Equal(HttpStatusCode.BadRequest, updateRes.StatusCode);
+        var err2 = await updateRes.Content.ReadAsStringAsync();
+        Assert.Contains("Cannot reduce capacity", err2);
+    }
+
+    [Fact]
+    public async Task CannotDeleteSlotWithBookings_CanDeactivateInstead()
+    {
+        var adminClient = CreateAuthenticatedClient(1, "admin@pcforge.com", "Admin");
+        var targetDate = DateTime.UtcNow.Date.AddDays(25);
+        int slotId = 3;
+
+        // Pre-fill a booking for Slot 3
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.ServiceRequests.Add(new ServiceRequest
+            {
+                ServiceRequestNumber = $"SR-NODELETE-{Guid.NewGuid().ToString("N")[..4]}",
+                UserId = 1,
+                SlotId = slotId,
+                Title = "Booking preventing delete",
+                PreferredDate = targetDate,
+                Status = "Pending"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // Attempt DELETE -> Must be rejected with 400 instructing to deactivate
+        var delRes = await adminClient.DeleteAsync($"/api/ServiceRequests/admin/slots/{slotId}");
+        Assert.Equal(HttpStatusCode.BadRequest, delRes.StatusCode);
+        var err = await delRes.Content.ReadAsStringAsync();
+        Assert.Contains("deactivate", err.ToLower());
+
+        // Deactivating the slot succeeds
+        var patchRes = await adminClient.PatchAsync($"/api/ServiceRequests/admin/slots/{slotId}/toggle-active", null);
+        Assert.Equal(HttpStatusCode.OK, patchRes.StatusCode);
+        var toggled = await patchRes.Content.ReadFromJsonAsync<ServiceTimeSlotDto>();
+        Assert.NotNull(toggled);
+        Assert.False(toggled.IsActive);
+    }
+
+    [Fact]
+    public async Task CancelledRequests_DoNotCountAsBooked_AndFreeUpCapacity()
+    {
+        var customerClient = CreateAuthenticatedClient(3, "alex@example.com", "Customer");
+        var targetDate = DateTime.UtcNow.Date.AddDays(28);
+        int slotId = 4; // Capacity 5
+
+        // Create a booking
+        var createPayload = new CreateServiceRequestDto
+        {
+            Title = "Will be cancelled",
+            PreferredDate = targetDate,
+            SlotId = slotId
+        };
+        var createRes = await customerClient.PostAsJsonAsync("/api/ServiceRequests", createPayload);
+        Assert.Equal(HttpStatusCode.Created, createRes.StatusCode);
+        var created = await createRes.Content.ReadFromJsonAsync<ServiceRequestDetailDto>();
+        Assert.NotNull(created);
+
+        // Pre-fill remaining 4 bookings to make it full (5 of 5)
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var maxId = await db.ServiceRequests.MaxAsync(sr => (int?)sr.ServiceRequestId) ?? 500;
+            for (int i = 1; i <= 4; i++)
+            {
+                db.ServiceRequests.Add(new ServiceRequest
+                {
+                    ServiceRequestId = maxId + i,
+                    ServiceRequestNumber = $"SR-FILL-{i}-{Guid.NewGuid().ToString("N")[..4]}",
+                    UserId = 1,
+                    SlotId = slotId,
+                    Title = $"Filler {i}",
+                    PreferredDate = targetDate,
+                    Status = "Pending"
+                });
+            }
+            await db.SaveChangesAsync();
+        }
+
+        // Slot is full
+        var slotsRes1 = await _client.GetFromJsonAsync<List<SlotAvailabilityDto>>($"/api/ServiceRequests/slots?date={targetDate:yyyy-MM-dd}");
+        Assert.NotNull(slotsRes1);
+        var sBefore = slotsRes1.First(s => s.SlotId == slotId);
+        Assert.Equal(0, sBefore.RemainingSlots);
+        Assert.False(sBefore.IsAvailable);
+
+        // Customer cancels their request
+        var cancelRes = await customerClient.PostAsync($"/api/ServiceRequests/{created.ServiceRequestId}/cancel", null);
+        Assert.Equal(HttpStatusCode.OK, cancelRes.StatusCode);
+
+        // Slot now has 1 available spot freed up!
+        var slotsRes2 = await _client.GetFromJsonAsync<List<SlotAvailabilityDto>>($"/api/ServiceRequests/slots?date={targetDate:yyyy-MM-dd}");
+        Assert.NotNull(slotsRes2);
+        var sAfter = slotsRes2.First(s => s.SlotId == slotId);
+        Assert.Equal(1, sAfter.RemainingSlots);
+        Assert.True(sAfter.IsAvailable);
+
+        // Another customer can now book the newly freed spot
+        var newCustomerClient = CreateAuthenticatedClient(31, "customer31@pcforge.com", "Customer");
+        var bookFreed = await newCustomerClient.PostAsJsonAsync("/api/ServiceRequests", new CreateServiceRequestDto
+        {
+            Title = "Booking freed spot",
+            PreferredDate = targetDate,
+            SlotId = slotId
+        });
+        Assert.Equal(HttpStatusCode.Created, bookFreed.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConcurrentBooking_PreventsOverbooking_WhenBookingLastSpot()
+    {
+        var targetDate = DateTime.UtcNow.Date.AddDays(35);
+        int slotId = 1;
+
+        // Clean any existing bookings for targetDate on slot 1, then pre-fill 4 bookings (capacity 5 -> 1 spot left)
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            for (int i = 1; i <= 4; i++)
+            {
+                db.ServiceRequests.Add(new ServiceRequest
+                {
+                    ServiceRequestNumber = $"SR-CONCURR-{i}-{Guid.NewGuid().ToString("N")[..4]}",
+                    UserId = 1,
+                    SlotId = slotId,
+                    Title = $"Concurrent Setup {i}",
+                    PreferredDate = targetDate,
+                    Status = "Pending"
+                });
+            }
+            await db.SaveChangesAsync();
+        }
+
+        // Two users attempt to book the single remaining spot at the exact same time
+        var clientA = CreateAuthenticatedClient(50, "userA@pcforge.com", "Customer");
+        var clientB = CreateAuthenticatedClient(51, "userB@pcforge.com", "Customer");
+
+        var taskA = clientA.PostAsJsonAsync("/api/ServiceRequests", new CreateServiceRequestDto
+        {
+            Title = "User A Booking",
+            PreferredDate = targetDate,
+            SlotId = slotId
+        });
+
+        var taskB = clientB.PostAsJsonAsync("/api/ServiceRequests", new CreateServiceRequestDto
+        {
+            Title = "User B Booking",
+            PreferredDate = targetDate,
+            SlotId = slotId
+        });
+
+        var responses = await Task.WhenAll(taskA, taskB);
+
+        var successCount = responses.Count(r => r.StatusCode == HttpStatusCode.Created);
+        var fullCount = responses.Count(r => r.StatusCode == HttpStatusCode.BadRequest);
+
+        // Exactly one user gets the last spot, and the other is rejected as full
+        Assert.Equal(1, successCount);
+        Assert.Equal(1, fullCount);
     }
 
     [Fact]
@@ -136,7 +387,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
         {
             Title = "Request to cancel",
             PreferredDate = DateTime.UtcNow.Date.AddDays(4),
-            PreferredTime = "01:00 PM"
+            SlotId = 2
         };
         var createRes = await customerClient.PostAsJsonAsync("/api/ServiceRequests", createPayload);
         Assert.Equal(HttpStatusCode.Created, createRes.StatusCode);
@@ -168,7 +419,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
             Title = "GPU artifacting under load",
             Description = "Green lines on display during FurMark benchmark",
             PreferredDate = DateTime.UtcNow.Date.AddDays(5),
-            PreferredTime = "03:00 PM"
+            SlotId = 2
         };
         var createRes = await customerClient.PostAsJsonAsync("/api/ServiceRequests", createPayload);
         var created = await createRes.Content.ReadFromJsonAsync<ServiceRequestDetailDto>();
@@ -223,113 +474,32 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.ServiceRequests.Add(new ServiceRequest
             {
-                ServiceRequestNumber = $"SR-FILTER-PENDING-{Guid.NewGuid().ToString("N")[..4]}",
+                ServiceRequestNumber = $"SR-FILTER-BOOKED-{Guid.NewGuid().ToString("N")[..4]}",
                 UserId = 1,
-                Title = "Filter Test Pending",
+                SlotId = 1,
+                Title = "Filter Test Booked",
                 Description = "Filter test",
                 PreferredDate = baseDate,
-                PreferredTime = "10:00 AM",
-                Status = "Pending"
+                Status = "Booked"
             });
             db.ServiceRequests.Add(new ServiceRequest
             {
                 ServiceRequestNumber = $"SR-FILTER-COMPLETED-{Guid.NewGuid().ToString("N")[..4]}",
                 UserId = 1,
+                SlotId = 2,
                 Title = "Filter Test Completed",
                 Description = "Filter test",
                 PreferredDate = baseDate.AddDays(5),
-                PreferredTime = "11:00 AM",
                 Status = "Completed"
             });
             await db.SaveChangesAsync();
         }
 
-        // Filter by status = "Pending" and date range
-        var filterUrl = $"/api/ServiceRequests?status=Pending&startDate={baseDate.AddDays(-1):yyyy-MM-dd}&endDate={baseDate.AddDays(1):yyyy-MM-dd}";
+        // Filter by status = "Booked" and date range
+        var filterUrl = $"/api/ServiceRequests?status=Booked&startDate={baseDate.AddDays(-1):yyyy-MM-dd}&endDate={baseDate.AddDays(1):yyyy-MM-dd}";
         var listRes = await adminClient.GetFromJsonAsync<List<ServiceRequestSummaryDto>>(filterUrl);
         Assert.NotNull(listRes);
-        Assert.Contains(listRes, r => r.Title == "Filter Test Pending");
+        Assert.Contains(listRes, r => r.Title == "Filter Test Booked");
         Assert.DoesNotContain(listRes, r => r.Title == "Filter Test Completed");
     }
-
-    [Fact]
-    public async Task AgenticServiceRequestCreation_ViaAiChat_CreatesPendingRequestAndChecksCapacity()
-    {
-        var customerId = 15;
-        var customerClient = CreateAuthenticatedClient(customerId, "customer15@pcforge.com", "Customer");
-
-        // Target weekday date
-        var targetDate = DateTime.UtcNow.Date.AddDays(30);
-        while (targetDate.DayOfWeek == DayOfWeek.Sunday)
-        {
-            targetDate = targetDate.AddDays(1);
-        }
-
-        // 1. Customer messages the AI assistant requesting a service appointment
-        var chatPayload = new AfterSalesChatRequestDto
-        {
-            UserId = customerId,
-            Message = $"Please create a service request for my computer. Date {targetDate:yyyy-MM-dd} at 10:30 AM. Title: Display freezes during benchmarks."
-        };
-
-        var chatRes = await customerClient.PostAsJsonAsync("/api/ServiceRequests/ai-chat", chatPayload);
-        Assert.Equal(HttpStatusCode.OK, chatRes.StatusCode);
-
-        var chatResult = await chatRes.Content.ReadFromJsonAsync<AfterSalesChatResponseDto>();
-        Assert.NotNull(chatResult);
-        Assert.True(chatResult.Success);
-        Assert.NotNull(chatResult.ServiceRequest);
-        Assert.Equal("Pending", chatResult.ServiceRequest.Status);
-        Assert.Equal("10:30 AM", chatResult.ServiceRequest.PreferredTime);
-        Assert.Contains(targetDate.ToString("yyyy-MM-dd"), chatResult.ServiceRequest.PreferredDate);
-        Assert.StartsWith("SR-", chatResult.ServiceRequest.ServiceRequestNumber);
-
-        // Verify in database that it was persisted authoritatively
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var savedSr = await db.ServiceRequests.FirstOrDefaultAsync(sr => sr.ServiceRequestId == chatResult.ServiceRequest.ServiceRequestId);
-            Assert.NotNull(savedSr);
-            Assert.Equal("Pending", savedSr.Status);
-            Assert.Equal(customerId, savedSr.UserId);
-        }
-
-        // 2. Pre-fill remaining slots up to 10 on targetDate
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var currentCount = await db.ServiceRequests.CountAsync(sr =>
-                sr.PreferredDate.HasValue && sr.PreferredDate.Value.Date == targetDate &&
-                sr.Status.ToLower() != "cancelled" && sr.Status.ToLower() != "canceled");
-
-            for (int i = currentCount + 1; i <= 10; i++)
-            {
-                db.ServiceRequests.Add(new ServiceRequest
-                {
-                    ServiceRequestNumber = $"SR-AGENTICCAP-{i}-{Guid.NewGuid().ToString("N")[..4]}",
-                    UserId = 1,
-                    Title = $"Filler Appointment {i}",
-                    Description = "Issue",
-                    PreferredDate = targetDate,
-                    PreferredTime = "11:00 AM",
-                    Status = "Pending"
-                });
-            }
-            await db.SaveChangesAsync();
-        }
-
-        // 3. Customer tries to book an 11th request on the same date via chat -> Must decline slot due to capacity limit
-        var fullChatPayload = new AfterSalesChatRequestDto
-        {
-            UserId = customerId,
-            Message = $"I want to book an appointment for service on {targetDate:yyyy-MM-dd} at 02:00 PM."
-        };
-        var fullChatRes = await customerClient.PostAsJsonAsync("/api/ServiceRequests/ai-chat", fullChatPayload);
-        Assert.Equal(HttpStatusCode.OK, fullChatRes.StatusCode);
-        var fullResult = await fullChatRes.Content.ReadFromJsonAsync<AfterSalesChatResponseDto>();
-        Assert.NotNull(fullResult);
-        Assert.Null(fullResult.ServiceRequest); // Request NOT created because date is at max 10 capacity
-        Assert.Contains("maximum capacity of 10", fullResult.Reply);
-    }
 }
-

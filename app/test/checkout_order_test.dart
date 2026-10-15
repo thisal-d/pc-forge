@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pc_forge_mobile/core/app_routes.dart';
+import 'package:pc_forge_mobile/core/auth_session.dart';
+import 'package:pc_forge_mobile/features/auth/data/models/user_model.dart';
 import 'package:pc_forge_mobile/features/cart/data/cart_service.dart';
 import 'package:pc_forge_mobile/features/catalog/data/models/product_model.dart';
+import 'package:pc_forge_mobile/features/checkout/data/user_contact_service.dart';
 import 'package:pc_forge_mobile/features/checkout/presentation/screens/checkout_screen.dart';
 import 'package:pc_forge_mobile/features/orders/data/order_service.dart';
 import 'package:pc_forge_mobile/features/orders/presentation/screens/order_detail_screen.dart';
@@ -15,6 +18,8 @@ class MockOrderApiService extends ApiService {
     required String shippingAddress,
     required String paymentMethod,
     required List<Map<String, dynamic>> items,
+    String? couponCode,
+    double? discountAmount,
     String? token,
   }) async {
     return {
@@ -103,6 +108,7 @@ void main() {
   group('OrderService Tests', () {
     setUp(() {
       CartService.instance.clear();
+      UserContactService.instance.clearAll();
       OrderService.instance.setApiServiceForTesting(MockOrderApiService());
     });
 
@@ -152,6 +158,8 @@ void main() {
   group('Checkout & Order Confirmation Widget Tests', () {
     setUp(() {
       CartService.instance.clear();
+      UserContactService.instance.clearAll();
+      AuthSession.instance.clearSession();
       OrderService.instance.setApiServiceForTesting(MockOrderApiService());
     });
 
@@ -174,6 +182,13 @@ void main() {
 
       // Check fields are present
       expect(find.text('Checkout & Order'), findsOneWidget);
+
+      // Fill in genuine contact details
+      await tester.enterText(find.byKey(const Key('checkout_name_field')), 'John Doe');
+      await tester.enterText(find.byKey(const Key('checkout_phone_field')), '0771234567');
+      await tester.enterText(find.byKey(const Key('checkout_address_field')), 'No. 45, Flower Road');
+      await tester.enterText(find.byKey(const Key('checkout_city_field')), 'Colombo 07');
+      await tester.pumpAndSettle();
 
       // Advance through wizard steps:
       // Step 0 -> Step 1 (Shipping to Payment)
@@ -224,6 +239,13 @@ void main() {
       // Step 0: Notice for Showroom Collection is present
       expect(find.text('In-Store Showroom Collection Required'), findsOneWidget);
 
+      // Enter contact details
+      await tester.enterText(find.byKey(const Key('checkout_name_field')), 'Jane Doe');
+      await tester.enterText(find.byKey(const Key('checkout_phone_field')), '0779876543');
+      await tester.enterText(find.byKey(const Key('checkout_address_field')), 'No. 10, Kandy Road');
+      await tester.enterText(find.byKey(const Key('checkout_city_field')), 'Colombo');
+      await tester.pumpAndSettle();
+
       // Advance to Step 1 (Payment)
       await tester.tap(find.text('Continue to Payment'));
       await tester.pumpAndSettle();
@@ -238,6 +260,81 @@ void main() {
 
       // Step 2: Confirmation button reflects in-store pickup
       expect(find.textContaining('Reserve for Store Pickup'), findsOneWidget);
+    });
+
+    testWidgets('new user without saved contact has empty fields and validates on empty submit', (WidgetTester tester) async {
+      // Authenticate a new user with NO saved address or phone
+      const newUser = UserModel(userId: 101, email: 'newbie@pcforge.com', firstName: 'New', lastName: 'Customer');
+      AuthSession.instance.setSession(user: newUser, token: 'mock_jwt_newbie');
+
+      CartService.instance.addItem(testGpu, quantity: 1);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: CheckoutScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Recipient name prefilled from genuine user profile
+      expect(find.widgetWithText(TextFormField, 'New Customer'), findsOneWidget);
+
+      // Phone, Address, City are strictly EMPTY, not prefilled with fake data!
+      final phoneField = tester.widget<TextFormField>(find.byKey(const Key('checkout_phone_field')));
+      expect(phoneField.controller?.text, isEmpty);
+
+      final addressField = tester.widget<TextFormField>(find.byKey(const Key('checkout_address_field')));
+      expect(addressField.controller?.text, isEmpty);
+
+      final cityField = tester.widget<TextFormField>(find.byKey(const Key('checkout_city_field')));
+      expect(cityField.controller?.text, isEmpty);
+
+      // Attempting to advance without entering contact details displays validation errors
+      await tester.tap(find.text('Continue to Payment'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Please enter phone number'), findsOneWidget);
+      expect(find.text('Please enter delivery address'), findsOneWidget);
+      expect(find.text('Please enter city'), findsOneWidget);
+    });
+
+    testWidgets('saved contact details persist for user and are never leaked to another user', (WidgetTester tester) async {
+      // User 201 has saved shipping details
+      const userA = UserModel(userId: 201, email: 'usera@pcforge.com', firstName: 'Alice', lastName: 'Smith');
+      UserContactService.instance.saveContact(
+        201,
+        const UserShippingContact(
+          recipientName: 'Alice Smith',
+          phoneNumber: '0712345678',
+          address: 'No. 88, Galle Road',
+          city: 'Colombo 03',
+        ),
+      );
+
+      // 1. User A logs in and opens checkout
+      AuthSession.instance.setSession(user: userA, token: 'mock_token_a');
+      CartService.instance.addItem(testGpu, quantity: 1);
+
+      await tester.pumpWidget(const MaterialApp(home: CheckoutScreen()));
+      await tester.pumpAndSettle();
+
+      // User A sees their legitimate saved details
+      expect(find.widgetWithText(TextFormField, 'Alice Smith'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, '0712345678'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'No. 88, Galle Road'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Colombo 03'), findsOneWidget);
+
+      // 2. User B logs in (userId: 202)
+      const userB = UserModel(userId: 202, email: 'userb@pcforge.com', firstName: 'Bob', lastName: 'Jones');
+      AuthSession.instance.setSession(user: userB, token: 'mock_token_b');
+
+      await tester.pumpWidget(MaterialApp(home: CheckoutScreen(key: UniqueKey())));
+      await tester.pumpAndSettle();
+
+      // User B sees their own name, but empty phone and address (User A's details are NEVER leaked!)
+      expect(find.widgetWithText(TextFormField, 'Bob Jones'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, '0712345678'), findsNothing);
+      expect(find.widgetWithText(TextFormField, 'No. 88, Galle Road'), findsNothing);
     });
   });
 }

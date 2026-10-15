@@ -93,6 +93,7 @@ public class CustomBuildsController : ControllerBase
                 ItemCount = cb.Items.Count,
                 CreatedAt = cb.CreatedAt,
                 UpdatedAt = cb.UpdatedAt,
+                ClearancePassed = cb.Status != "Changes Requested",
                 Components = cb.Items.Select(i => new CustomBuildComponentDto
                 {
                     ProductId = i.ProductId,
@@ -204,6 +205,7 @@ public class CustomBuildsController : ControllerBase
             PsuCapacityWatts = psuWatts,
             PsuHeadroomWatts = headroom,
             PsuHeadroomPercentage = headroomPercent,
+            ClearancePassed = build.Status != "Changes Requested" && socketMatch && memoryMatch && (headroom == null || headroom >= 0),
             Components = components
         };
 
@@ -274,6 +276,30 @@ public class CustomBuildsController : ControllerBase
 
         _logger.LogInformation("New custom build #{BuildId} '{BuildName}' submitted by user #{UserId}",
             build.BuildId, build.BuildName, userId);
+
+        // Dispatch email notification for build submission
+        try
+        {
+            var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == userId);
+            if (!string.IsNullOrWhiteSpace(user?.Email))
+            {
+                var customerName = string.Join(" ", new[] { user.FirstName, user.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+                if (string.IsNullOrWhiteSpace(customerName)) customerName = "Valued Customer";
+
+                _ = _emailService.SendBuildNotificationAsync(
+                    user.Email,
+                    customerName,
+                    build.BuildId,
+                    build.BuildName,
+                    "Pending Staff Review",
+                    build.CustomerNotes,
+                    build.TotalPrice);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispatch build submission email for Build #{BuildId}", build.BuildId);
+        }
 
         return CreatedAtAction(nameof(GetBuildById), new { id = build.BuildId }, await GetBuildDetailInternal(build.BuildId));
     }
@@ -353,6 +379,30 @@ public class CustomBuildsController : ControllerBase
         _logger.LogInformation("Custom build #{BuildId} modified and resubmitted by user #{UserId}",
             build.BuildId, currentUserId);
 
+        // Dispatch email notification for resubmission / review start
+        try
+        {
+            var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == build.UserId);
+            if (!string.IsNullOrWhiteSpace(user?.Email))
+            {
+                var customerName = string.Join(" ", new[] { user.FirstName, user.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+                if (string.IsNullOrWhiteSpace(customerName)) customerName = "Valued Customer";
+
+                _ = _emailService.SendBuildNotificationAsync(
+                    user.Email,
+                    customerName,
+                    build.BuildId,
+                    build.BuildName,
+                    "In Review by Staff",
+                    build.CustomerNotes,
+                    build.TotalPrice);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispatch build resubmission email for Build #{BuildId}", build.BuildId);
+        }
+
         return Ok(await GetBuildDetailInternal(id));
     }
 
@@ -402,9 +452,8 @@ public class CustomBuildsController : ControllerBase
         _logger.LogInformation("Custom Build #{BuildId} review status updated to '{Status}'",
             build.BuildId, build.Status);
 
-        // Automatically dispatch email notification when review status changes to Approved or Changes Requested
-        if (string.Equals(dto.Status, "Approved by Staff", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(dto.Status, "Changes Requested", StringComparison.OrdinalIgnoreCase))
+        // Automatically dispatch email notification when review status changes
+        if (!string.Equals(dto.Status, "Ordered", StringComparison.OrdinalIgnoreCase))
         {
             var customerEmail = build.User?.Email;
             var customerName = string.Join(" ", new[] { build.User?.FirstName, build.User?.LastName }
@@ -418,7 +467,7 @@ public class CustomBuildsController : ControllerBase
             {
                 try
                 {
-                    await _emailService.SendBuildReviewNotificationAsync(
+                    await _emailService.SendBuildNotificationAsync(
                         customerEmail,
                         customerName,
                         build.BuildId,
@@ -435,6 +484,69 @@ public class CustomBuildsController : ControllerBase
         }
 
         return Ok(await GetBuildDetailInternal(id));
+    }
+
+    /// <summary>
+    /// Delete a custom build. Customers can delete their own builds, and Staff/Admin can delete any build.
+    /// </summary>
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteBuild(int id)
+    {
+        var build = await _context.CustomBuilds
+            .Include(cb => cb.User)
+            .Include(cb => cb.Items)
+            .FirstOrDefaultAsync(cb => cb.BuildId == id);
+
+        if (build == null)
+        {
+            return NotFound(new { message = $"Custom Build #{id} not found." });
+        }
+
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+        {
+            return Unauthorized(new { message = "Authentication required to delete a custom build." });
+        }
+
+        var isStaffOrAdmin = IsStaffOrAdmin();
+        if (!isStaffOrAdmin && build.UserId != currentUserId.Value)
+        {
+            return Forbid();
+        }
+
+        var customerEmail = build.User?.Email;
+        var customerName = string.Join(" ", new[] { build.User?.FirstName, build.User?.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        if (string.IsNullOrWhiteSpace(customerName)) customerName = "Valued Customer";
+        var buildName = build.BuildName;
+        var totalPrice = build.TotalPrice;
+
+        _context.CustomBuildItems.RemoveRange(build.Items);
+        _context.CustomBuilds.Remove(build);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Custom build #{BuildId} successfully deleted by user #{UserId}", id, currentUserId.Value);
+
+        // Dispatch cancellation email
+        if (!string.IsNullOrWhiteSpace(customerEmail))
+        {
+            try
+            {
+                _ = _emailService.SendBuildNotificationAsync(
+                    customerEmail,
+                    customerName,
+                    id,
+                    buildName,
+                    "Cancelled",
+                    "Custom build configuration was cancelled and removed.",
+                    totalPrice);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send build cancellation notification email for Build #{BuildId}", id);
+            }
+        }
+
+        return Ok(new { success = true, message = $"Custom Build #{id} deleted successfully." });
     }
 
     private async Task<CustomBuildDetailDto?> GetBuildDetailInternal(int id)

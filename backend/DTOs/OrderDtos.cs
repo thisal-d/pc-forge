@@ -22,6 +22,10 @@ public class CreateOrderDto
     [Required]
     [MinLength(1, ErrorMessage = "Order must contain at least one item.")]
     public List<CreateOrderItemDto> Items { get; set; } = new();
+
+    public string? CouponCode { get; set; }
+
+    public decimal? DiscountAmount { get; set; }
 }
 
 public class OrderItemDetailDto

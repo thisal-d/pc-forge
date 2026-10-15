@@ -92,6 +92,31 @@ class CustomBuildModel {
       status.toLowerCase().contains('in review') ||
       status.toLowerCase().contains('reviewing');
 
+  double get componentsSubtotal =>
+      selectedComponents.values.fold(0.0, (sum, c) => sum + c.price);
+
+  double get discountAmount {
+    if (componentsSubtotal > totalCost && totalCost > 0) {
+      return componentsSubtotal - totalCost;
+    }
+    return 0.0;
+  }
+
+  String? get couponCode {
+    if (customerNotes != null) {
+      final match = RegExp(r'Coupon:\s*([A-Za-z0-9_]+)').firstMatch(customerNotes!);
+      if (match != null && match.group(1) != null && match.group(1)!.isNotEmpty) {
+        return match.group(1);
+      }
+      final matchPromo = RegExp(r'\b(WELCOME5|FORGE10|GAMER2026|SLIITVIP|BUILDMASTER)\b', caseSensitive: false)
+          .firstMatch(customerNotes!);
+      if (matchPromo != null) {
+        return matchPromo.group(0)?.toUpperCase();
+      }
+    }
+    return null;
+  }
+
   CustomBuildModel copyWith({
     int? buildId,
     String? buildName,

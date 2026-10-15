@@ -53,22 +53,38 @@ void main() {
     expect(find.byKey(const Key('register_confirm_password_field')), findsOneWidget);
     expect(find.byKey(const Key('register_submit_btn')), findsOneWidget);
 
-    // Verify validation errors on empty submission in Register screen
-    await tester.tap(find.byKey(const Key('register_submit_btn')));
-    await tester.pumpAndSettle();
+    // Verify Register button is initially disabled when form is empty
+    ElevatedButton submitBtn = tester.widget<ElevatedButton>(find.byKey(const Key('register_submit_btn')));
+    expect(submitBtn.onPressed, isNull);
 
-    expect(find.text('Please enter an email'), findsOneWidget);
-    expect(find.text('Please enter a password'), findsOneWidget);
-    expect(find.text('Please confirm your password'), findsOneWidget);
-
-    // Test password length and mismatch validation
+    // Enter partial data: invalid 3-char password
+    await tester.enterText(find.byKey(const Key('register_firstname_field')), 'John');
+    await tester.enterText(find.byKey(const Key('register_lastname_field')), 'D'); // Single char last name
     await tester.enterText(find.byKey(const Key('register_email_field')), 'test@pcforge.com');
-    await tester.enterText(find.byKey(const Key('register_password_field')), '123');
-    await tester.enterText(find.byKey(const Key('register_confirm_password_field')), '456');
-    await tester.tap(find.byKey(const Key('register_submit_btn')));
+    await tester.enterText(find.byKey(const Key('register_password_field')), '123456');
+    await tester.enterText(find.byKey(const Key('register_confirm_password_field')), '123456');
     await tester.pumpAndSettle();
 
-    expect(find.text('Password must be at least 6 characters'), findsOneWidget);
+    // 6 chars is less than 8 - shows validation error and button remains disabled
+    expect(find.text('Password must be at least 8 characters long.'), findsWidgets);
+    submitBtn = tester.widget<ElevatedButton>(find.byKey(const Key('register_submit_btn')));
+    expect(submitBtn.onPressed, isNull);
+
+    // Enter valid 8-character password and confirm password
+    await tester.enterText(find.byKey(const Key('register_password_field')), 'Password123!');
+    await tester.enterText(find.byKey(const Key('register_confirm_password_field')), 'Password123!');
+    await tester.pumpAndSettle();
+
+    // With single-char last name ('D') and >= 8 char password, button is enabled!
+    submitBtn = tester.widget<ElevatedButton>(find.byKey(const Key('register_submit_btn')));
+    expect(submitBtn.onPressed, isNotNull);
+
+    // Clearing last name disables button again
+    await tester.enterText(find.byKey(const Key('register_lastname_field')), '');
+    await tester.pumpAndSettle();
+    expect(find.text('Last name is required.'), findsOneWidget);
+    submitBtn = tester.widget<ElevatedButton>(find.byKey(const Key('register_submit_btn')));
+    expect(submitBtn.onPressed, isNull);
 
     // Navigate back to Login screen
     final loginBtn = find.byKey(const Key('register_to_login_btn'));

@@ -172,6 +172,7 @@ class AiBuildService extends ChangeNotifier {
         '/aibuilds/generate-build',
         payload,
         token: token,
+        timeout: const Duration(seconds: 120),
       );
 
       final model = AiBuildResultModel.fromJson(res);
@@ -215,6 +216,7 @@ class AiBuildService extends ChangeNotifier {
         '/aibuilds/verify-stock',
         payload,
         token: token,
+        timeout: const Duration(seconds: 90),
       );
 
       final model = AiStockVerificationModel.fromJson(res);
@@ -269,6 +271,7 @@ class AiBuildService extends ChangeNotifier {
         '/aibuilds/order-proposal',
         payload,
         token: token,
+        timeout: const Duration(seconds: 90),
       );
 
       return AiOrderProposalResultModel.fromJson(res);
@@ -295,6 +298,8 @@ class AiBuildService extends ChangeNotifier {
     required String formattedTotal,
     required String shippingAddress,
     required List<AiOrderPricingItemModel> components,
+    String? promoCode,
+    double? discountAmount,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -311,6 +316,8 @@ class AiBuildService extends ChangeNotifier {
         'formatted_total': formattedTotal,
         'shipping_address': shippingAddress,
         'components': components.map((c) => c.toJson()).toList(),
+        if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
+        if (discountAmount != null && discountAmount > 0) 'discount_amount': discountAmount,
       };
 
       final res = await _apiService.post(

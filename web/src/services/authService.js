@@ -7,6 +7,14 @@ export const authService = {
   // Login user and store token
   async login(email, password) {
     const response = await api.post('/auth/login', { email, password });
+    
+    // Customer accounts are strictly prohibited from logging into the web portal
+    const userRole = (response.data?.role || '').trim().toLowerCase();
+    if (userRole === 'customer') {
+      authService.logout();
+      throw new Error('Access denied. Customer accounts are not permitted to log into the Web Portal. Please use the PCForge mobile application.');
+    }
+
     if (response.data && response.data.token) {
       localStorage.setItem(TOKEN_KEY, response.data.token);
       localStorage.setItem(USER_KEY, JSON.stringify({
@@ -29,6 +37,14 @@ export const authService = {
       firstName,
       lastName,
     });
+    
+    // Customer accounts are strictly prohibited from accessing the web portal
+    const userRole = (response.data?.role || '').trim().toLowerCase();
+    if (userRole === 'customer') {
+      authService.logout();
+      throw new Error('Access denied. Customer registration is not permitted on the Web Portal. Please use the PCForge mobile application.');
+    }
+
     if (response.data && response.data.token) {
       localStorage.setItem(TOKEN_KEY, response.data.token);
       localStorage.setItem(USER_KEY, JSON.stringify({

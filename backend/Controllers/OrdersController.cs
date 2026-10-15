@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PCForge.Api.Data;
 using PCForge.Api.DTOs;
 using PCForge.Api.Models;
+using PCForge.Api.Services;
 
 namespace PCForge.Api.Controllers;
 
@@ -14,11 +15,16 @@ namespace PCForge.Api.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IEmailService _emailService;
     private readonly ILogger<OrdersController> _logger;
 
-    public OrdersController(AppDbContext context, ILogger<OrdersController> logger)
+    public OrdersController(
+        AppDbContext context,
+        IEmailService emailService,
+        ILogger<OrdersController> logger)
     {
         _context = context;
+        _emailService = emailService;
         _logger = logger;
     }
 
@@ -53,7 +59,7 @@ public class OrdersController : ControllerBase
             .ToDictionaryAsync(p => p.ProductId);
 
         // 3. Stock Validation & Total Calculation
-        decimal totalAmount = 0;
+        decimal subtotal = 0;
         var orderItems = new List<OrderItem>();
 
         foreach (var itemDto in dto.Items)
@@ -76,7 +82,7 @@ public class OrdersController : ControllerBase
                 });
             }
 
-            totalAmount += product.Price * itemDto.Quantity;
+            subtotal += product.Price * itemDto.Quantity;
 
             orderItems.Add(new OrderItem
             {
@@ -85,6 +91,39 @@ public class OrdersController : ControllerBase
                 UnitPrice = product.Price
             });
         }
+
+        // 3b. Apply Coupon or Custom Build Discount
+        decimal discountAmount = 0m;
+        if (!string.IsNullOrWhiteSpace(dto.CouponCode))
+        {
+            var cleanCoupon = dto.CouponCode.Trim().ToUpper();
+            var coupon = await _context.Coupons.AsNoTracking().FirstOrDefaultAsync(c => c.Code == cleanCoupon && c.IsActive);
+            if (coupon != null && (coupon.MinSubtotal == null || subtotal >= coupon.MinSubtotal.Value))
+            {
+                if (string.Equals(coupon.DiscountType, "PERCENTAGE", StringComparison.OrdinalIgnoreCase))
+                {
+                    discountAmount = subtotal * (coupon.DiscountValue / 100m);
+                    if (coupon.MaxDiscount.HasValue && coupon.MaxDiscount.Value > 0)
+                    {
+                        discountAmount = Math.Min(discountAmount, coupon.MaxDiscount.Value);
+                    }
+                }
+                else if (string.Equals(coupon.DiscountType, "FLAT", StringComparison.OrdinalIgnoreCase))
+                {
+                    discountAmount = coupon.DiscountValue;
+                }
+            }
+            else if (dto.DiscountAmount.HasValue && dto.DiscountAmount.Value > 0)
+            {
+                discountAmount = Math.Min(dto.DiscountAmount.Value, subtotal);
+            }
+        }
+        else if (dto.DiscountAmount.HasValue && dto.DiscountAmount.Value > 0)
+        {
+            discountAmount = Math.Min(dto.DiscountAmount.Value, subtotal);
+        }
+
+        decimal totalAmount = Math.Max(0m, subtotal - discountAmount);
 
         // 4. Payment Method & Total Threshold Validation (Server-side from DB prices)
         var isCod = OrderStatusConstants.IsCod(dto.PaymentMethod);
@@ -112,15 +151,6 @@ public class OrdersController : ControllerBase
 
         // 5. Reserve & Deduct Inventory in Transaction
         var isInMemory = _context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
-        using var transaction = isInMemory ? null : await _context.Database.BeginTransactionAsync();
-
-        foreach (var itemDto in dto.Items)
-        {
-            var product = products[itemDto.ProductId];
-            product.StockQuantity -= itemDto.Quantity;
-            product.UpdatedAt = DateTime.UtcNow;
-        }
-
         var order = new Order
         {
             UserId = userId,
@@ -133,22 +163,56 @@ public class OrdersController : ControllerBase
             Items = orderItems
         };
 
-        _context.Orders.Add(order);
-        await _context.SaveChangesAsync();
-
-        if (transaction != null)
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            await transaction.CommitAsync();
-        }
+            using var transaction = isInMemory ? null : await _context.Database.BeginTransactionAsync();
+
+            foreach (var itemDto in dto.Items)
+            {
+                var product = products[itemDto.ProductId];
+                product.StockQuantity -= itemDto.Quantity;
+                product.UpdatedAt = DateTime.UtcNow;
+            }
+
+            _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync();
+            }
+        });
 
         _logger.LogInformation("Order #{OrderId} placed successfully for User {UserId}, Method: {PaymentMethod}, Total: {TotalAmount:C}",
             order.OrderId, userId, normalizedPaymentMethod, totalAmount);
 
-        // 5. Load User info for response
+        // 5. Load User info for response and email
         var user = await _context.Users.FindAsync(userId);
         var customerName = user != null ? $"{user.FirstName} {user.LastName}".Trim() : "";
         if (string.IsNullOrEmpty(customerName)) customerName = user?.Email ?? "";
         var customerEmail = user?.Email ?? "";
+
+        // Dispatch Order Confirmed email notification
+        if (!string.IsNullOrWhiteSpace(customerEmail))
+        {
+            try
+            {
+                _ = _emailService.SendOrderNotificationAsync(
+                    customerEmail,
+                    string.IsNullOrWhiteSpace(customerName) ? "Valued Customer" : customerName,
+                    order.OrderId,
+                    order.Status,
+                    order.PaymentMethod,
+                    order.ShippingAddress,
+                    order.TotalAmount,
+                    order.Items.Sum(i => i.Quantity));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to dispatch order placed email for Order #{OrderId}", order.OrderId);
+            }
+        }
 
         var response = new OrderDetailDto
         {
@@ -293,80 +357,109 @@ public class OrdersController : ControllerBase
         }
 
         var isInMemory = _context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
-        using var transaction = isInMemory ? null : await _context.Database.BeginTransactionAsync();
-
-        Order? order;
-        if (!isInMemory)
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync<ActionResult<OrderDetailDto>>(async () =>
         {
-            order = await _context.Orders
-                .FromSqlRaw("SELECT * FROM orders WHERE orderid = {0} FOR UPDATE", id)
-                .Include(o => o.User)
-                .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                .FirstOrDefaultAsync();
-        }
-        else
-        {
-            order = await _context.Orders
-                .Include(o => o.User)
-                .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                .FirstOrDefaultAsync(o => o.OrderId == id);
-        }
+            using var transaction = isInMemory ? null : await _context.Database.BeginTransactionAsync();
 
-        if (order == null)
-        {
-            return NotFound(new { message = $"Order #{id} not found." });
-        }
-
-        var targetCanonical = OrderStatusConstants.AllStatuses.FirstOrDefault(s => s.Equals(dto.Status.Trim(), StringComparison.OrdinalIgnoreCase));
-        if (targetCanonical == null)
-        {
-            return BadRequest(new { message = $"Invalid status '{dto.Status}'. Allowed: {string.Join(", ", OrderStatusConstants.AllStatuses)}" });
-        }
-
-        if (!OrderStatusConstants.IsValidTransition(order.Status, targetCanonical, order.PaymentMethod, out var transitionError))
-        {
-            return BadRequest(new { message = transitionError });
-        }
-
-        var previousStatus = order.Status;
-
-        // If status isn't changing, return current
-        if (previousStatus.Equals(targetCanonical, StringComparison.OrdinalIgnoreCase))
-        {
-            return Ok(MapToDetailDto(order));
-        }
-
-        // Restock inventory if transitioning to Cancelled (idempotent)
-        if (targetCanonical.Equals(OrderStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase) &&
-            !previousStatus.Equals(OrderStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var item in order.Items)
+            Order? order;
+            if (!isInMemory)
             {
-                if (item.Product != null)
+                order = await _context.Orders
+                    .FromSqlRaw("SELECT * FROM orders WHERE orderid = {0} FOR UPDATE", id)
+                    .Include(o => o.User)
+                    .Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
+                    .FirstOrDefaultAsync();
+            }
+            else
+            {
+                order = await _context.Orders
+                    .Include(o => o.User)
+                    .Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
+                    .FirstOrDefaultAsync(o => o.OrderId == id);
+            }
+
+            if (order == null)
+            {
+                return NotFound(new { message = $"Order #{id} not found." });
+            }
+
+            var targetCanonical = OrderStatusConstants.AllStatuses.FirstOrDefault(s => s.Equals(dto.Status.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (targetCanonical == null)
+            {
+                return BadRequest(new { message = $"Invalid status '{dto.Status}'. Allowed: {string.Join(", ", OrderStatusConstants.AllStatuses)}" });
+            }
+
+            if (!OrderStatusConstants.IsValidTransition(order.Status, targetCanonical, order.PaymentMethod, out var transitionError))
+            {
+                return BadRequest(new { message = transitionError });
+            }
+
+            var previousStatus = order.Status;
+
+            // If status isn't changing, return current
+            if (previousStatus.Equals(targetCanonical, StringComparison.OrdinalIgnoreCase))
+            {
+                return Ok(MapToDetailDto(order));
+            }
+
+            // Restock inventory if transitioning to Cancelled (idempotent)
+            if (targetCanonical.Equals(OrderStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase) &&
+                !previousStatus.Equals(OrderStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var item in order.Items)
                 {
-                    item.Product.StockQuantity += item.Quantity;
-                    item.Product.UpdatedAt = DateTime.UtcNow;
+                    if (item.Product != null)
+                    {
+                        item.Product.StockQuantity += item.Quantity;
+                        item.Product.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+                _logger.LogInformation("Order #{OrderId} cancelled by staff. Restocked {Count} items.", order.OrderId, order.Items.Count);
+            }
+
+            order.Status = targetCanonical;
+            order.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync();
+            }
+
+            _logger.LogInformation("Order #{OrderId} status changed from '{PreviousStatus}' to '{NewStatus}' by {User}",
+                order.OrderId, previousStatus, targetCanonical, User.Identity?.Name ?? "Staff");
+
+            // Dispatch order status change notification email
+            var customerEmail = order.User?.Email;
+            var customerName = order.User != null ? $"{order.User.FirstName} {order.User.LastName}".Trim() : "";
+            if (string.IsNullOrWhiteSpace(customerName)) customerName = order.User?.Email ?? "Valued Customer";
+
+            if (!string.IsNullOrWhiteSpace(customerEmail))
+            {
+                try
+                {
+                    _ = _emailService.SendOrderNotificationAsync(
+                        customerEmail,
+                        customerName,
+                        order.OrderId,
+                        order.Status,
+                        order.PaymentMethod,
+                        order.ShippingAddress,
+                        order.TotalAmount,
+                        order.Items.Sum(i => i.Quantity));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to dispatch order status email for Order #{OrderId} ({Status})", order.OrderId, order.Status);
                 }
             }
-            _logger.LogInformation("Order #{OrderId} cancelled by staff. Restocked {Count} items.", order.OrderId, order.Items.Count);
-        }
 
-        order.Status = targetCanonical;
-        order.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        if (transaction != null)
-        {
-            await transaction.CommitAsync();
-        }
-
-        _logger.LogInformation("Order #{OrderId} status changed from '{PreviousStatus}' to '{NewStatus}' by {User}",
-            order.OrderId, previousStatus, targetCanonical, User.Identity?.Name ?? "Staff");
-
-        return Ok(MapToDetailDto(order));
+            return Ok(MapToDetailDto(order));
+        });
     }
 
     /// <summary>
@@ -401,79 +494,109 @@ public class OrdersController : ControllerBase
         var isStaffOrAdmin = IsStaffOrAdmin();
 
         var isInMemory = _context.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
-        using var transaction = isInMemory ? null : await _context.Database.BeginTransactionAsync();
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync<ActionResult<OrderDetailDto>>(async () =>
+        {
+            using var transaction = isInMemory ? null : await _context.Database.BeginTransactionAsync();
 
-        Order? order;
-        if (!isInMemory)
-        {
-            // Acquire row lock to ensure idempotency and prevent concurrent double-cancels
-            order = await _context.Orders
-                .FromSqlRaw("SELECT * FROM orders WHERE orderid = {0} FOR UPDATE", id)
-                .Include(o => o.User)
-                .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                .FirstOrDefaultAsync();
-        }
-        else
-        {
-            order = await _context.Orders
-                .Include(o => o.User)
-                .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                .FirstOrDefaultAsync(o => o.OrderId == id);
-        }
-
-        if (order == null)
-        {
-            return NotFound(new { message = $"Order #{id} was not found." });
-        }
-
-        // Verify customer owns this order (or is staff/admin)
-        if (!isStaffOrAdmin && order.UserId != currentUserId.Value)
-        {
-            return Forbid();
-        }
-
-        // Idempotency: If already cancelled, return existing state without restocking again
-        if (order.Status.Equals(OrderStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogInformation("Order #{OrderId} cancel requested, but already Cancelled (idempotent response).", id);
-            return Ok(MapToDetailDto(order));
-        }
-
-        // Status rule validation: Only allowed in 'Order placed' or 'Processing'
-        if (!OrderStatusConstants.CanCancel(order.Status))
-        {
-            return BadRequest(new
+            Order? order;
+            if (!isInMemory)
             {
-                message = $"Order #{id} cannot be cancelled because it is in status '{order.Status}'. Cancellation is only allowed when status is 'Order placed' or 'Processing'."
-            });
-        }
-
-        // Restock inventory for each item
-        foreach (var item in order.Items)
-        {
-            if (item.Product != null)
-            {
-                item.Product.StockQuantity += item.Quantity;
-                item.Product.UpdatedAt = DateTime.UtcNow;
+                // Acquire row lock to ensure idempotency and prevent concurrent double-cancels
+                order = await _context.Orders
+                    .FromSqlRaw("SELECT * FROM orders WHERE orderid = {0} FOR UPDATE", id)
+                    .Include(o => o.User)
+                    .Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
+                    .FirstOrDefaultAsync();
             }
-        }
+            else
+            {
+                order = await _context.Orders
+                    .Include(o => o.User)
+                    .Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
+                    .FirstOrDefaultAsync(o => o.OrderId == id);
+            }
 
-        order.Status = OrderStatusConstants.Cancelled;
-        order.UpdatedAt = DateTime.UtcNow;
+            if (order == null)
+            {
+                return NotFound(new { message = $"Order #{id} was not found." });
+            }
 
-        await _context.SaveChangesAsync();
+            // Verify customer owns this order (or is staff/admin)
+            if (!isStaffOrAdmin && order.UserId != currentUserId.Value)
+            {
+                return Forbid();
+            }
 
-        if (transaction != null)
-        {
-            await transaction.CommitAsync();
-        }
+            // Idempotency: If already cancelled, return existing state without restocking again
+            if (order.Status.Equals(OrderStatusConstants.Cancelled, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("Order #{OrderId} cancel requested, but already Cancelled (idempotent response).", id);
+                return Ok(MapToDetailDto(order));
+            }
 
-        _logger.LogInformation("Order #{OrderId} cancelled successfully by user #{UserId}. Restocked {ItemCount} items.",
-            order.OrderId, currentUserId.Value, order.Items.Count);
+            // Status rule validation: Only allowed in 'Order placed' or 'Processing'
+            if (!OrderStatusConstants.CanCancel(order.Status))
+            {
+                return BadRequest(new
+                {
+                    message = $"Order #{id} cannot be cancelled because it is in status '{order.Status}'. Cancellation is only allowed when status is 'Order placed' or 'Processing'."
+                });
+            }
 
-        return Ok(MapToDetailDto(order));
+            // Restock inventory for each item
+            foreach (var item in order.Items)
+            {
+                if (item.Product != null)
+                {
+                    item.Product.StockQuantity += item.Quantity;
+                    item.Product.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
+            order.Status = OrderStatusConstants.Cancelled;
+            order.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync();
+            }
+
+            _logger.LogInformation("Order #{OrderId} cancelled successfully by user #{UserId}. Restocked {ItemCount} items.",
+                order.OrderId, currentUserId.Value, order.Items.Count);
+
+            // Dispatch cancellation email
+            var customerEmail = order.User?.Email;
+            var customerName = order.User != null ? $"{order.User.FirstName} {order.User.LastName}".Trim() : "";
+            if (string.IsNullOrWhiteSpace(customerName)) customerName = order.User?.Email ?? "Valued Customer";
+
+            if (!string.IsNullOrWhiteSpace(customerEmail))
+            {
+                try
+                {
+                    _ = _emailService.SendOrderNotificationAsync(
+                        customerEmail,
+                        customerName,
+                        order.OrderId,
+                        OrderStatusConstants.Cancelled,
+                        order.PaymentMethod,
+                        order.ShippingAddress,
+                        order.TotalAmount,
+                        order.Items.Sum(i => i.Quantity),
+                        "Order was cancelled per customer or staff request.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to dispatch order cancellation email for Order #{OrderId}", order.OrderId);
+                }
+            }
+
+            return Ok(MapToDetailDto(order));
+        });
     }
 
     private static OrderDetailDto MapToDetailDto(Order order)

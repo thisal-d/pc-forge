@@ -63,6 +63,97 @@ public class SecurityTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(1, user.RoleId);
     }
 
+    [Fact]
+    public async Task Register_WithPasswordLessThan8Chars_MustReturnBadRequestWithSpecificMessage()
+    {
+        ClearBearerToken();
+        var payload = new
+        {
+            email = $"user_{Guid.NewGuid():N}@example.com",
+            password = "Pass1!", // 6 characters
+            firstName = "John",
+            lastName = "Doe"
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/auth/register", payload);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var content = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        Assert.NotNull(content);
+        Assert.False(content.Success);
+        Assert.Contains("Password must be at least 8 characters long", content.Message);
+    }
+
+    [Fact]
+    public async Task Register_WithOneCharacterLastName_MustSucceed()
+    {
+        ClearBearerToken();
+        var payload = new
+        {
+            email = $"user_{Guid.NewGuid():N}@example.com",
+            password = "Password123!",
+            firstName = "John",
+            lastName = "X" // 1 character last name
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/auth/register", payload);
+        response.EnsureSuccessStatusCode();
+
+        var content = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        Assert.NotNull(content);
+        Assert.True(content.Success);
+        Assert.Equal("X", content.LastName);
+    }
+
+    [Fact]
+    public async Task Register_WithEmptyLastName_MustReturnBadRequestWithSpecificMessage()
+    {
+        ClearBearerToken();
+        var payload = new
+        {
+            email = $"user_{Guid.NewGuid():N}@example.com",
+            password = "Password123!",
+            firstName = "John",
+            lastName = ""
+        };
+
+        var response = await _client.PostAsJsonAsync("/api/auth/register", payload);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var content = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        Assert.NotNull(content);
+        Assert.False(content.Success);
+        Assert.Equal("Last name is required.", content.Message);
+    }
+
+    [Fact]
+    public async Task Register_WithAlreadyRegisteredEmail_MustReturnBadRequestWithSpecificMessage()
+    {
+        ClearBearerToken();
+        var email = $"dup_{Guid.NewGuid():N}@example.com";
+        var payload = new
+        {
+            email = email,
+            password = "Password123!",
+            firstName = "Alice",
+            lastName = "Smith"
+        };
+
+        // First registration
+        var res1 = await _client.PostAsJsonAsync("/api/auth/register", payload);
+        res1.EnsureSuccessStatusCode();
+
+        // Duplicate registration with same email
+        var res2 = await _client.PostAsJsonAsync("/api/auth/register", payload);
+        Assert.Equal(HttpStatusCode.BadRequest, res2.StatusCode);
+
+        var content = await res2.Content.ReadFromJsonAsync<AuthResponseDto>();
+        Assert.NotNull(content);
+        Assert.False(content.Success);
+        Assert.Equal("An account with this email already exists.", content.Message);
+    }
+
+
     // =========================================================================
     // 2. PROFILE UPDATE & ACCOUNT TAKEOVER TESTS
     // =========================================================================
@@ -466,6 +557,74 @@ public class SecurityTests : IClassFixture<CustomWebApplicationFactory>
         SetBearerToken(staffToken);
         var staffResponse = await _client.GetAsync($"/api/custombuilds/{alexBuildId}");
         Assert.Equal(HttpStatusCode.OK, staffResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task CustomBuilds_CustomerDeletingOwnBuild_MustSucceed()
+    {
+        int alexBuildId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var build = new CustomBuild
+            {
+                UserId = 3, // Alex
+                BuildName = "Alex's Build To Delete",
+                TotalPrice = 1500m,
+                EstimatedWattage = 500,
+                Status = "Pending Staff Review",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            db.CustomBuilds.Add(build);
+            db.SaveChanges();
+            alexBuildId = build.BuildId;
+        }
+
+        // Alex (User 3) deletes his own build
+        var alexToken = CustomWebApplicationFactory.GenerateToken(3, "alex@example.com", "Customer");
+        SetBearerToken(alexToken);
+
+        var response = await _client.DeleteAsync($"/api/custombuilds/{alexBuildId}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        // Verify in DB that it is deleted
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var deleted = db.CustomBuilds.Find(alexBuildId);
+            Assert.Null(deleted);
+        }
+    }
+
+    [Fact]
+    public async Task CustomBuilds_CustomerDeletingAnotherUsersBuild_MustReturnForbidden()
+    {
+        int alexBuildId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var build = new CustomBuild
+            {
+                UserId = 3, // Alex
+                BuildName = "Alex's Build",
+                TotalPrice = 1500m,
+                EstimatedWattage = 500,
+                Status = "Pending Staff Review",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            db.CustomBuilds.Add(build);
+            db.SaveChanges();
+            alexBuildId = build.BuildId;
+        }
+
+        // Bob (User 4) attempts to delete Alex's build
+        var bobToken = CustomWebApplicationFactory.GenerateToken(4, "bob@example.com", "Customer");
+        SetBearerToken(bobToken);
+
+        var response = await _client.DeleteAsync($"/api/custombuilds/{alexBuildId}");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

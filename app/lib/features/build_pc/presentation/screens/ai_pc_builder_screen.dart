@@ -87,7 +87,7 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Member 03 Agent is selecting 8 components and executing deterministic socket/wattage clearance tools.',
+                  'PC Build & Compatibility Agent is selecting 8 components and validating socket, chipset, and wattage clearance.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12.5,
