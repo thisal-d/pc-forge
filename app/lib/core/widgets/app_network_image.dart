@@ -1,11 +1,10 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../utils/image_utils.dart';
 
-/// Rock-solid network image widget with URL normalization, gapless playback,
-/// automatic connection timeout handling, and rich branded hardware category fallbacks.
-class AppNetworkImage extends StatefulWidget {
+/// Rock-solid network image widget with URL normalization, anti-bot mobile headers,
+/// immediate loading placeholder (no blank frames), and rich branded hardware fallbacks.
+class AppNetworkImage extends StatelessWidget {
   final String? imageUrl;
   final String? categoryName;
   final String? productName;
@@ -32,85 +31,34 @@ class AppNetworkImage extends StatefulWidget {
   });
 
   @override
-  State<AppNetworkImage> createState() => _AppNetworkImageState();
-}
-
-class _AppNetworkImageState extends State<AppNetworkImage> {
-  Timer? _timeoutTimer;
-  bool _timedOut = false;
-  bool _isLoaded = false;
-  String? _resolvedUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _initImage();
-  }
-
-  @override
-  void didUpdateWidget(covariant AppNetworkImage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl) {
-      _timeoutTimer?.cancel();
-      _timedOut = false;
-      _isLoaded = false;
-      _initImage();
-    }
-  }
-
-  void _initImage() {
-    _resolvedUrl = ImageUtils.resolveImageUrl(widget.imageUrl);
-    if (_resolvedUrl != null && _resolvedUrl!.isNotEmpty) {
-      // 7-second safety timeout so stalled connections gracefully display branded fallback
-      _timeoutTimer = Timer(const Duration(seconds: 7), () {
-        if (mounted && !_isLoaded) {
-          setState(() {
-            _timedOut = true;
-          });
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _timeoutTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final resolvedUrl = ImageUtils.resolveImageUrl(imageUrl);
+
     Widget imageWidget;
-    if (_resolvedUrl == null || _resolvedUrl!.isEmpty || _timedOut) {
+    if (resolvedUrl == null || resolvedUrl.isEmpty) {
       imageWidget = _buildFallback();
     } else {
       imageWidget = Image.network(
-        _resolvedUrl!,
-        width: widget.width,
-        height: widget.height,
-        fit: widget.fit,
-        gaplessPlayback: true,
-        headers: ImageUtils.getHeadersForUrl(_resolvedUrl),
+        resolvedUrl,
+        width: width,
+        height: height,
+        fit: fit,
+        headers: ImageUtils.getHeadersForUrl(resolvedUrl),
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
           if (wasSynchronouslyLoaded || frame != null) {
-            if (!_isLoaded) {
-              _isLoaded = true;
-              _timeoutTimer?.cancel();
-            }
             return child;
           }
           return _buildLoadingPlaceholder();
         },
         errorBuilder: (context, error, stackTrace) {
-          _timeoutTimer?.cancel();
           return _buildFallback();
         },
       );
     }
 
-    if (widget.borderRadius != null) {
+    if (borderRadius != null) {
       return ClipRRect(
-        borderRadius: widget.borderRadius!,
+        borderRadius: borderRadius!,
         child: imageWidget,
       );
     }
@@ -120,13 +68,13 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
 
   Widget _buildLoadingPlaceholder() {
     return Container(
-      width: widget.width,
-      height: widget.height,
+      width: width,
+      height: height,
       color: const Color(0xFFF1F5F9),
       child: Center(
         child: SizedBox(
-          width: (widget.fallbackIconSize * 0.6).clamp(16.0, 24.0),
-          height: (widget.fallbackIconSize * 0.6).clamp(16.0, 24.0),
+          width: (fallbackIconSize * 0.6).clamp(16.0, 24.0),
+          height: (fallbackIconSize * 0.6).clamp(16.0, 24.0),
           child: const CircularProgressIndicator(
             strokeWidth: 2,
             color: AppColors.primaryBlue,
@@ -137,17 +85,17 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
   }
 
   Widget _buildFallback() {
-    if (widget.customFallback != null) return widget.customFallback!;
+    if (customFallback != null) return customFallback!;
 
-    final icon = ImageUtils.getCategoryIcon(widget.categoryName);
-    final catName = (widget.categoryName ?? '').trim();
+    final icon = ImageUtils.getCategoryIcon(categoryName);
+    final catName = (categoryName ?? '').trim();
 
     return Container(
-      width: widget.width,
-      height: widget.height,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
         color: AppColors.imageContainerBg,
-        borderRadius: widget.borderRadius,
+        borderRadius: borderRadius,
       ),
       child: Center(
         child: Column(
@@ -162,11 +110,11 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
               ),
               child: Icon(
                 icon,
-                size: widget.fallbackIconSize,
+                size: fallbackIconSize,
                 color: AppColors.primaryBlue.withValues(alpha: 0.85),
               ),
             ),
-            if (widget.showCategoryTag && catName.isNotEmpty && (widget.height == null || widget.height! >= 85)) ...[
+            if (showCategoryTag && catName.isNotEmpty && (height == null || height! >= 85)) ...[
               const SizedBox(height: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),

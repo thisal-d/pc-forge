@@ -4,15 +4,14 @@ import '../../services/api_service.dart';
 /// Centralized utility for resolving image URLs, supplying HTTP headers,
 /// and providing contextual hardware category icons.
 class ImageUtils {
-  /// Standard mobile browser headers to bypass CDN anti-bot blocks on mobile.
-  /// Strictly avoids requesting image/avif since Flutter Skia/Impeller does not support AVIF decoding.
+  /// Standard mobile browser headers to bypass CDN / Cloudflare anti-bot blocks on mobile.
   static const Map<String, String> standardHeaders = {
     'User-Agent':
         'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-    'Accept': 'image/jpeg,image/png,image/webp,image/*;q=0.8',
+    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
   };
 
-  /// Context-aware headers based on destination host.
+  /// Context-aware headers based on destination host (e.g. Unsplash, Cloudinary).
   static Map<String, String> getHeadersForUrl(String? url) {
     if (url == null || url.isEmpty) return standardHeaders;
     final headers = Map<String, String>.from(standardHeaders);
@@ -40,11 +39,6 @@ class ImageUtils {
 
     // Absolute HTTP / HTTPS URLs
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      // If URL contains auto=format (common in Unsplash/Imgix CDNs), force fm=jpg to avoid AVIF delivery
-      if (trimmed.contains('auto=format')) {
-        return trimmed.replaceAll('auto=format', 'auto=format&fm=jpg');
-      }
-
       final defaultBase = ApiService.defaultBaseUrl;
       try {
         final baseUri = Uri.parse(defaultBase);

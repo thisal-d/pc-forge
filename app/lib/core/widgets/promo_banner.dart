@@ -55,7 +55,7 @@ class PromoBanner extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Official PCForge Logo Brand Pill
+                          // PCForge Official Logo Brand Tag
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                             margin: const EdgeInsets.only(bottom: 8),
@@ -70,27 +70,20 @@ class PromoBanner extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Image.asset(
-                                    'assets/images/logo.png',
-                                    width: 12,
-                                    height: 12,
-                                    fit: BoxFit.contain,
-                                  ),
+                                Image.asset(
+                                  'assets/images/logo.png',
+                                  width: 13,
+                                  height: 13,
+                                  fit: BoxFit.contain,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 5),
                                 Text(
                                   'PCFORGE OFFICIAL',
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.95),
                                     fontSize: 9.5,
                                     fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.5,
+                                    letterSpacing: 0.6,
                                   ),
                                 ),
                               ],
@@ -134,7 +127,7 @@ class PromoBanner extends StatelessWidget {
 
                     const SizedBox(width: 8),
 
-                    // Right Gaming PC Rig Graphic (Local Asset - No Network Dependency)
+                    // Right Custom Generated Gaming PC Rig Graphic (Local Asset)
                     Expanded(
                       flex: 4,
                       child: Container(
@@ -152,7 +145,7 @@ class PromoBanner extends StatelessWidget {
                           fit: StackFit.expand,
                           children: [
                             Image.asset(
-                              'assets/images/promo_gaming_rig.jpg',
+                              'assets/images/build_better_rig.jpg',
                               fit: BoxFit.cover,
                             ),
                             // RGB Neon Gradient Overlay
@@ -173,7 +166,7 @@ class PromoBanner extends StatelessWidget {
                               left: 6,
                               right: 6,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 2.5, horizontal: 6),
+                                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
                                 decoration: BoxDecoration(
                                   color: Colors.black.withValues(alpha: 0.65),
                                   borderRadius: BorderRadius.circular(6),
@@ -194,7 +187,7 @@ class PromoBanner extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 4),
                                     const Text(
-                                      'PRO RIGS',
+                                      'RGB RIGS',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 9,
@@ -220,18 +213,18 @@ class PromoBanner extends StatelessWidget {
     );
   }
 
-  Widget _perkItem(IconData icon, String text) {
+  Widget _perkItem(IconData icon, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: Colors.white, size: 13),
+        Icon(icon, color: Colors.white, size: 14),
         const SizedBox(width: 4),
         Text(
-          text,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.95),
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
