@@ -66,12 +66,24 @@ def test_build_agent_quota_exhaustion_stops_with_error():
     mock_bound.invoke.side_effect = Exception("429 RESOURCE_EXHAUSTED: Quota limit reached")
     mock_llm.bind_tools.return_value = mock_bound
 
+    sample_catalog = [
+        {"product_id": 1, "name": "AMD Ryzen 5 7600", "category": "CPU", "price": 65000.0, "socket": "AM5", "memory_type": "DDR5"},
+        {"product_id": 2, "name": "MSI B650 Motherboard", "category": "Motherboard", "price": 55000.0, "socket": "AM5", "memory_type": "DDR5", "form_factor": "ATX"},
+        {"product_id": 3, "name": "Corsair 32GB RAM", "category": "RAM", "price": 35000.0, "memory_type": "DDR5"},
+        {"product_id": 4, "name": "Nvidia RTX 4070", "category": "GPU", "price": 220000.0, "power_wattage": 200},
+        {"product_id": 5, "name": "Corsair 750W PSU", "category": "PSU", "price": 38000.0, "power_wattage": 750},
+        {"product_id": 6, "name": "Samsung 1TB SSD", "category": "Storage", "price": 28000.0},
+        {"product_id": 7, "name": "NZXT H5 Case", "category": "Case", "price": 32000.0, "form_factor": "ATX"},
+        {"product_id": 8, "name": "DeepCool AK620 Cooler", "category": "Cooler", "price": 22000.0, "socket": "AM5"},
+    ]
+
     req = BuildGenerationRequest(
         purpose="Gaming",
         budget_amount=500000.0,
         currency="LKR",
         target_resolution="1440p",
-        preferences=["RGB"]
+        preferences=["RGB"],
+        catalog=sample_catalog
     )
 
     with patch("ai_service.agents.build_agent.agent.get_llm", return_value=mock_llm):
