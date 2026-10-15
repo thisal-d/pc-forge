@@ -269,7 +269,7 @@ class RotatingChatGoogleGenerativeAI(BaseChatModel):
             except Exception as e:
                 last_err = e
                 if is_retryable_gemini_error(e) and attempt < len(self.models) - 1:
-                    logger.warning("Gemini API key %d failed (%s: %s), trying next configured key.", idx + 1, type(e).__name__, str(e)[:120])
+                    logger.warning("Gemini API key %d failed, trying next configured key. (%s: %s)", idx + 1, type(e).__name__, str(e)[:120])
                     with _key_lock:
                         _active_key_index = (idx + 1) % len(self.models)
                     continue
@@ -295,7 +295,7 @@ class RotatingChatGoogleGenerativeAI(BaseChatModel):
             except Exception as e:
                 last_err = e
                 if is_retryable_gemini_error(e) and attempt < len(self.models) - 1:
-                    logger.warning("Gemini API key %d failed (%s: %s), trying next configured key.", idx + 1, type(e).__name__, str(e)[:120])
+                    logger.warning("Gemini API key %d failed, trying next configured key. (%s: %s)", idx + 1, type(e).__name__, str(e)[:120])
                     with _key_lock:
                         _active_key_index = (idx + 1) % len(self.models)
                     continue
@@ -359,7 +359,7 @@ class RotatingChatGoogleGenerativeAI(BaseChatModel):
             except Exception as e:
                 last_err = e
                 if is_retryable_gemini_error(e) and attempt < len(self.models) - 1:
-                    logger.warning("Gemini API key %d failed (%s: %s), trying next configured key.", idx + 1, type(e).__name__, str(e)[:120])
+                    logger.warning("Gemini API key %d failed, trying next configured key. (%s: %s)", idx + 1, type(e).__name__, str(e)[:120])
                     with _key_lock:
                         _active_key_index = (idx + 1) % len(self.models)
                     continue
