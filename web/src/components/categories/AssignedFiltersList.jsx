@@ -1,5 +1,5 @@
 import React from 'react';
-import { CloseIcon } from '../icons/index.js';
+import { CloseIcon, ChevronUpIcon, ChevronDownIcon } from '../icons/index.js';
 
 export const AssignedFiltersList = ({
   filters,
@@ -94,7 +94,7 @@ export const AssignedFiltersList = ({
                       }}
                       title="Move filter up"
                     >
-                      ▲
+                      <ChevronUpIcon size={12} />
                     </button>
                     <button
                       type="button"
@@ -116,7 +116,7 @@ export const AssignedFiltersList = ({
                       }}
                       title="Move filter down"
                     >
-                      ▼
+                      <ChevronDownIcon size={12} />
                     </button>
                   </div>
 

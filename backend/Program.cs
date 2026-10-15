@@ -1,10 +1,11 @@
-// PCForge Backend API
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using PCForge.Api.Data;
+using PCForge.Api.DTOs;
 using PCForge.Api.Services;
 
 LoadDotEnvFiles();
@@ -32,7 +33,14 @@ var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConn
 var connectionString = NormalizePostgresConnectionString(rawConnectionString);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString, npgsqlOptions =>
+    {
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorCodesToAdd: null);
+        npgsqlOptions.CommandTimeout(60);
+    }));
 
 // 2. Register Application Services
 builder.Services.AddHttpContextAccessor();
@@ -107,8 +115,24 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 5. Add Controllers and OpenAPI/Swagger
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var firstError = context.ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .FirstOrDefault(msg => !string.IsNullOrWhiteSpace(msg))
+                ?? "Invalid request parameters.";
+
+            return new BadRequestObjectResult(new AuthResponseDto
+            {
+                Success = false,
+                Message = firstError
+            });
+        };
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -249,6 +273,19 @@ if (!app.Environment.IsEnvironment("Testing"))
                     CONSTRAINT uq_master_filter_option UNIQUE(filterid, optionvalue)
                 );
 
+                -- Ensure promotional coupons table exists
+                CREATE TABLE IF NOT EXISTS coupons (
+                    couponid SERIAL PRIMARY KEY,
+                    code VARCHAR(50) UNIQUE NOT NULL,
+                    description VARCHAR(255) NOT NULL,
+                    discounttype VARCHAR(20) NOT NULL DEFAULT 'PERCENTAGE',
+                    discountvalue NUMERIC(10, 2) NOT NULL,
+                    minsubtotal NUMERIC(12, 2) DEFAULT 0,
+                    maxdiscount NUMERIC(12, 2) NULL,
+                    isactive BOOLEAN DEFAULT TRUE,
+                    createdat TIMESTAMPTZ DEFAULT NOW()
+                );
+
                 ALTER TABLE categoryfilters ADD COLUMN IF NOT EXISTS masterfilterid INT NULL REFERENCES filters(filterid) ON DELETE SET NULL;
 
                 -- Populate filters from existing categoryfilters if filters is empty
@@ -311,6 +348,50 @@ if (!app.Environment.IsEnvironment("Testing"))
                     END IF;
                 END $$;
 
+                -- Ensure servicetimeslots and servicetimeslotoverrides tables exist
+                CREATE TABLE IF NOT EXISTS servicetimeslots (
+                    slotid SERIAL PRIMARY KEY,
+                    starttime VARCHAR(10) NOT NULL,
+                    endtime VARCHAR(10) NOT NULL,
+                    label VARCHAR(50),
+                    defaultcapacity INT NOT NULL DEFAULT 5,
+                    isactive BOOLEAN NOT NULL DEFAULT TRUE,
+                    displayorder INT DEFAULT 0,
+                    createdat TIMESTAMPTZ DEFAULT NOW(),
+                    updatedat TIMESTAMPTZ DEFAULT NOW()
+                );
+
+                CREATE TABLE IF NOT EXISTS servicetimeslotoverrides (
+                    overrideid SERIAL PRIMARY KEY,
+                    slotid INT NOT NULL REFERENCES servicetimeslots(slotid) ON DELETE CASCADE,
+                    date DATE NOT NULL,
+                    customcapacity INT NULL,
+                    isclosed BOOLEAN NOT NULL DEFAULT FALSE,
+                    reason VARCHAR(255) NULL,
+                    createdat TIMESTAMPTZ DEFAULT NOW(),
+                    updatedat TIMESTAMPTZ DEFAULT NOW(),
+                    CONSTRAINT uq_slot_date UNIQUE(slotid, date)
+                );
+
+                ALTER TABLE servicerequests ADD COLUMN IF NOT EXISTS slotid INT NULL REFERENCES servicetimeslots(slotid) ON DELETE SET NULL;
+
+                -- Seed default time slots if table is empty
+                INSERT INTO servicetimeslots (starttime, endtime, label, defaultcapacity, isactive, displayorder, createdat, updatedat)
+                SELECT '09:00', '11:00', '09:00 AM - 11:00 AM', 5, TRUE, 1, NOW(), NOW()
+                WHERE NOT EXISTS (SELECT 1 FROM servicetimeslots);
+
+                INSERT INTO servicetimeslots (starttime, endtime, label, defaultcapacity, isactive, displayorder, createdat, updatedat)
+                SELECT '11:00', '13:00', '11:00 AM - 01:00 PM', 5, TRUE, 2, NOW(), NOW()
+                WHERE (SELECT COUNT(*) FROM servicetimeslots) = 1;
+
+                INSERT INTO servicetimeslots (starttime, endtime, label, defaultcapacity, isactive, displayorder, createdat, updatedat)
+                SELECT '14:00', '16:00', '02:00 PM - 04:00 PM', 5, TRUE, 3, NOW(), NOW()
+                WHERE (SELECT COUNT(*) FROM servicetimeslots) = 2;
+
+                INSERT INTO servicetimeslots (starttime, endtime, label, defaultcapacity, isactive, displayorder, createdat, updatedat)
+                SELECT '16:00', '18:00', '04:00 PM - 06:00 PM', 5, TRUE, 4, NOW(), NOW()
+                WHERE (SELECT COUNT(*) FROM servicetimeslots) = 3;
+
                 DROP TABLE IF EXISTS supporttickets CASCADE;
                 ALTER TABLE servicerequests DROP CONSTRAINT IF EXISTS servicerequests_productid_fkey;
                 ALTER TABLE servicerequests DROP CONSTRAINT IF EXISTS servicerequests_assignedstaffid_fkey;
@@ -354,6 +435,9 @@ if (!app.Environment.IsEnvironment("Testing"))
                     END IF;
                     IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'master_filter_options_optionid_seq') THEN
                         PERFORM setval('master_filter_options_optionid_seq', (SELECT GREATEST(COALESCE(MAX(optionid), 1), 1) FROM master_filter_options));
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'coupons_couponid_seq') THEN
+                        PERFORM setval('coupons_couponid_seq', (SELECT GREATEST(COALESCE(MAX(couponid), 1), 1) FROM coupons));
                     END IF;
                 END $$;
             ");
@@ -459,28 +543,49 @@ static string? NormalizePostgresConnectionString(string? connStr)
     if (string.IsNullOrWhiteSpace(connStr))
         return connStr;
 
-    if (!connStr.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) &&
-        !connStr.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    var result = connStr;
+
+    if (connStr.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+        connStr.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
     {
-        return connStr;
+        try
+        {
+            var uri = new Uri(connStr);
+            var userInfo = uri.UserInfo.Split(':');
+            var user = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "";
+            var pass = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+            var host = uri.Host;
+            var port = uri.Port > 0 ? uri.Port : 5432;
+            var database = uri.AbsolutePath.TrimStart('/');
+
+            result = $"Host={host};Port={port};Database={database};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;";
+        }
+        catch
+        {
+            result = connStr;
+        }
     }
 
-    try
+    var optionsToEnsure = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
-        var uri = new Uri(connStr);
-        var userInfo = uri.UserInfo.Split(':');
-        var user = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : "";
-        var pass = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
-        var host = uri.Host;
-        var port = uri.Port > 0 ? uri.Port : 5432;
-        var database = uri.AbsolutePath.TrimStart('/');
+        { "Timeout", "60" },
+        { "Command Timeout", "60" },
+        { "Keepalive", "30" },
+        { "Pooling", "true" },
+        { "Connection Idle Lifetime", "15" },
+        { "Connection Pruning Interval", "10" }
+    };
 
-        return $"Host={host};Port={port};Database={database};Username={user};Password={pass};SSL Mode=Require;Trust Server Certificate=true;";
-    }
-    catch
+    var trimmed = result.Trim().TrimEnd(';');
+    foreach (var (key, val) in optionsToEnsure)
     {
-        return connStr;
+        if (!trimmed.Contains($"{key}=", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed += $";{key}={val}";
+        }
     }
+
+    return trimmed + ";";
 }
 
 public partial class Program { }

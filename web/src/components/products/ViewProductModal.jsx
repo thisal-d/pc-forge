@@ -120,24 +120,43 @@ export const ViewProductModal = ({
 
           {/* Description */}
           {product.description && (
-            <div style={{ marginTop: '0.5rem' }}>
+            <div style={{ marginTop: '0.75rem' }}>
               <span className="detail-item-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
                 Description
               </span>
-              <div style={{ fontSize: '0.9rem', color: '#cbd5e1', lineHeight: '1.5', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem', borderRadius: '6px' }}>
+              <div
+                style={{
+                  fontSize: '0.875rem',
+                  color: 'var(--text-body, #334155)',
+                  lineHeight: '1.55',
+                  background: 'var(--bg, #f8fafc)',
+                  border: '1px solid var(--border, #e2e8f0)',
+                  padding: '0.85rem 1rem',
+                  borderRadius: 'var(--radius-md, 8px)',
+                }}
+              >
                 {product.description}
               </div>
             </div>
           )}
 
           {/* Configured Category Filter Values / Specifications */}
-          <div style={{ marginTop: '0.75rem' }}>
-            <h4 style={{ color: '#a78bfa', fontSize: '0.95rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
+          <div style={{ marginTop: '1rem' }}>
+            <h4
+              style={{
+                color: 'var(--text-main, #0f172a)',
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                borderBottom: '1px solid var(--border, #e2e8f0)',
+                paddingBottom: '0.45rem',
+                marginBottom: '0.75rem',
+              }}
+            >
               Hardware Specifications (Product Filter Values)
             </h4>
 
             {viewingFilterValues.length === 0 && (!product.specifications || Object.keys(product.specifications).length === 0) ? (
-              <div style={{ padding: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+              <div style={{ padding: '0.75rem', color: 'var(--text-muted, #64748b)', fontSize: '0.85rem', fontStyle: 'italic' }}>
                 No dynamic specifications assigned to this product yet.
               </div>
             ) : (
@@ -149,7 +168,7 @@ export const ViewProductModal = ({
                   return (
                     <div className="detail-item" key={fv.productFilterValueId || `${fv.filterId}-${fv.rawValue}`}>
                       <span className="detail-item-label">{label}</span>
-                      <span className="detail-item-value" style={{ color: '#93c5fd' }}>
+                      <span className="detail-item-value" style={{ color: 'var(--primary, #2563eb)', fontWeight: 700 }}>
                         {fv.rawValue} {unit && !fv.rawValue.includes(unit) ? unit : ''}
                       </span>
                     </div>
@@ -165,7 +184,7 @@ export const ViewProductModal = ({
                     return (
                       <div className="detail-item" key={key}>
                         <span className="detail-item-label">{key.replace(/_/g, ' ')}</span>
-                        <span className="detail-item-value" style={{ color: '#cbd5e1' }}>
+                        <span className="detail-item-value" style={{ color: 'var(--text-main, #0f172a)', fontWeight: 600 }}>
                           {String(val)}
                         </span>
                       </div>

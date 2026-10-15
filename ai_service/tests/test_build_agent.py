@@ -12,6 +12,7 @@ from ai_service.main import app
 from ai_service.agents.build_agent.models import BuildGenerationRequest
 from ai_service.agents.build_agent.tools import (
     BUILD_TOOLS,
+    build_context_var,
     check_case_fit,
     check_memory_compatibility,
     check_psu_wattage,
@@ -92,6 +93,13 @@ def test_case_fit_tool():
 
 def test_get_candidate_components_filter():
     """Validates catalog retrieval and category filtering."""
+    build_context_var.set({
+        "catalog": [
+            {"product_id": 1, "name": "AMD Ryzen 7 7800X3D", "category": "CPU", "price": 145000.0, "socket": "AM5", "memory_type": "DDR5"},
+            {"product_id": 4, "name": "Intel Core i7-14700K", "category": "CPU", "price": 128000.0, "socket": "LGA1700", "memory_type": "DDR5"},
+            {"product_id": 11, "name": "MSI MAG B650 Tomahawk WiFi", "category": "Motherboard", "price": 68000.0, "socket": "AM5", "memory_type": "DDR5"}
+        ]
+    })
     cpus_raw = get_candidate_components.invoke({"category": "CPU"})
     cpus = json.loads(cpus_raw)
     assert len(cpus) > 0

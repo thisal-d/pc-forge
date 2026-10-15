@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { filterService } from '../services/filterService.js';
-import { CloseIcon, AlertTriangleIcon, CheckCircleIcon } from '../components/icons/index.js';
+import { Pagination } from '../components/common/Pagination.jsx';
+import { CloseIcon, AlertTriangleIcon, CheckCircleIcon, InfoIcon } from '../components/icons/index.js';
+import '../styles/pages/filters.css';
 
 // Slug generator
 export const slugify = (text) => {
@@ -100,6 +102,20 @@ export const FilterManagement = () => {
       filterType: typeFilter,
     });
   }, [filters, searchQuery, typeFilter]);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, typeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredFilters.length / pageSize));
+  const paginatedFilters = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredFilters.slice(start, start + pageSize);
+  }, [filteredFilters, currentPage, pageSize]);
 
   // Derived Stats
   const stats = useMemo(() => {
@@ -360,100 +376,32 @@ export const FilterManagement = () => {
 
   const getTypeBadge = (type) => {
     const t = (type || 'multiselect').toLowerCase();
-    if (t === 'multiselect') {
-      return (
-        <span
-          style={{
-            padding: '3px 8px',
-            borderRadius: '12px',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            background: '#eff6ff',
-            color: '#1d4ed8',
-            border: '1px solid #bfdbfe',
-          }}
-        >
-          Multi-Select
-        </span>
-      );
+    switch (t) {
+      case 'multiselect':
+        return <span className="filter-type-badge filter-type-multiselect">Multi-Select</span>;
+      case 'singleselect':
+        return <span className="filter-type-badge filter-type-singleselect">Single-Select</span>;
+      case 'range':
+        return <span className="filter-type-badge filter-type-range">Numeric Range</span>;
+      case 'boolean':
+        return <span className="filter-type-badge filter-type-boolean">Boolean Switch</span>;
+      default:
+        return <span className="badge badge-secondary">{type}</span>;
     }
-    if (t === 'singleselect') {
-      return (
-        <span
-          style={{
-            padding: '3px 8px',
-            borderRadius: '12px',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            background: '#faf5ff',
-            color: '#7e22ce',
-            border: '1px solid #e9d5ff',
-          }}
-        >
-          Single-Select
-        </span>
-      );
-    }
-    if (t === 'range') {
-      return (
-        <span
-          style={{
-            padding: '3px 8px',
-            borderRadius: '12px',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            background: '#fffbeb',
-            color: '#b45309',
-            border: '1px solid #fde68a',
-          }}
-        >
-          Numeric Range
-        </span>
-      );
-    }
-    if (t === 'boolean') {
-      return (
-        <span
-          style={{
-            padding: '3px 8px',
-            borderRadius: '12px',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            background: '#ecfdf5',
-            color: '#047857',
-            border: '1px solid #a7f3d0',
-          }}
-        >
-          Boolean Switch
-        </span>
-      );
-    }
-    return <span className="badge badge-secondary">{type}</span>;
   };
 
   return (
-    <div className="page-container" style={{ padding: '1.5rem 2rem' }}>
+    <div className="page-container">
       {/* Toast Notification */}
       {notification && (
-        <div
-          className={`alert ${notification.type === 'error' ? 'alert-error' : 'alert-success'}`}
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            zIndex: 9999,
-            minWidth: '320px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-          }}
-        >
-          {notification.type === 'error' ? <AlertTriangleIcon size={18} /> : <CheckCircleIcon size={18} />}
-          <div style={{ flex: 1 }}>{notification.message}</div>
+        <div className={`notification-banner alert alert-${notification.type === 'error' ? 'error' : 'success'}`}>
+          <span>{notification.message}</span>
           <button
+            type="button"
             onClick={() => setNotification(null)}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit' }}
+            className="clear-search-btn"
+            style={{ position: 'static', marginLeft: 'auto' }}
+            aria-label="Dismiss notification"
           >
             <CloseIcon size={14} />
           </button>
@@ -461,394 +409,362 @@ export const FilterManagement = () => {
       )}
 
       {/* Header Banner */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="dashboard-header">
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
-            Filter Management
-          </h2>
-          <p style={{ margin: '0.3rem 0 0', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+          <h1>Filter Management</h1>
+          <p className="subtitle">
             Manage master hardware specifications and dynamic filter options stored in the database.
           </p>
         </div>
-        <button
-          id="create-filter-btn"
-          className="btn btn-primary"
-          onClick={handleOpenCreateModal}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.65rem 1.25rem',
-            fontWeight: 600,
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          Create Filter
-        </button>
+        <div className="header-actions">
+          <button
+            id="create-filter-btn"
+            className="btn btn-primary"
+            onClick={handleOpenCreateModal}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Create Filter</span>
+          </button>
+        </div>
       </div>
 
       {/* KPI Stats Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-          gap: '1rem',
-          marginBottom: '1.5rem',
-        }}
-      >
-        <div style={{ background: '#ffffff', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.15rem 1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Total Database Filters
-          </span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.35rem' }}>
-            {stats.total}
+      <div className="stats-grid">
+        <div className="stat-card stat-card-total">
+          <div className="metric-card-top">
+            <div className="metric-icon-circle icon-circle-blue">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              </svg>
+            </div>
+            <div className="metric-details">
+              <span className="stat-label">Total Filters</span>
+              <span className="stat-value">{stats.total}</span>
+              <span className="stat-subtext">Hardware specifications</span>
+            </div>
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.15rem 1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Multi-Select Filters
-          </span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1d4ed8', marginTop: '0.35rem' }}>
-            {stats.multiselect}
+        <div className="stat-card stat-card-active">
+          <div className="metric-card-top">
+            <div className="metric-icon-circle icon-circle-blue">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 11l3 3L22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+            </div>
+            <div className="metric-details">
+              <span className="stat-label">Multi-Select</span>
+              <span className="stat-value">{stats.multiselect}</span>
+              <span className="stat-subtext">Checkbox attributes</span>
+            </div>
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.15rem 1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#7e22ce', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Single-Select Filters
-          </span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#7e22ce', marginTop: '0.35rem' }}>
-            {stats.singleselect}
+        <div className="stat-card stat-card-tech">
+          <div className="metric-card-top">
+            <div className="metric-icon-circle icon-circle-purple">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="4" />
+              </svg>
+            </div>
+            <div className="metric-details">
+              <span className="stat-label">Single-Select</span>
+              <span className="stat-value">{stats.singleselect}</span>
+              <span className="stat-subtext">Radio attributes</span>
+            </div>
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.15rem 1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Predefined Option Values
-          </span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#047857', marginTop: '0.35rem' }}>
-            {stats.totalOptions}
+        <div className="stat-card stat-card-active">
+          <div className="metric-card-top">
+            <div className="metric-icon-circle icon-circle-green">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <div className="metric-details">
+              <span className="stat-label">Option Values</span>
+              <span className="stat-value">{stats.totalOptions}</span>
+              <span className="stat-subtext">Predefined filter options</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div
-        style={{
-          background: '#ffffff',
-          border: '1px solid var(--border)',
-          borderRadius: '10px',
-          padding: '1rem 1.25rem',
-          marginBottom: '1.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
-          flexWrap: 'wrap',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-        }}
-      >
-        <div style={{ flex: '1 1 280px', position: 'relative' }}>
-          <input
-            id="filter-search-input"
-            type="text"
-            className="form-control"
-            placeholder="Search by filter name, key (e.g. cuda_cores), or unit..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              paddingLeft: '2.4rem',
-              borderRadius: '8px',
-              border: '1px solid var(--border)',
-              height: '40px',
-              fontSize: '0.875rem',
-              width: '100%',
-            }}
-          />
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }}
-          >
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </div>
+      <div className="toolbar-card">
+        <div className="search-filter-row">
+          <div className="toolbar-search-wrapper">
+            <span className="toolbar-search-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </span>
+            <input
+              id="filter-search-input"
+              type="text"
+              className="toolbar-search-input"
+              placeholder="Search by filter name, key (e.g. cuda_cores), or unit..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="toolbar-clear-btn"
+                onClick={() => setSearchQuery('')}
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-        <div style={{ minWidth: '180px' }}>
-          <select
-            id="filter-type-select"
-            className="form-control"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            style={{
-              borderRadius: '8px',
-              border: '1px solid var(--border)',
-              height: '40px',
-              fontSize: '0.875rem',
-            }}
-          >
-            <option value="all">All Filter Types</option>
-            <option value="multiselect">Multi-Select</option>
-            <option value="singleselect">Single-Select</option>
-            <option value="range">Numeric Range</option>
-            <option value="boolean">Boolean Switch</option>
-          </select>
-        </div>
+          <div className="toolbar-filters-group">
+            <div className="toolbar-select-item">
+              <select
+                id="filter-type-select"
+                className="toolbar-select"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="all">All Filter Types</option>
+                <option value="multiselect">Multi-Select</option>
+                <option value="singleselect">Single-Select</option>
+                <option value="range">Numeric Range</option>
+                <option value="boolean">Boolean Switch</option>
+              </select>
+            </div>
 
-        {(searchQuery || typeFilter !== 'all') && (
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setTypeFilter('all');
-            }}
-            className="btn btn-secondary-sm"
-            style={{ height: '40px', borderRadius: '8px', padding: '0 1rem' }}
-          >
-            Reset Filters
-          </button>
-        )}
+            {(searchQuery || typeFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setTypeFilter('all');
+                }}
+                className="btn btn-outline-sm"
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Main Table */}
-      <div style={{ background: '#ffffff', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+      <div className="data-table-card">
+        <div className="table-header-banner">
+          <h3>Specifications & Filter Keys ({filteredFilters.length})</h3>
+          <span className="table-header-subtitle">
+            Showing {paginatedFilters.length} of {filters.length} master filter specifications
+          </span>
+        </div>
+
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
             Loading database filters...
           </div>
         ) : filteredFilters.length === 0 ? (
-          <div style={{ padding: '3.5rem 2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 1rem', opacity: 0.5 }}>
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-            </svg>
-            <h4 style={{ margin: '0 0 0.5rem', color: 'var(--text-main)', fontSize: '1.05rem' }}>No Filters Found</h4>
-            <p style={{ margin: 0, fontSize: '0.875rem' }}>
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              </svg>
+            </div>
+            <h4>No Filters Found</h4>
+            <p>
               {searchQuery || typeFilter !== 'all'
                 ? 'No filters matched your search criteria.'
                 : 'No master filters have been created yet. Click "Create Filter" to add one.'}
             </p>
+            {(searchQuery || typeFilter !== 'all') && (
+              <button
+                type="button"
+                className="btn btn-outline-sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setTypeFilter('all');
+                }}
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         ) : (
-          <table className="table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)' }}>
-                <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Filter Name & Key
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  UI Type
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Unit
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Predefined Options
-                </th>
-                <th style={{ padding: '0.85rem 1rem', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Assigned Categories
-                </th>
-                <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredFilters.map((f) => (
-                <tr key={f.filterId} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.15s ease' }}>
-                  <td style={{ padding: '1rem 1.25rem' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.925rem', color: 'var(--text-main)' }}>
-                      {f.displayName}
-                    </div>
-                    <code
-                      style={{
-                        display: 'inline-block',
-                        background: '#f1f5f9',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        color: '#475569',
-                        marginTop: '0.2rem',
-                        fontFamily: 'monospace',
-                      }}
-                    >
-                      {f.filterKey}
-                    </code>
-                  </td>
-
-                  <td style={{ padding: '1rem 1rem' }}>{getTypeBadge(f.filterType)}</td>
-
-                  <td style={{ padding: '1rem 1rem' }}>
-                    {f.unit ? (
-                      <span
-                        style={{
-                          background: '#f8fafc',
-                          border: '1px solid #cbd5e1',
-                          padding: '2px 7px',
-                          borderRadius: '6px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          color: '#334155',
-                        }}
-                      >
-                        {f.unit}
-                      </span>
-                    ) : (
-                      <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>—</span>
-                    )}
-                  </td>
-
-                  <td style={{ padding: '1rem 1rem' }}>
-                    {f.options && f.options.length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', maxWidth: '320px' }}>
-                        {f.options.slice(0, 4).map((opt) => (
-                          <span
-                            key={opt.optionId || opt.value}
-                            style={{
-                              background: '#f1f5f9',
-                              border: '1px solid #e2e8f0',
-                              padding: '2px 8px',
-                              borderRadius: '12px',
-                              fontSize: '0.75rem',
-                              color: '#334155',
-                              fontWeight: 500,
-                            }}
-                          >
-                            {opt.value}
-                          </span>
-                        ))}
-                        {f.options.length > 4 && (
-                          <span
-                            style={{
-                              background: '#e2e8f0',
-                              padding: '2px 6px',
-                              borderRadius: '12px',
-                              fontSize: '0.72rem',
-                              fontWeight: 600,
-                              color: '#475569',
-                            }}
-                          >
-                            +{f.options.length - 4} more
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                        (Harvested from products)
-                      </span>
-                    )}
-                  </td>
-
-                  <td style={{ padding: '1rem 1rem' }}>
-                    {f.assignedCategoryNames && f.assignedCategoryNames.length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                        {f.assignedCategoryNames.map((catName) => (
-                          <span
-                            key={catName}
-                            style={{
-                              background: '#e0f2fe',
-                              border: '1px solid #bae6fd',
-                              color: '#0369a1',
-                              padding: '2px 8px',
-                              borderRadius: '12px',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {catName}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: '0.78rem', color: '#94a3b8', background: '#f8fafc', padding: '2px 8px', borderRadius: '10px' }}>
-                        Not assigned
-                      </span>
-                    )}
-                  </td>
-
-                  <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
-                      <button
-                        className="btn btn-secondary-sm"
-                        onClick={() => handleOpenEditModal(f)}
-                        style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', borderRadius: '6px' }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-danger-sm"
-                        onClick={() => handleOpenDeleteModal(f)}
-                        style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', borderRadius: '6px' }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Filter Name & Key</th>
+                  <th>UI Type</th>
+                  <th>Unit</th>
+                  <th>Predefined Options</th>
+                  <th>Assigned Categories</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {paginatedFilters.map((f) => (
+                  <tr key={f.filterId}>
+                    <td>
+                      <div style={{ fontWeight: 700, fontSize: '0.925rem', color: 'var(--text-main)' }}>
+                        {f.displayName}
+                      </div>
+                      <code className="filter-key-code">
+                        {f.filterKey}
+                      </code>
+                    </td>
+
+                    <td>{getTypeBadge(f.filterType)}</td>
+
+                    <td>
+                      {f.unit ? (
+                        <span className="filter-unit-pill">
+                          {f.unit}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-subtle)', fontSize: '0.85rem' }}>—</span>
+                      )}
+                    </td>
+
+                    <td>
+                      {f.options && f.options.length > 0 ? (
+                        <div className="filter-options-wrap">
+                          {f.options.slice(0, 4).map((opt) => (
+                            <span
+                              key={opt.optionId || opt.value}
+                              className="filter-option-chip"
+                            >
+                              {opt.value}
+                            </span>
+                          ))}
+                          {f.options.length > 4 && (
+                            <span className="filter-option-more">
+                              +{f.options.length - 4} more
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          (Harvested from products)
+                        </span>
+                      )}
+                    </td>
+
+                    <td>
+                      {f.assignedCategoryNames && f.assignedCategoryNames.length > 0 ? (
+                        <div className="filter-cat-wrap">
+                          {f.assignedCategoryNames.map((catName) => (
+                            <span
+                              key={catName}
+                              className="filter-cat-pill"
+                            >
+                              {catName}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="filter-cat-empty">
+                          Not assigned
+                        </span>
+                      )}
+                    </td>
+
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="btn btn-outline-sm"
+                          onClick={() => handleOpenEditModal(f)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger-sm"
+                          onClick={() => handleOpenDeleteModal(f)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
+
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredFilters.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          itemLabel="filters"
+        />
       </div>
 
       {/* ==================================================== */}
       {/* CREATE FILTER MODAL */}
       {/* ==================================================== */}
       {isCreateModalOpen && (
-        <div className="modal-backdrop" onClick={handleCloseCreateModal}>
+        <div className="modal-overlay" onClick={handleCloseCreateModal}>
           <div className="modal-dialog" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()} id="create-filter-modal">
             <div className="modal-header">
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Create Master Filter</h3>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <h3 className="modal-title">Create Master Filter</h3>
+                <span className="modal-subtitle">
                   New technical specification attribute stored in the database
                 </span>
               </div>
-              <button onClick={handleCloseCreateModal} className="modal-close-btn">
+              <button onClick={handleCloseCreateModal} className="modal-close-btn" aria-label="Close modal">
                 <CloseIcon size={16} />
               </button>
             </div>
 
             <form onSubmit={handleCreateSubmit}>
-              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              <div className="modal-body">
                 {createErrors.general && (
-                  <div className="alert alert-error" style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem' }}>
+                  <div className="alert alert-error">
                     {createErrors.general}
                   </div>
                 )}
 
-                <div className="form-group" style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                    Display Label <span style={{ color: '#ef4444' }}>*</span>
+                <div className="form-group">
+                  <label className="form-label-saas">
+                    Display Label *
                   </label>
                   <input
                     id="create-display-name-input"
                     type="text"
-                    className="form-control"
+                    className="form-input-saas"
                     placeholder="e.g. Memory Speed, VRAM Capacity, Socket Type"
                     value={createForm.displayName}
                     onChange={handleCreateDisplayNameChange}
                     required
                   />
                   {createErrors.displayName && (
-                    <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: '0.25rem', display: 'block' }}>
+                    <span className="field-error-text">
                       {createErrors.displayName}
                     </span>
                   )}
                 </div>
 
-                <div className="form-group" style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                    System Filter Key <span style={{ color: '#ef4444' }}>*</span>
+                <div className="form-group">
+                  <label className="form-label-saas">
+                    System Filter Key *
                     <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
                       (auto-slugged, used in product specs & queries)
                     </span>
@@ -856,7 +772,7 @@ export const FilterManagement = () => {
                   <input
                     id="create-filter-key-input"
                     type="text"
-                    className="form-control"
+                    className="form-input-saas"
                     placeholder="e.g. memory_speed, vram, socket"
                     value={createForm.filterKey}
                     onChange={(e) => setCreateForm({ ...createForm, filterKey: slugify(e.target.value) })}
@@ -864,19 +780,19 @@ export const FilterManagement = () => {
                     style={{ fontFamily: 'monospace' }}
                   />
                   {createErrors.filterKey && (
-                    <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: '0.25rem', display: 'block' }}>
+                    <span className="field-error-text">
                       {createErrors.filterKey}
                     </span>
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                    <label className="form-label-saas">
                       UI Filter Type
                     </label>
                     <select
-                      className="form-control"
+                      className="form-select-saas"
                       value={createForm.filterType}
                       onChange={(e) => setCreateForm({ ...createForm, filterType: e.target.value })}
                     >
@@ -888,7 +804,7 @@ export const FilterManagement = () => {
                   </div>
 
                   <div className="form-group">
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                    <label className="form-label-saas">
                       Unit of Measure
                       <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '0.3rem' }}>
                         (Optional)
@@ -896,7 +812,7 @@ export const FilterManagement = () => {
                     </label>
                     <input
                       type="text"
-                      className="form-control"
+                      className="form-input-saas"
                       placeholder="e.g. GB, MHz, W, mm"
                       value={createForm.unit}
                       onChange={(e) => setCreateForm({ ...createForm, unit: e.target.value })}
@@ -905,8 +821,8 @@ export const FilterManagement = () => {
                 </div>
 
                 {/* Predefined Options Chip Manager */}
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginTop: '1.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1rem', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
                     <label style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
                       Predefined Filter Options
                     </label>
@@ -918,11 +834,11 @@ export const FilterManagement = () => {
                     Add selectable options/chips for customer mobile and web catalog filtering.
                   </p>
 
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                     <input
                       id="create-option-input"
                       type="text"
-                      className="form-control"
+                      className="form-input-saas"
                       placeholder="e.g. 144Hz, AM5, 16GB"
                       value={createOptionInput}
                       onChange={(e) => setCreateOptionInput(e.target.value)}
@@ -932,26 +848,25 @@ export const FilterManagement = () => {
                           handleAddCreateOption(e);
                         }
                       }}
-                      style={{ fontSize: '0.85rem' }}
                     />
                     <button
                       type="button"
-                      className="btn btn-secondary-sm"
+                      className="btn btn-secondary"
                       onClick={handleAddCreateOption}
-                      style={{ padding: '0 1.15rem', fontWeight: 600, borderRadius: '6px' }}
+                      style={{ padding: '0 1rem', whiteSpace: 'nowrap' }}
                     >
                       + Add
                     </button>
                   </div>
 
                   {createForm.unit && createForm.unit.trim() && (
-                    <div style={{ fontSize: '0.76rem', color: '#6366f1', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <span>Unit of measure <strong>{createForm.unit.trim()}</strong> will be automatically appended (e.g. 100 &rarr; 100{createForm.unit.trim()}).</span>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--primary)', marginBottom: '0.5rem' }}>
+                      Unit of measure <strong>{createForm.unit.trim()}</strong> will be automatically appended (e.g. 100 &rarr; 100{createForm.unit.trim()}).
                     </div>
                   )}
 
                   {createErrors.option && (
-                    <div style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: '0.5rem' }}>
+                    <div className="field-error-text" style={{ marginBottom: '0.5rem' }}>
                       {createErrors.option}
                     </div>
                   )}
@@ -961,32 +876,14 @@ export const FilterManagement = () => {
                       {createForm.options.map((opt, idx) => (
                         <span
                           key={idx}
-                          style={{
-                            background: '#ffffff',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '16px',
-                            padding: '4px 10px',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            color: '#1e293b',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                          }}
+                          className="filter-option-chip"
                         >
                           {opt}
                           <button
                             type="button"
+                            className="filter-option-chip-remove"
                             onClick={() => handleRemoveCreateOption(idx)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              color: '#94a3b8',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                            }}
+                            aria-label={`Remove option ${opt}`}
                           >
                             <CloseIcon size={12} />
                           </button>
@@ -994,15 +891,15 @@ export const FilterManagement = () => {
                       ))}
                     </div>
                   ) : (
-                    <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                       No options added yet. (Options can also be harvested from product specifications).
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', background: '#f8fafc', padding: '0.85rem 1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button type="button" onClick={handleCloseCreateModal} className="btn btn-secondary-sm" disabled={createSubmitting}>
+              <div className="modal-footer">
+                <button type="button" onClick={handleCloseCreateModal} className="btn btn-secondary" disabled={createSubmitting}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={createSubmitting} id="save-filter-submit-btn">
@@ -1018,66 +915,66 @@ export const FilterManagement = () => {
       {/* EDIT FILTER MODAL */}
       {/* ==================================================== */}
       {isEditModalOpen && editingFilter && (
-        <div className="modal-backdrop" onClick={handleCloseEditModal}>
+        <div className="modal-overlay" onClick={handleCloseEditModal}>
           <div className="modal-dialog" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()} id="edit-filter-modal">
             <div className="modal-header">
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>Edit Master Filter</h3>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <h3 className="modal-title">Edit Master Filter</h3>
+                <span className="modal-subtitle">
                   Update metadata and options for <code style={{ fontWeight: 700 }}>{editingFilter.filterKey}</code>
                 </span>
               </div>
-              <button onClick={handleCloseEditModal} className="modal-close-btn">
+              <button onClick={handleCloseEditModal} className="modal-close-btn" aria-label="Close modal">
                 <CloseIcon size={16} />
               </button>
             </div>
 
             <form onSubmit={handleEditSubmit}>
-              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              <div className="modal-body">
                 {editErrors.general && (
-                  <div className="alert alert-error" style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem' }}>
+                  <div className="alert alert-error">
                     {editErrors.general}
                   </div>
                 )}
 
-                <div className="form-group" style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                    Display Label <span style={{ color: '#ef4444' }}>*</span>
+                <div className="form-group">
+                  <label className="form-label-saas">
+                    Display Label *
                   </label>
                   <input
                     type="text"
-                    className="form-control"
+                    className="form-input-saas"
                     value={editForm.displayName}
                     onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })}
                     required
                   />
                   {editErrors.displayName && (
-                    <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: '0.25rem', display: 'block' }}>
+                    <span className="field-error-text">
                       {editErrors.displayName}
                     </span>
                   )}
                 </div>
 
-                <div className="form-group" style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                <div className="form-group">
+                  <label className="form-label-saas">
                     System Filter Key <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)' }}>(Immutable Key)</span>
                   </label>
                   <input
                     type="text"
-                    className="form-control"
+                    className="form-input-saas"
                     value={editingFilter.filterKey}
                     disabled
-                    style={{ background: '#f8fafc', color: '#64748b', fontFamily: 'monospace' }}
+                    style={{ background: '#f8fafc', color: 'var(--text-muted)', fontFamily: 'monospace' }}
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                    <label className="form-label-saas">
                       UI Filter Type
                     </label>
                     <select
-                      className="form-control"
+                      className="form-select-saas"
                       value={editForm.filterType}
                       onChange={(e) => setEditForm({ ...editForm, filterType: e.target.value })}
                     >
@@ -1089,12 +986,12 @@ export const FilterManagement = () => {
                   </div>
 
                   <div className="form-group">
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                    <label className="form-label-saas">
                       Unit of Measure
                     </label>
                     <input
                       type="text"
-                      className="form-control"
+                      className="form-input-saas"
                       placeholder="e.g. GB, MHz, W"
                       value={editForm.unit}
                       onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
@@ -1103,8 +1000,8 @@ export const FilterManagement = () => {
                 </div>
 
                 {/* Predefined Options Chip Manager */}
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginTop: '1.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1rem', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
                     <label style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
                       Predefined Filter Options
                     </label>
@@ -1113,10 +1010,10 @@ export const FilterManagement = () => {
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                     <input
                       type="text"
-                      className="form-control"
+                      className="form-input-saas"
                       placeholder="e.g. 144Hz, AM5, 16GB"
                       value={editOptionInput}
                       onChange={(e) => setEditOptionInput(e.target.value)}
@@ -1126,26 +1023,25 @@ export const FilterManagement = () => {
                           handleAddEditOption(e);
                         }
                       }}
-                      style={{ fontSize: '0.85rem' }}
                     />
                     <button
                       type="button"
-                      className="btn btn-secondary-sm"
+                      className="btn btn-secondary"
                       onClick={handleAddEditOption}
-                      style={{ padding: '0 1.15rem', fontWeight: 600, borderRadius: '6px' }}
+                      style={{ padding: '0 1rem', whiteSpace: 'nowrap' }}
                     >
                       + Add
                     </button>
                   </div>
 
                   {editForm.unit && editForm.unit.trim() && (
-                    <div style={{ fontSize: '0.76rem', color: '#6366f1', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <span>Unit of measure <strong>{editForm.unit.trim()}</strong> will be automatically appended (e.g. 100 &rarr; 100{editForm.unit.trim()}).</span>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--primary)', marginBottom: '0.5rem' }}>
+                      Unit of measure <strong>{editForm.unit.trim()}</strong> will be automatically appended (e.g. 100 &rarr; 100{editForm.unit.trim()}).
                     </div>
                   )}
 
                   {editErrors.option && (
-                    <div style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: '0.5rem' }}>
+                    <div className="field-error-text" style={{ marginBottom: '0.5rem' }}>
                       {editErrors.option}
                     </div>
                   )}
@@ -1154,32 +1050,14 @@ export const FilterManagement = () => {
                     {editForm.options.map((opt, idx) => (
                       <span
                         key={idx}
-                        style={{
-                          background: '#ffffff',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '16px',
-                          padding: '4px 10px',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          color: '#1e293b',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                        }}
+                        className="filter-option-chip"
                       >
                         {opt}
                         <button
                           type="button"
+                          className="filter-option-chip-remove"
                           onClick={() => handleRemoveEditOption(idx)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: 0,
-                            color: '#94a3b8',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                          }}
+                          aria-label={`Remove option ${opt}`}
                         >
                           <CloseIcon size={12} />
                         </button>
@@ -1188,13 +1066,14 @@ export const FilterManagement = () => {
                   </div>
                 </div>
 
-                <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#eff6ff', borderRadius: '6px', fontSize: '0.8rem', color: '#1e40af' }}>
-                  ℹ️ Changes to Display Name, Unit, and Type will automatically sync across categories assigned this filter.
+                <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', color: 'var(--primary-hover)', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <InfoIcon size={16} color="var(--primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <span>Changes to Display Name, Unit, and Type will automatically sync across categories assigned this filter.</span>
                 </div>
               </div>
 
-              <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', background: '#f8fafc', padding: '0.85rem 1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button type="button" onClick={handleCloseEditModal} className="btn btn-secondary-sm" disabled={editSubmitting}>
+              <div className="modal-footer">
+                <button type="button" onClick={handleCloseEditModal} className="btn btn-secondary" disabled={editSubmitting}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={editSubmitting}>
@@ -1210,18 +1089,18 @@ export const FilterManagement = () => {
       {/* DELETE CONFIRMATION MODAL */}
       {/* ==================================================== */}
       {deleteCandidate && (
-        <div className="modal-backdrop" onClick={handleCloseDeleteModal}>
+        <div className="modal-overlay" onClick={handleCloseDeleteModal}>
           <div className="modal-dialog" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()} id="delete-filter-modal">
             <div className="modal-header">
-              <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#dc2626' }}>Delete Filter</h3>
-              <button onClick={handleCloseDeleteModal} className="modal-close-btn">
+              <h3 className="modal-title" style={{ color: 'var(--danger-text)' }}>Delete Filter</h3>
+              <button onClick={handleCloseDeleteModal} className="modal-close-btn" aria-label="Close modal">
                 <CloseIcon size={16} />
               </button>
             </div>
 
             <div className="modal-body">
               {deleteError && (
-                <div className="alert alert-error" style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem' }}>
+                <div className="alert alert-error">
                   {deleteError}
                 </div>
               )}
@@ -1232,7 +1111,7 @@ export const FilterManagement = () => {
               </p>
 
               {deleteCandidate.assignedCategoriesCount > 0 ? (
-                <div style={{ padding: '0.85rem', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '8px', color: '#9f1239', fontSize: '0.825rem' }}>
+                <div style={{ padding: '0.85rem', background: 'var(--danger-light)', border: '1px solid var(--danger-border)', borderRadius: 'var(--radius-md)', color: 'var(--danger-text)', fontSize: '0.825rem' }}>
                   <strong>Warning:</strong> This filter is currently assigned to {deleteCandidate.assignedCategoriesCount} category/categories:
                   <div style={{ marginTop: '0.4rem', fontWeight: 600 }}>
                     {deleteCandidate.assignedCategoryNames.join(', ')}
@@ -1248,16 +1127,15 @@ export const FilterManagement = () => {
               )}
             </div>
 
-            <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', background: '#f8fafc', padding: '0.85rem 1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button type="button" onClick={handleCloseDeleteModal} className="btn btn-secondary-sm" disabled={deleteSubmitting}>
+            <div className="modal-footer">
+              <button type="button" onClick={handleCloseDeleteModal} className="btn btn-secondary" disabled={deleteSubmitting}>
                 Cancel
               </button>
               <button
                 type="button"
-                className="btn btn-danger-sm"
+                className="btn btn-danger"
                 onClick={handleConfirmDelete}
                 disabled={deleteSubmitting || deleteCandidate.assignedCategoriesCount > 0}
-                style={{ padding: '0.5rem 1.15rem', fontWeight: 600 }}
               >
                 {deleteSubmitting ? 'Deleting...' : 'Delete Filter'}
               </button>

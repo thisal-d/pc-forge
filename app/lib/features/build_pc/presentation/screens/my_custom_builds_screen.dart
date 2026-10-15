@@ -79,6 +79,67 @@ class _MyCustomBuildsScreenState extends State<MyCustomBuildsScreen> {
     }
   }
 
+  Future<void> _confirmDeleteBuild(CustomBuildModel build) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.delete_forever_rounded, color: AppColors.alertRed, size: 24),
+            SizedBox(width: 8),
+            Text('Delete Build?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete "${build.buildName}"? This will permanently remove it from your builds.',
+          style: const TextStyle(fontSize: 13.5, color: AppColors.secondaryText, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.secondaryText)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.alertRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final token = AuthSession.instance.token;
+        await _buildService.deleteBuild(build.buildId, token: token);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Custom Build "${build.buildName}" deleted successfully.'),
+              backgroundColor: AppColors.stockGreen,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete build: $e'),
+              backgroundColor: AppColors.alertRed,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   List<CustomBuildModel> _getFilteredBuilds(List<CustomBuildModel> builds) {
     return builds.where((b) {
       if (_selectedStatus == 'IN_REVIEW' && !(b.isReviewing || b.isPendingReview)) return false;
@@ -459,7 +520,7 @@ class _MyCustomBuildsScreenState extends State<MyCustomBuildsScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Submitted: ${_formatDate(build.submittedAt)} \u2022 ID #${build.buildId}',
+                          'Submitted: ${_formatDate(build.submittedAt)}',
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
@@ -470,28 +531,42 @@ class _MyCustomBuildsScreenState extends State<MyCustomBuildsScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: statusBg,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: statusBorder),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(statusIcon, size: 14, color: statusColor),
-                        const SizedBox(width: 4),
-                        Text(
-                          build.status,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: statusColor,
-                          ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: statusBg,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: statusBorder),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(statusIcon, size: 14, color: statusColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              build.status,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: statusColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        key: Key('delete_build_btn_${build.buildId}'),
+                        icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.secondaryText),
+                        tooltip: 'Delete Build',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: () => _confirmDeleteBuild(build),
+                      ),
+                    ],
                   ),
                 ],
               ),

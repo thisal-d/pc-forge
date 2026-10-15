@@ -68,7 +68,7 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: const Color(0xFF10B981),
-          content: Text('Voucher "${code.toUpperCase()}" recalculated by Order Planning Agent!'),
+          content: Text('Voucher "${code.toUpperCase()}" applied successfully!'),
         ),
       );
     } else {
@@ -100,7 +100,7 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
                 ),
                 SizedBox(height: 20),
                 Text(
-                  'Saving Order Proposal...',
+                  'Submitting Build Review...',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -109,7 +109,7 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Submitting build to React technician queue for human inspection. No payment is charged yet.',
+                  'Submitting build to technician queue for human inspection. No payment is charged yet.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12.5,
@@ -132,6 +132,8 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
       formattedTotal: _proposal.pricing.formattedTotal,
       shippingAddress: 'Colombo, Western Province',
       components: _proposal.components,
+      promoCode: _proposal.pricing.discountCode,
+      discountAmount: _proposal.pricing.discountAmount,
     );
 
     if (!mounted) return;
@@ -151,7 +153,7 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: Color(0xFFEF4444),
-          content: Text('Failed to submit order to backend. Please check backend connection.'),
+          content: Text('Failed to submit build review to backend. Please check backend connection.'),
         ),
       );
     }
@@ -205,7 +207,7 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Confirm your order',
+              'Review your build',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -214,7 +216,7 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
               ),
             ),
             Text(
-              'Order Planning Agent • Step 4',
+              'Pricing & Review • Step 4',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -302,7 +304,7 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Order Summary',
+            'Build Summary',
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
@@ -327,14 +329,15 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
             isBold: false,
             valueColor: const Color(0xFF10B981), // Green for discount deduction
           ),
-          const SizedBox(height: 14),
-
-          // Row 3: Delivery
-          _buildSummaryRow(
-            label: 'Delivery',
-            value: pricing.formattedDelivery,
-            isBold: false,
-          ),
+          if (pricing.deliveryFee > 0) ...[
+            const SizedBox(height: 14),
+            // Row 3: Delivery
+            _buildSummaryRow(
+              label: 'Delivery',
+              value: pricing.formattedDelivery,
+              isBold: false,
+            ),
+          ],
 
           const SizedBox(height: 16),
           const Divider(color: Color(0xFF0F172A), thickness: 1.5, height: 1),
@@ -589,7 +592,7 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
               shadowColor: const Color(0xFF5B4DFF).withValues(alpha: 0.4),
             ),
             child: const Text(
-              'Approve Order',
+              'Submit Build Review',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,

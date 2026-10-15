@@ -34,11 +34,11 @@ const AppLayout = () => {
             <Route path="/register" element={<Register />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Protected Routes (All Authenticated Roles) */}
+            {/* Protected Routes (Staff & Admin Only) */}
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['Admin', 'Staff']}>
                   <Dashboard />
                 </ProtectedRoute>
               }

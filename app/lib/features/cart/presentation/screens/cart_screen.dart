@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_network_image.dart';
 import '../../data/cart_service.dart';
 
 class CartScreen extends StatelessWidget {
@@ -106,8 +107,9 @@ class CartScreen extends StatelessWidget {
             );
           }
 
-          final estimatedTax = cart.subtotal * 0.05; // 5% Estimated Tax
-          final grandTotal = cart.subtotal + cart.shippingAmount + estimatedTax;
+          final netSubtotal = (cart.subtotal - cart.discountAmount).clamp(0.0, double.infinity);
+          final estimatedTax = netSubtotal * 0.05; // 5% Estimated Tax
+          final grandTotal = netSubtotal + cart.shippingAmount + estimatedTax;
 
           return Column(
             children: [
@@ -145,19 +147,16 @@ class CartScreen extends StatelessWidget {
                                 border: Border.all(color: AppColors.border),
                               ),
                               clipBehavior: Clip.antiAlias,
-                              child: (product?.imageUrl != null && product!.imageUrl!.trim().isNotEmpty)
-                                  ? Image.network(
-                                      product.imageUrl!.trim(),
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (ctx, err, st) => const Icon(
-                                        Icons.memory_rounded,
-                                        color: AppColors.secondaryText,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.memory_rounded,
-                                      color: AppColors.secondaryText,
-                                    ),
+                              child: AppNetworkImage(
+                                imageUrl: product?.imageUrl,
+                                categoryName: product?.categoryName,
+                                productName: product?.name,
+                                width: 72,
+                                height: 72,
+                                fit: BoxFit.cover,
+                                fallbackIconSize: 28,
+                                showCategoryTag: false,
+                              ),
                             ),
 
                             const SizedBox(width: 12),
@@ -317,6 +316,24 @@ class CartScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (cart.discountAmount > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              cart.couponCode != null && cart.couponCode!.isNotEmpty
+                                  ? 'Discount (${cart.couponCode})'
+                                  : 'Discount',
+                              style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                            Text(
+                              '- LKR ${cart.discountAmount.toStringAsFixed(2)}',
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF10B981)),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 6),
 
                       // Shipping

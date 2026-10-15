@@ -399,7 +399,7 @@ class _AiInventoryScreenState extends State<AiInventoryScreen> {
                 ),
                 SizedBox(height: 20),
                 Text(
-                  'Pricing Build & Calculating Delivery...',
+                  'Pricing Custom Build & Applying Promotions...',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -408,7 +408,7 @@ class _AiInventoryScreenState extends State<AiInventoryScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Member 04 Order Planning Agent is summing component pricing, validating welcome voucher, and sizing shipping fees.',
+                  'Order Planning Agent is verifying component prices, applying eligible promotions, and finalizing your custom build proposal.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12.5,
@@ -457,7 +457,7 @@ class _AiInventoryScreenState extends State<AiInventoryScreen> {
         SnackBar(
           backgroundColor: const Color(0xFFEF4444),
           content: Text(
-            proposalResult.error ?? 'Failed to generate order proposal. Please ensure backend is running.',
+            proposalResult.error ?? 'Failed to generate build review summary. Please ensure backend is running.',
           ),
         ),
       );

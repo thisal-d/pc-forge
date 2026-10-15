@@ -27,7 +27,7 @@ class _SupportScreenState extends State<SupportScreen> {
 
   final List<Map<String, String>> _statusFilters = [
     {'key': 'ALL', 'label': 'All Requests'},
-    {'key': 'PENDING', 'label': 'Pending'},
+    {'key': 'BOOKED', 'label': 'Booked'},
     {'key': 'IN PROGRESS', 'label': 'In Progress'},
     {'key': 'COMPLETED', 'label': 'Completed'},
     {'key': 'NO SHOW', 'label': 'No Show'},
@@ -64,7 +64,7 @@ class _SupportScreenState extends State<SupportScreen> {
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
     setState(() {
-      _displayedCount = (_displayedCount + 8).clamp(0, filtered.length);
+      _displayedCount = (_displayedCount + 8).clamp(0, filtered.length).toInt();
       _isLoadingMore = false;
     });
   }
@@ -122,7 +122,7 @@ class _SupportScreenState extends State<SupportScreen> {
 
   bool _isCancellable(String status) {
     final s = status.toUpperCase().replaceAll('_', ' ');
-    return s == 'PENDING';
+    return s == 'BOOKED' || s == 'PENDING';
   }
 
   Future<void> _confirmCancelRequest(ServiceRequestModel sr) async {
@@ -173,6 +173,20 @@ class _SupportScreenState extends State<SupportScreen> {
     }
   }
 
+  String _formatDisplayDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return '';
+    try {
+      final parsed = DateTime.tryParse(raw);
+      if (parsed != null) {
+        return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
+      }
+    } catch (_) {}
+    if (raw.contains('T')) {
+      return raw.split('T')[0];
+    }
+    return raw;
+  }
+
   List<ServiceRequestModel> _getFilteredRequests(List<ServiceRequestModel> requests) {
     return requests.where((sr) {
       if (_selectedStatus != 'ALL') {
@@ -190,6 +204,8 @@ class _SupportScreenState extends State<SupportScreen> {
           if (rStatus != 'CANCELLED' && rStatus != 'CANCELED') return false;
         } else if (fStatus == 'NO SHOW') {
           if (rStatus != 'NO SHOW') return false;
+        } else if (fStatus == 'BOOKED' || fStatus == 'PENDING') {
+          if (rStatus != 'BOOKED' && rStatus != 'PENDING') return false;
         } else if (rStatus != fStatus) {
           return false;
         }
@@ -231,6 +247,7 @@ class _SupportScreenState extends State<SupportScreen> {
   Color _getStatusColor(String status) {
     final s = status.toUpperCase().replaceAll('_', ' ');
     switch (s) {
+      case 'BOOKED':
       case 'PENDING':
         return AppColors.warningAmber;
       case 'IN PROGRESS':
@@ -254,6 +271,7 @@ class _SupportScreenState extends State<SupportScreen> {
   int _getStatusStepIndex(String status) {
     final s = status.toUpperCase().replaceAll('_', ' ');
     switch (s) {
+      case 'BOOKED':
       case 'PENDING':
         return 0;
       case 'IN PROGRESS':
@@ -271,7 +289,7 @@ class _SupportScreenState extends State<SupportScreen> {
 
   void _showRequestDetails(ServiceRequestModel sr) {
     final currentStep = _getStatusStepIndex(sr.status);
-    final timelineSteps = ['Pending', 'Under Review', 'In Service', 'Resolved'];
+    final timelineSteps = ['Booked', 'Under Review', 'In Service', 'Resolved'];
 
     showModalBottomSheet(
       context: context,
@@ -357,6 +375,7 @@ class _SupportScreenState extends State<SupportScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.background,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,14 +451,20 @@ class _SupportScreenState extends State<SupportScreen> {
 
               const SizedBox(height: 16),
 
-              if (sr.preferredDate != null) ...[
+              if (sr.preferredDate != null && sr.preferredDate!.isNotEmpty) ...[
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.secondaryText),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Service Appointment: ${sr.preferredDate} (${sr.preferredTime ?? "10:00 AM"})',
-                      style: const TextStyle(color: AppColors.primaryDark, fontSize: 13, fontWeight: FontWeight.w500),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.secondaryText),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Service Appointment: ${_formatDisplayDate(sr.preferredDate)} (${sr.preferredTime ?? "10:00 AM"})',
+                        style: const TextStyle(color: AppColors.primaryDark, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
                     ),
                   ],
                 ),
@@ -911,23 +936,37 @@ class _SupportScreenState extends State<SupportScreen> {
                                           ),
                                         ),
                                       ),
-                                    );
+                                  );
                                   }
 
                                   final sr = displayedRequests[index - 1];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                    elevation: 0,
-                                    color: AppColors.surface,
-                                    child: InkWell(
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 14),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface,
                                       borderRadius: BorderRadius.circular(16),
-                                      onTap: () => _showRequestDetails(sr),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
+                                      border: Border.all(
+                                        color: const Color(0xFFCBD5E1),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x0A0F172A),
+                                          blurRadius: 8,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(16),
+                                        onTap: () => _showRequestDetails(sr),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
                                             Row(
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
@@ -997,19 +1036,23 @@ class _SupportScreenState extends State<SupportScreen> {
                                                     style: const TextStyle(fontSize: 10, color: AppColors.secondaryText),
                                                   ),
                                                 ),
-                                                const SizedBox(width: 8),
-                                                if (sr.preferredDate != null) ...[
+                                                if (sr.preferredDate != null && sr.preferredDate!.isNotEmpty) ...[
+                                                  const SizedBox(width: 8),
                                                   const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.secondaryText),
                                                   const SizedBox(width: 4),
-                                                  Text(
-                                                    sr.preferredTime != null && sr.preferredTime!.isNotEmpty
-                                                        ? '${sr.preferredDate} at ${sr.preferredTime}'
-                                                        : '${sr.preferredDate}',
-                                                    style: const TextStyle(fontSize: 11, color: AppColors.secondaryText, fontWeight: FontWeight.w500),
+                                                  Expanded(
+                                                    child: Text(
+                                                      sr.preferredTime != null && sr.preferredTime!.isNotEmpty
+                                                          ? '${_formatDisplayDate(sr.preferredDate)} at ${sr.preferredTime}'
+                                                          : _formatDisplayDate(sr.preferredDate),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: const TextStyle(fontSize: 11, color: AppColors.secondaryText, fontWeight: FontWeight.w500),
+                                                    ),
                                                   ),
-                                                  const SizedBox(width: 8),
-                                                ],
-                                                const Spacer(),
+                                                ] else
+                                                  const Spacer(),
+                                                const SizedBox(width: 8),
                                                 Text(
                                                   '${sr.createdAt.day}/${sr.createdAt.month}/${sr.createdAt.year}',
                                                   style: const TextStyle(fontSize: 11, color: AppColors.secondaryText),
@@ -1039,6 +1082,7 @@ class _SupportScreenState extends State<SupportScreen> {
                                           ],
                                         ),
                                       ),
+                                    ),
                                     ),
                                   );
                                 },

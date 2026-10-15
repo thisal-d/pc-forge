@@ -9,57 +9,13 @@ import json
 import os
 import random
 from typing import Dict, List, Optional, Any
+import urllib.parse
+import urllib.request
 from langchain_core.tools import tool
 
-order_planning_context_var: ContextVar[Dict[str, Any]] = ContextVar("order_planning_context_var", default={})
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
 
-DEFAULT_COUPONS: Dict[str, Dict[str, Any]] = {
-    "WELCOME5": {
-        "code": "WELCOME5",
-        "description": "5% Welcome Discount on your first PC build",
-        "discount_type": "PERCENTAGE",
-        "discount_value": 5.0,
-        "min_subtotal": 0.0,
-        "max_discount": 8000.0,
-        "is_active": True
-    },
-    "FORGE10": {
-        "code": "FORGE10",
-        "description": "10% PCForge Season Discount",
-        "discount_type": "PERCENTAGE",
-        "discount_value": 10.0,
-        "min_subtotal": 50000.0,
-        "max_discount": 50000.0,
-        "is_active": True
-    },
-    "GAMER2026": {
-        "code": "GAMER2026",
-        "description": "15% High-End Gaming Promotion",
-        "discount_type": "PERCENTAGE",
-        "discount_value": 15.0,
-        "min_subtotal": 100000.0,
-        "max_discount": 75000.0,
-        "is_active": True
-    },
-    "SLIITVIP": {
-        "code": "SLIITVIP",
-        "description": "20% SLIIT Academic Partner VIP Discount",
-        "discount_type": "PERCENTAGE",
-        "discount_value": 20.0,
-        "min_subtotal": 0.0,
-        "max_discount": 100000.0,
-        "is_active": True
-    },
-    "BUILDMASTER": {
-        "code": "BUILDMASTER",
-        "description": "Flat Rs. 15,000 Discount on High-End Custom Builds",
-        "discount_type": "FLAT",
-        "discount_value": 15000.0,
-        "min_subtotal": 300000.0,
-        "max_discount": 15000.0,
-        "is_active": True
-    }
-}
+order_planning_context_var: ContextVar[Dict[str, Any]] = ContextVar("order_planning_context_var", default={})
 
 
 def _format_currency(amount: float, currency: str = "LKR") -> str:
@@ -159,7 +115,7 @@ def apply_discount(
             "message": "No promo code provided."
         })
 
-    # Retrieve coupon details from request context or defaults
+    # Retrieve coupon details from request context or live backend API connected to PostgreSQL
     matched_coupon = None
     ctx = order_planning_context_var.get()
     ctx_coupons = ctx.get("coupons") if isinstance(ctx, dict) else None
@@ -169,8 +125,25 @@ def apply_discount(
                 matched_coupon = c
                 break
 
-    if not matched_coupon and code_clean in DEFAULT_COUPONS:
-        matched_coupon = DEFAULT_COUPONS[code_clean]
+    # If not in request-scoped context, validate against PostgreSQL via live backend API
+    if not matched_coupon:
+        try:
+            url = f"{BACKEND_URL.rstrip('/')}/api/coupons/validate/{urllib.parse.quote(code_clean)}"
+            req = urllib.request.Request(url, headers={"User-Agent": "PCForgeAi/1.0"})
+            with urllib.request.urlopen(req, timeout=3.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if isinstance(data, dict) and data.get("code"):
+                    matched_coupon = {
+                        "code": data.get("code"),
+                        "description": data.get("description", "Promotion applied"),
+                        "discount_type": data.get("discountType") or data.get("discount_type") or "PERCENTAGE",
+                        "discount_value": float(data.get("discountValue") or data.get("discount_value") or 0.0),
+                        "min_subtotal": float(data.get("minSubtotal") or data.get("min_subtotal") or 0.0),
+                        "max_discount": float(data.get("maxDiscount") or data.get("max_discount")) if (data.get("maxDiscount") or data.get("max_discount")) else None,
+                        "is_active": data.get("isActive", True)
+                    }
+        except Exception:
+            matched_coupon = None
 
     if not matched_coupon:
         return json.dumps({
@@ -284,8 +257,8 @@ def create_order_proposal(
     reservation_id: str,
     subtotal: float,
     discount_amount: float,
-    delivery_fee: float,
-    total_price: float,
+    delivery_fee: float = 0.0,
+    total_price: Optional[float] = None,
     promo_code: str = "",
     currency: str = "LKR",
     order_number: Optional[str] = None
@@ -294,10 +267,10 @@ def create_order_proposal(
     Matches UI 4 in PCForge Agentic Workflow specifications.
     Args:
         build_name: Name of the proposed PC build.
-        reservation_id: Valid 15-minute warehouse reservation hold ID from Member 02.
-        subtotal: Sum of component prices before discount and delivery.
+        reservation_id: Valid 15-minute warehouse reservation hold ID.
+        subtotal: Sum of component prices before discount.
         discount_amount: Deducted discount amount.
-        delivery_fee: Calculated delivery fee.
+        delivery_fee: Delivery fee (0.0 for build proposals; selected at checkout).
         total_price: Net total price to be proposed to customer.
         promo_code: Applied coupon code.
         currency: Store currency code ('LKR' or 'Rs.').
@@ -315,6 +288,9 @@ def create_order_proposal(
     prop_id = f"PROP-{ord_num.replace('-', '')}"
     disc_label = f"Discount ({promo_code.strip().upper()})" if promo_code else "Discount"
 
+    delivery_val = float(delivery_fee or 0.0)
+    calculated_total = float(total_price) if total_price is not None else max(0.0, float(subtotal) - float(discount_amount) + delivery_val)
+
     return json.dumps({
         "proposal_id": prop_id,
         "order_number": ord_num,
@@ -328,12 +304,12 @@ def create_order_proposal(
             "discount_code": promo_code or None,
             "discount_amount": float(discount_amount),
             "discount_label": disc_label,
-            "delivery_fee": float(delivery_fee),
-            "total_price": float(total_price),
+            "delivery_fee": delivery_val,
+            "total_price": calculated_total,
             "formatted_subtotal": _format_currency(subtotal, currency),
             "formatted_discount": f"- {_format_currency(discount_amount, currency)}" if discount_amount > 0 else _format_currency(0, currency),
-            "formatted_delivery": _format_currency(delivery_fee, currency),
-            "formatted_total": _format_currency(total_price, currency),
+            "formatted_delivery": _format_currency(delivery_val, currency) if delivery_val > 0 else "Rs. 0 (Calculated at checkout)",
+            "formatted_total": _format_currency(calculated_total, currency),
         },
         "technician_notice": "We'll notify you once a technician has checked your build — usually within a few hours."
     })

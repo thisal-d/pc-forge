@@ -25,7 +25,7 @@ class AiRmaServiceRequestModel {
     this.productId,
     required this.componentName,
     this.issueType = 'Hardware fault',
-    this.status = 'PENDING',
+    this.status = 'BOOKED',
     this.priority = 'Normal',
     this.description = '',
     this.attachmentUrl,
@@ -58,7 +58,7 @@ class AiRmaServiceRequestModel {
           json['issue_type']?.toString() ??
           json['issueType']?.toString() ??
           'General',
-      status: (json['status']?.toString() ?? 'PENDING').toUpperCase(),
+      status: (json['status']?.toString() ?? 'BOOKED').toUpperCase(),
       priority: json['priority']?.toString() ?? 'Normal',
       description: json['problem_description']?.toString() ??
           json['problemDescription']?.toString() ??

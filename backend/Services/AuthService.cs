@@ -50,12 +50,12 @@ public class AuthService : IAuthService
             };
         }
 
-        if (string.IsNullOrWhiteSpace(dto.LastName) || dto.LastName.Trim().Length < 2)
+        if (string.IsNullOrWhiteSpace(dto.LastName))
         {
             return new AuthResponseDto
             {
                 Success = false,
-                Message = "Last name must be at least 2 characters."
+                Message = "Last name is required."
             };
         }
 
@@ -66,7 +66,7 @@ public class AuthService : IAuthService
             return new AuthResponseDto
             {
                 Success = false,
-                Message = "A user with this email already exists."
+                Message = "An account with this email already exists."
             };
         }
 

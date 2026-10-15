@@ -19,17 +19,16 @@ from ai_service.guardrails import SYSTEM_SECURITY_RULES, sanitize_and_delimit, v
 from ai_service.agents.after_sales_agent.models import (
     AfterSalesChatRequest,
     AfterSalesChatResponse,
-    RmaTicketDetails,
     ServiceRequestDetails,
 )
 from ai_service.agents.after_sales_agent.tools import (
     AFTER_SALES_TOOLS,
     after_sales_context_var,
-    check_warranty,
     create_service_request,
+    get_available_time_slots,
     get_customer,
-    get_order,
-    get_order_products,
+    get_customer_service_requests,
+    get_service_request,
     search_troubleshooting_knowledge,
     update_service_appointment,
     validate_service_appointment,
@@ -39,7 +38,7 @@ TOOLS_BY_NAME = {t.name: t for t in AFTER_SALES_TOOLS}
 
 AFTER_SALES_SYSTEM_PROMPT = """\
 You are the PCForge AI After-Sales Service Agent, an empathetic and patient customer support representative.
-Your mission is to help customers who have issues with a PC or computer component purchased from PCForge.
+Your mission is to help customers who have issues with a PC or computer hardware.
 
 CORE PRINCIPLE:
 The customer is a regular person and does NOT have technical knowledge.
@@ -63,12 +62,17 @@ TWO MODES OF OPERATION:
   Stop troubleshooting immediately and transition to Service Request Mode.
 
 --- MODE 2: SERVICE REQUEST MODE ---
-- Collect the customer's preferred appointment date and time (Monday through Saturday, between 9:00 AM and 6:00 PM). Do not ask for an Order ID.
+- Collect the customer's appointment preference:
+  * Operating Days: Monday through Saturday (Closed on Sundays).
+  * Available Time Slots: ALWAYS use `get_available_time_slots` with the requested date to retrieve active slots and remaining capacity directly from the store database, and present the active slots to the customer.
+- Formulate a clear, concise Title (e.g. "PC won't boot into Windows" or "Display Artifacting") and problem Description based on the conversation so far.
+- Service requests are general service appointments. Do NOT ask for or require an Order ID, Order Number, Product ID, Product Name, serial number, or warranty proof.
+- Photos/images are not used in PCForge service requests. NEVER ask or instruct the customer to take, upload, or attach photos, images, or screenshots of the PC, components, or screens.
 - Never re-ask for details already provided by the customer.
-- Use your appointment validation tool to verify the date, working hours, and daily booking capacity.
-- Present a clear summary (Title, Description, Date, Time) and ask the customer to confirm before booking.
-- Once confirmed by the customer, create the Service Request.
-- If the customer wishes to reschedule an existing appointment, update the appointment without creating duplicates.
+- Use `validate_service_appointment` to verify date and slot availability.
+- Present a clear summary (Title, Description, Date, Time Slot) and ask the customer to confirm before booking.
+- Once confirmed by the customer, create the Service Request using `create_service_request`.
+- If the customer wishes to reschedule an existing appointment, use `update_service_appointment` without creating duplicates.
 
 STYLE & FORMATTING:
 - Write in a clean, natural conversational style.
@@ -84,16 +88,13 @@ class AfterSalesState(TypedDict):
     session_id: str
     problem_description: str
     problem_category: str
-    product_name: str
-    product_id: Optional[int]
-    order_id: Optional[int]
     troubleshooting_attempt: int
     attempted_steps: List[str]
     issue_resolved: bool
-    warranty_status: str
-    warranty_expiry_date: Optional[str]
     preferred_date: Optional[str]
     preferred_time: Optional[str]
+    slot_id: Optional[int]
+    slot_label: Optional[str]
     service_request_required: bool
     service_request_mode: bool
     service_request_data: Optional[Dict]
@@ -168,18 +169,20 @@ def agent_node(state: AfterSalesState) -> Dict:
         ctx = after_sales_context_var.get() if isinstance(after_sales_context_var.get(), dict) else {}
         known_date = state.get("preferred_date") or ctx.get("preferred_date")
         known_time = state.get("preferred_time") or ctx.get("preferred_time")
+        known_slot = state.get("slot_label") or ctx.get("slot_label")
 
         date_info = f"Already collected preferred date: {known_date}." if known_date else "Preferred date: not yet provided."
-        time_info = f"Already collected preferred time: {known_time}." if known_time else "Preferred time: not yet provided."
+        time_info = f"Already collected time slot: {known_slot or known_time}." if (known_slot or known_time) else "Time slot: not yet provided."
 
         directive = SystemMessage(
             content=(
                 f"[Service Request Mode is ACTIVE. Do not troubleshoot.\n"
                 f"- No Order ID is needed.\n"
+                f"- Standard Slots: Slot 1 (09:00 AM - 11:00 AM), Slot 2 (11:00 AM - 01:00 PM), Slot 3 (02:00 PM - 04:00 PM), Slot 4 (04:00 PM - 06:00 PM).\n"
                 f"- Current Appointment State: {date_info} | {time_info}\n"
-                f"- If date or time is missing, ask only for the missing detail.\n"
-                f"- When date and time are provided, validate the appointment, summarize the details, and ask for confirmation.\n"
-                f"- Once confirmed, book the service request.\n"
+                f"- If date or time slot is missing, ask only for the missing detail.\n"
+                f"- When date and time slot are provided, validate the appointment, summarize the details (Title, Description, Date, Slot), and ask for confirmation.\n"
+                f"- Once confirmed, book the service request using create_service_request.\n"
                 f"- Use clean plain text without markdown asterisks.]"
             )
         )
@@ -209,11 +212,10 @@ def tools_node(state: AfterSalesState) -> Dict:
     attempt_count = state.get("troubleshooting_attempt", 0)
     attempted_steps = list(state.get("attempted_steps", []))
     problem_cat = state.get("problem_category", "General")
-    warranty_st = state.get("warranty_status", "Active")
-    warranty_exp = state.get("warranty_expiry_date")
-    order_id = state.get("order_id")
     pref_date = state.get("preferred_date")
     pref_time = state.get("preferred_time")
+    pref_slot_id = state.get("slot_id")
+    pref_slot_label = state.get("slot_label")
     sr_required = state.get("service_request_required", False)
 
     tool_messages = []
@@ -236,36 +238,47 @@ def tools_node(state: AfterSalesState) -> Dict:
                         problem_cat = parsed.get("matched_category", problem_cat)
                         if parsed.get("is_safety_hazard"):
                             sr_required = True
-                    elif t_name == "check_warranty":
-                        warranty_st = parsed.get("warranty_status", warranty_st)
-                        warranty_exp = parsed.get("warranty_expiry_date", warranty_exp)
-                        if parsed.get("order_id"):
-                            order_id = parsed.get("order_id")
                     elif t_name == "validate_service_appointment":
                         if parsed.get("valid") is True:
                             pref_date = parsed.get("date") or pref_date
                             pref_time = parsed.get("time") or pref_time
+                            pref_slot_id = parsed.get("slot_id") or pref_slot_id
+                            pref_slot_label = parsed.get("slot_label") or pref_slot_label
                         elif parsed.get("missing") == "time":
                             pref_date = parsed.get("date") or pref_date
                         elif parsed.get("missing") == "date":
                             pref_time = parsed.get("time") or pref_time
+                            pref_slot_id = parsed.get("slot_id") or pref_slot_id
+                            pref_slot_label = parsed.get("slot_label") or pref_slot_label
                         ctx = after_sales_context_var.get()
                         if isinstance(ctx, dict):
                             if pref_date:
                                 ctx["preferred_date"] = pref_date
                             if pref_time:
                                 ctx["preferred_time"] = pref_time
+                            if pref_slot_id:
+                                ctx["slot_id"] = pref_slot_id
+                            if pref_slot_label:
+                                ctx["slot_label"] = pref_slot_label
                     elif t_name == "update_service_appointment":
                         pref_date = parsed.get("preferred_date", pref_date)
                         pref_time = parsed.get("preferred_time", pref_time)
+                        pref_slot_id = parsed.get("slot_id", pref_slot_id)
+                        pref_slot_label = parsed.get("slot_label", pref_slot_label)
                         if sr_data:
                             sr_data["preferred_date"] = pref_date
                             sr_data["preferred_time"] = pref_time
+                            sr_data["slot_id"] = pref_slot_id
+                            sr_data["slot_label"] = pref_slot_label
                         else:
                             sr_data = parsed
-                    elif t_name in ("create_service_request", "create_rma_ticket"):
+                    elif t_name == "create_service_request":
                         sr_data = parsed
                         sr_required = True
+                        if parsed.get("slot_id"):
+                            pref_slot_id = parsed.get("slot_id")
+                        if parsed.get("slot_label"):
+                            pref_slot_label = parsed.get("slot_label")
                 except Exception:
                     pass
             except Exception as ex:
@@ -289,11 +302,10 @@ def tools_node(state: AfterSalesState) -> Dict:
         "troubleshooting_attempt": attempt_count,
         "attempted_steps": attempted_steps,
         "problem_category": problem_cat,
-        "warranty_status": warranty_st,
-        "warranty_expiry_date": warranty_exp,
-        "order_id": order_id,
         "preferred_date": pref_date,
         "preferred_time": pref_time,
+        "slot_id": pref_slot_id,
+        "slot_label": pref_slot_label,
         "service_request_required": sr_required,
         "service_request_mode": sr_mode or (sr_data is not None)
     }
@@ -344,7 +356,8 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
     after_sales_context_var.set({
         "customer": request.customer,
         "orders": request.orders,
-        "service_requests": request.service_requests
+        "service_requests": request.service_requests,
+        "time_slots": request.time_slots,
     })
     session_id = request.session_id or f"after_sales_{request.user_id}"
     config = {"configurable": {"thread_id": session_id}}
@@ -383,11 +396,15 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
     prev_sr_mode = False
     prev_pref_date = None
     prev_pref_time = None
+    prev_slot_id = None
+    prev_slot_label = None
     if state_history and state_history.get("channel_values"):
         vals = state_history.get("channel_values", {})
         prev_sr_mode = vals.get("service_request_mode", False)
         prev_pref_date = vals.get("preferred_date")
         prev_pref_time = vals.get("preferred_time")
+        prev_slot_id = vals.get("slot_id")
+        prev_slot_label = vals.get("slot_label")
 
     is_sr_mode = prev_sr_mode or user_requested_sr
 
@@ -395,8 +412,11 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
         "customer": request.customer,
         "orders": request.orders,
         "service_requests": request.service_requests,
+        "time_slots": request.time_slots,
         "preferred_date": prev_pref_date,
-        "preferred_time": prev_pref_time
+        "preferred_time": prev_pref_time,
+        "slot_id": prev_slot_id,
+        "slot_label": prev_slot_label
     })
 
     # Delimit untrusted input & neutralize delimiter breakouts
@@ -410,6 +430,8 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
         "order_id": None,
         "preferred_date": prev_pref_date,
         "preferred_time": prev_pref_time,
+        "slot_id": prev_slot_id,
+        "slot_label": prev_slot_label,
         "service_request_mode": is_sr_mode,
         "iteration_count": 0
     }
@@ -460,7 +482,15 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
                 except Exception:
                     pass
 
-        # Step count and attempted steps tracking from reply
+        # Step count and attempted steps tracking from user message and agent reply
+        user_step_match = re.search(r'\b(?:step|part)\s*(\d+)\b', user_msg_clean, re.IGNORECASE)
+        if user_step_match:
+            u_step = int(user_step_match.group(1))
+            attempt_count = max(attempt_count, u_step)
+            u_desc = f"Step {u_step}"
+            if u_desc not in attempted_steps:
+                attempted_steps.append(u_desc)
+
         step_match = re.search(r'\b(?:step|part)\s*(\d+)\b', reply_text, re.IGNORECASE)
         if step_match:
             step_num = int(step_match.group(1))
@@ -468,6 +498,18 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
             step_desc = f"Step {step_num}"
             if step_desc not in attempted_steps:
                 attempted_steps.append(step_desc)
+
+        # Detect completion of 5 steps or customer saying step 5
+        if (
+            attempt_count >= 5
+            or re.search(r'\b(?:five|5)\s*(?:troubleshooting\s*)?steps?\b', user_msg_clean, re.IGNORECASE)
+            or re.search(r'\bstep\s*5\b', user_msg_clean, re.IGNORECASE)
+            or re.search(r'\ball\s*five\s*steps\b', reply_text, re.IGNORECASE)
+            or re.search(r'\ball\s*5\s*steps\b', reply_text, re.IGNORECASE)
+        ):
+            attempt_count = max(attempt_count, 5)
+            is_sr_mode = True
+            sr_required = True
         elif "service request" in reply_text.lower() and "technician" in reply_text.lower():
             is_sr_mode = True
 
@@ -483,48 +525,32 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
 
         # Build ServiceRequestDetails if Service Request was created
         sr_model = None
-        rma_legacy_model = None
 
-        if sr_raw and (sr_raw.get("service_request_number") or sr_raw.get("service_request_id") or sr_raw.get("ticket_id")):
-            num_id = sr_raw.get("service_request_id") or sr_raw.get("ticket_id") or 108
-            sr_num = sr_raw.get("service_request_number") or sr_raw.get("rma_number") or f"SR-{num_id:06d}"
+        if sr_raw and (sr_raw.get("service_request_number") or sr_raw.get("service_request_id")):
+            num_id = sr_raw.get("service_request_id") or 108
+            sr_num = sr_raw.get("service_request_number") or f"SR-{num_id:06d}"
+            raw_act = str(sr_raw.get("action") or "create").lower()
+            action_type = "update" if ("update" in raw_act or "reschedule" in raw_act) else "create"
 
             sr_model = ServiceRequestDetails(
+                action=action_type,
                 id=num_id,
                 service_request_id=num_id,
                 service_request_number=sr_num,
                 user_id=request.user_id,
-                order_id=None,
-                order_number=None,
-                product_id=sr_raw.get("product_id") or 8,
-                product_name=sr_raw.get("product_name") or sr_raw.get("component") or "Hardware Component",
-                title=sr_raw.get("title") or (f"Service - {sr_raw.get('product_name')}" if sr_raw.get("product_name") else f"Service: {problem_category}"),
+                title=sr_raw.get("title") or f"Service: {problem_category}",
                 description=sr_raw.get("description") or sr_raw.get("problem_description") or user_msg_clean,
                 problem_description=sr_raw.get("problem_description") or user_msg_clean,
                 problem_category=problem_category,
                 troubleshooting_summary=sr_raw.get("troubleshooting_summary") or f"Troubleshooting completed ({attempt_count} attempts).",
                 attempt_count=attempt_count or 1,
-                warranty_status=sr_raw.get("warranty_status", "Active"),
-                warranty_expiry_date=sr_raw.get("warranty_expiry_date", "Aug 2028"),
                 preferred_date=sr_raw.get("preferred_date"),
                 preferred_time=sr_raw.get("preferred_time") or "10:00 AM",
-                status=sr_raw.get("status", "PENDING"),
+                slot_id=sr_raw.get("slot_id"),
+                slot_label=sr_raw.get("slot_label") or sr_raw.get("preferred_time"),
+                status=sr_raw.get("status", "BOOKED"),
                 priority=sr_raw.get("priority", "Normal"),
                 created_at=datetime.now(timezone.utc).isoformat()
-            )
-
-            rma_legacy_model = RmaTicketDetails(
-                ticket_id=num_id,
-                rma_number=sr_num,
-                order_id=None,
-                order_number=None,
-                product_id=sr_model.product_id,
-                component_name=sr_model.product_name,
-                issue_type=problem_category,
-                status=sr_model.status,
-                priority=sr_model.priority,
-                description=user_msg_clean,
-                created_at=sr_model.created_at
             )
             sr_required = True
             is_sr_mode = True
@@ -535,19 +561,20 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
                 reply_text = (
                     "Understood. We will stop troubleshooting here and set up a Service Request "
                     "for our technicians to inspect your system in person.\n\n"
-                    "What date and time would you prefer for the service appointment? "
+                    "What date and time slot would you prefer for the service appointment? "
                     "Our service center is open Monday through Saturday between 9:00 AM and 6:00 PM."
                 )
 
         # Suggest Service Request after 5 unsuccessful troubleshooting attempts
-        if attempt_count >= 5 and not is_resolved and not is_sr_mode and not sr_model:
+        if attempt_count >= 5 and not is_resolved and not sr_model:
             is_sr_mode = True
-            if "service request" not in reply_text.lower() or "suggest" not in reply_text.lower():
+            sr_required = True
+            if "service request" not in reply_text.lower():
                 reply_text += (
                     "\n\nWe have completed 5 troubleshooting steps and your PC issue is not resolved. "
                     "I suggest creating a Service Request so one of our service center technicians can inspect and repair your PC in person.\n\n"
-                    "What date and time would you prefer for the appointment? "
-                    "Our service center is open Monday through Saturday between 9:00 AM and 6:00 PM."
+                    "What date and time slot would you prefer for the appointment? "
+                    "Our service center is open Monday through Saturday with slots between 9:00 AM and 6:00 PM."
                 )
 
         # While chatting during troubleshooting, prompt user to create a service request and stop chatting
@@ -571,6 +598,8 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
         ctx = after_sales_context_var.get() if isinstance(after_sales_context_var.get(), dict) else {}
         final_pref_date = final_state.get("preferred_date") or ctx.get("preferred_date") or prev_pref_date
         final_pref_time = final_state.get("preferred_time") or ctx.get("preferred_time") or prev_pref_time
+        final_slot_id = final_state.get("slot_id") or ctx.get("slot_id") or prev_slot_id
+        final_slot_label = final_state.get("slot_label") or ctx.get("slot_label") or prev_slot_label
 
         try:
             AFTER_SALES_GRAPH.update_state(
@@ -581,6 +610,8 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
                     "problem_category": problem_category,
                     "preferred_date": final_pref_date,
                     "preferred_time": final_pref_time,
+                    "slot_id": final_slot_id,
+                    "slot_label": final_slot_label,
                     "service_request_required": sr_required or is_sr_mode,
                     "service_request_mode": is_sr_mode
                 }
@@ -603,7 +634,6 @@ def run_after_sales_chat(request: AfterSalesChatRequest) -> AfterSalesChatRespon
             service_request_required=sr_required or is_sr_mode,
             service_request_mode=is_sr_mode,
             service_request=sr_model,
-            ticket=rma_legacy_model,
             agent_trace=trace
         )
 

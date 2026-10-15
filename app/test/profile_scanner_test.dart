@@ -144,13 +144,11 @@ void main() {
 
       expect(find.text('In-Store Scanner (Device Feature)'), findsOneWidget);
       expect(find.text('Align component barcode / QR inside the frame'), findsOneWidget);
-      expect(find.text('Simulate Barcode Scan (Tap any component):'), findsOneWidget);
+      expect(find.text('QR & Barcode Lookup'), findsOneWidget);
 
-      // Tap a preset hardware barcode chip (RTX 4070 Ti)
-      final rtxChip = find.textContaining('RTX 4070 Ti');
-      expect(rtxChip, findsOneWidget);
-
-      await tester.tap(rtxChip);
+      // Enter hardware barcode / QR code payload into scanner input
+      await tester.enterText(find.byType(TextField), 'BAR-GPU-4070');
+      await tester.tap(find.byKey(const Key('scan_lookup_btn')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
 

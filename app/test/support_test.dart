@@ -22,6 +22,7 @@ class MockSupportApiService extends ApiService {
     String warrantyStatus = 'Active',
     String? preferredDate,
     String? preferredTime,
+    int? slotId,
     String priority = 'Normal',
     String? attachmentUrl,
     String? token,
@@ -295,7 +296,7 @@ void main() {
       expect(find.text('Submit Service Request'), findsWidgets);
       expect(find.text('Title (Optional)'), findsOneWidget);
       expect(find.text('Description (Optional)'), findsOneWidget);
-      expect(find.text('Preferred Appointment (Optional)'), findsOneWidget);
+      expect(find.text('Appointment Date & Time'), findsOneWidget);
     });
 
     testWidgets('SupportScreen renders New Service Request manual action button', (tester) async {

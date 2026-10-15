@@ -16,6 +16,7 @@ vi.mock("../api/axiosInstance", () => ({
 }));
 
 import api from "../api/axiosInstance";
+import { authService } from "../services/authService.js";
 import { productService } from "../services/productService.js";
 import { buildReviewService } from "../services/buildReviewService.js";
 import { orderService } from "../services/orderService.js";
@@ -39,6 +40,15 @@ describe("Auth – login()", () => {
     await expect(
       api.post("/auth/login", { email: "x", password: "wrong" })
     ).rejects.toMatchObject({ response: { status: 401 } });
+  });
+
+  it("fails login if Customer credentials are entered on web", async () => {
+    api.post.mockResolvedValueOnce({
+      data: { token: "jwt-cust-123", role: "Customer", email: "customer@pcforge.com" },
+    });
+    await expect(
+      authService.login("customer@pcforge.com", "Cust123!")
+    ).rejects.toThrow(/Customer accounts are not permitted to log into the Web Portal/i);
   });
 });
 

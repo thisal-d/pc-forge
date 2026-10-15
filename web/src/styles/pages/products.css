@@ -147,3 +147,60 @@
   color: #d97706;
   border: 1px solid #fde68a;
 }
+
+/* Product Table Sizing & Actions Overflow Fix */
+#products-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#products-table th,
+#products-table td {
+  padding: 0.75rem 0.65rem;
+  vertical-align: middle;
+}
+
+#products-table th:last-child,
+#products-table td:last-child {
+  padding-right: 1.25rem;
+  text-align: right;
+  white-space: nowrap;
+  width: 320px;
+  min-width: 320px;
+}
+
+.product-actions-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.product-actions-group button,
+.product-actions-group .btn,
+.product-actions-group .btn-outline-sm,
+.product-actions-group .btn-warning-sm,
+.product-actions-group .btn-success-sm,
+.product-actions-group .btn-danger-sm {
+  padding: 0.28rem 0.52rem !important;
+  font-size: 0.775rem !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius-sm, 6px) !important;
+  white-space: nowrap !important;
+  line-height: 1.25 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.25rem !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  transition: all 0.15s ease !important;
+}
+
+.product-actions-group button:hover,
+.product-actions-group .btn:hover {
+  transform: translateY(-1px);
+}
+
+

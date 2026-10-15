@@ -55,6 +55,41 @@ class PromoBanner extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // PCForge Official Logo Brand Tag
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.25),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Image.asset(
+                                  'assets/images/logo.png',
+                                  width: 13,
+                                  height: 13,
+                                  fit: BoxFit.contain,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'PCFORGE OFFICIAL',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.95),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                           const Text(
                             'Build Better.\nPlay Further.',
                             style: TextStyle(
@@ -92,7 +127,7 @@ class PromoBanner extends StatelessWidget {
 
                     const SizedBox(width: 8),
 
-                    // Right Gaming PC Rig Graphic
+                    // Right Custom Generated Gaming PC Rig Graphic (Local Asset)
                     Expanded(
                       flex: 4,
                       child: Container(
@@ -109,32 +144,9 @@ class PromoBanner extends StatelessWidget {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            Image.network(
-                              'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=400&auto=format&fit=crop&q=80',
+                            Image.asset(
+                              'assets/images/build_better_rig.jpg',
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: Colors.blue.shade900.withValues(alpha: 0.4),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.developer_board,
-                                    color: Colors.white,
-                                    size: 40,
-                                  ),
-                                ),
-                              ),
-                              loadingBuilder: (context, child, progress) {
-                                if (progress == null) return child;
-                                return const Center(
-                                  child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                );
-                              },
                             ),
                             // RGB Neon Gradient Overlay
                             Container(
@@ -156,16 +168,25 @@ class PromoBanner extends StatelessWidget {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.6),
+                                  color: Colors.black.withValues(alpha: 0.65),
                                   borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    width: 0.5,
+                                  ),
                                 ),
-                                child: const Row(
+                                child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.bolt, color: Colors.amber, size: 12),
-                                    SizedBox(width: 4),
-                                    Text(
+                                    Image.asset(
+                                      'assets/images/logo.png',
+                                      width: 11,
+                                      height: 11,
+                                      fit: BoxFit.contain,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Text(
                                       'RGB RIGS',
                                       style: TextStyle(
                                         color: Colors.white,

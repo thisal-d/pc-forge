@@ -29,10 +29,16 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
+            var firstError = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .FirstOrDefault(msg => !string.IsNullOrWhiteSpace(msg))
+                ?? "Invalid registration data provided.";
+
             return BadRequest(new AuthResponseDto
             {
                 Success = false,
-                Message = "Invalid registration data provided."
+                Message = firstError
             });
         }
 
@@ -52,7 +58,7 @@ public class AuthController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new AuthResponseDto
             {
                 Success = false,
-                Message = $"Server error during registration: {ex.Message}"
+                Message = "Something went wrong. Please try again later."
             });
         }
     }
