@@ -132,6 +132,8 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
       formattedTotal: _proposal.pricing.formattedTotal,
       shippingAddress: 'Colombo, Western Province',
       components: _proposal.components,
+      promoCode: _proposal.pricing.discountCode,
+      discountAmount: _proposal.pricing.discountAmount,
     );
 
     if (!mounted) return;
@@ -327,14 +329,15 @@ class _AiOrderProposalScreenState extends State<AiOrderProposalScreen> {
             isBold: false,
             valueColor: const Color(0xFF10B981), // Green for discount deduction
           ),
-          const SizedBox(height: 14),
-
-          // Row 3: Delivery
-          _buildSummaryRow(
-            label: 'Delivery',
-            value: pricing.formattedDelivery,
-            isBold: false,
-          ),
+          if (pricing.deliveryFee > 0) ...[
+            const SizedBox(height: 14),
+            // Row 3: Delivery
+            _buildSummaryRow(
+              label: 'Delivery',
+              value: pricing.formattedDelivery,
+              isBold: false,
+            ),
+          ],
 
           const SizedBox(height: 16),
           const Divider(color: Color(0xFF0F172A), thickness: 1.5, height: 1),

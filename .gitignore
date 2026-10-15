@@ -19,6 +19,7 @@ yarn-error.log*
 **/build/
 contributions.md
 **/.flutter-plugins
+your-part
 **/.flutter-plugins-dependencies
 **/.pub-cache/
 **/.pub/
@@ -62,4 +63,4 @@ pubspec.lock
 !backend/Data/
 readme-test.md
 .env.deploy
-test-member/
+test-member/

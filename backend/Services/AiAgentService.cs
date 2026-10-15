@@ -145,7 +145,8 @@ public class AiAgentService : IAiAgentService
                         Socket = p.Socket,
                         MemoryType = p.MemoryType,
                         PowerWattage = p.PowerWattage,
-                        FormFactor = p.FormFactor
+                        FormFactor = p.FormFactor,
+                        StockQuantity = p.StockQuantity
                     }).ToList();
                 }
                 finally
@@ -207,7 +208,8 @@ public class AiAgentService : IAiAgentService
                         Socket = p.Socket,
                         MemoryType = p.MemoryType,
                         PowerWattage = p.PowerWattage,
-                        FormFactor = p.FormFactor
+                        FormFactor = p.FormFactor,
+                        StockQuantity = p.StockQuantity
                     }).ToList();
                 }
                 finally

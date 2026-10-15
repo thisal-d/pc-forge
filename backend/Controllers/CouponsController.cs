@@ -56,7 +56,18 @@ public class CouponsController : ControllerBase
 
         var coupons = await query
             .OrderByDescending(c => c.CreatedAt)
-            .Select(c => MapToDto(c))
+            .Select(c => new CouponDto
+            {
+                CouponId = c.CouponId,
+                Code = c.Code,
+                Description = c.Description,
+                DiscountType = c.DiscountType,
+                DiscountValue = c.DiscountValue,
+                MinSubtotal = c.MinSubtotal,
+                MaxDiscount = c.MaxDiscount,
+                IsActive = c.IsActive,
+                CreatedAt = c.CreatedAt
+            })
             .ToListAsync();
 
         return Ok(coupons);

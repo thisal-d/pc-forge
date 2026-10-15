@@ -541,7 +541,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
           if (sr.preferredDate != null) ...[
             _buildServiceRequestRow(
               label: 'Preferred Appointment',
-              value: '${sr.preferredDate} at ${sr.preferredTime ?? "10:00 AM"}',
+              value: '${_formatDisplayDate(sr.preferredDate)} at ${sr.preferredTime ?? "10:00 AM"}',
               isBold: true,
             ),
             const SizedBox(height: 8),
@@ -714,7 +714,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
           if (sr.preferredDate != null) ...[
             _buildServiceRequestRow(
               label: 'Appointment',
-              value: '${sr.preferredDate} (${sr.preferredTime ?? "10:00 AM"})',
+              value: '${_formatDisplayDate(sr.preferredDate)} (${sr.preferredTime ?? "10:00 AM"})',
               isBold: true,
             ),
             const SizedBox(height: 8),
@@ -1027,6 +1027,20 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
     );
   }
 
+  String _formatDisplayDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return '';
+    try {
+      final parsed = DateTime.tryParse(raw);
+      if (parsed != null) {
+        return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
+      }
+    } catch (_) {}
+    if (raw.contains('T')) {
+      return raw.split('T')[0];
+    }
+    return raw;
+  }
+
   Widget _buildServiceRequestRow({
     required String label,
     required String value,
@@ -1035,17 +1049,22 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
   }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           style: const TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: valueColor ?? const Color(0xFF0F172A),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
+              color: valueColor ?? const Color(0xFF0F172A),
+            ),
           ),
         ),
       ],

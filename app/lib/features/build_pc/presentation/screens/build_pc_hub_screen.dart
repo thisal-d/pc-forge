@@ -250,7 +250,7 @@ class _BuildPcHubScreenState extends State<BuildPcHubScreen> {
             const SizedBox(height: 8),
 
             const Text(
-              'Autonomous multi-agent system analyzing thermal headroom, bottleneck margins, and pricing arbitrage for your dream rig.',
+              'Collaborative multi-agent system that discovers requirements, verifies socket and TDP compatibility, and reserves live inventory in real time.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13.5,
@@ -260,29 +260,37 @@ class _BuildPcHubScreenState extends State<BuildPcHubScreen> {
             ),
             const SizedBox(height: 24),
 
-            // AI Subsystems Preview Grid
+            // AI Subsystems Preview Grid (Real PCForge Multi-Agent Pipeline)
             _buildAgentPreviewCard(
-              icon: Icons.thermostat_rounded,
+              icon: Icons.chat_bubble_outline_rounded,
+              color: const Color(0xFF8B5CF6),
+              agentName: 'Requirement Discovery Agent',
+              description:
+                  'Multi-turn conversational AI that gathers your workload needs, target resolution, and budget limits.',
+            ),
+            const SizedBox(height: 10),
+            _buildAgentPreviewCard(
+              icon: Icons.memory_rounded,
               color: const Color(0xFF06B6D4),
-              agentName: 'Thermal & Clearance Agent',
+              agentName: 'Build & Compatibility Agent',
               description:
-                  'Calculates radiator clearances and ensures GPU length fits within chassis dimensions.',
+                  'Validates CPU socket, RAM DDR generation, and total TDP power budget across available components.',
             ),
             const SizedBox(height: 10),
             _buildAgentPreviewCard(
-              icon: Icons.speed_rounded,
+              icon: Icons.inventory_2_outlined,
               color: const Color(0xFF10B981),
-              agentName: 'Bottleneck & TDP Auditor',
+              agentName: 'Inventory Intelligence Agent',
               description:
-                  'Balances CPU single-core performance with GPU compute power to prevent gaming stutters.',
+                  'Audits live warehouse stock in real time and places a 15-minute temporary reservation hold.',
             ),
             const SizedBox(height: 10),
             _buildAgentPreviewCard(
-              icon: Icons.price_check_rounded,
+              icon: Icons.local_shipping_outlined,
               color: const Color(0xFFF59E0B),
-              agentName: 'Budget Arbitrage Agent',
+              agentName: 'Order Planning & Logistics Agent',
               description:
-                  'Maximizes performance-per-rupee against current inventory stock in real time.',
+                  'Calculates final pricing, applies coupon discounts, and estimates technician build lead times.',
             ),
 
             const SizedBox(height: 28),

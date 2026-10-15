@@ -15,6 +15,7 @@ from ai_service.agents.inventory_agent.tools import (
     get_stock_level,
     find_compatible_substitute,
     reserve_stock,
+    inventory_context_var,
 )
 from ai_service.agents.inventory_agent.agent import verify_build_inventory
 
@@ -35,6 +36,11 @@ def test_inventory_tools_manifest():
 
 def test_get_stock_level_tool():
     """Validates querying stock for a component from live database."""
+    inventory_context_var.set({
+        "catalog": [
+            {"product_id": 1, "name": "AMD Ryzen 5 7600X", "category": "CPU", "price": 69000.0, "stock_quantity": 8}
+        ]
+    })
     # Product 1 is AMD Ryzen 5 7600X
     result_str = get_stock_level.invoke({"product_id": 1})
     data = json.loads(result_str)
@@ -50,6 +56,11 @@ def test_get_stock_level_tool():
 
 def test_find_compatible_substitute_tool():
     """Validates finding an in-stock substitute within the same category."""
+    inventory_context_var.set({
+        "catalog": [
+            {"product_id": 3, "name": "AMD Ryzen 7 7700X", "category": "CPU", "socket": "AM5", "price": 95000.0, "stock_quantity": 5}
+        ]
+    })
     result_str = find_compatible_substitute.invoke({
         "category": "CPU",
         "failed_product_id": 99999,
@@ -59,10 +70,10 @@ def test_find_compatible_substitute_tool():
     candidates = json.loads(result_str)
 
     assert isinstance(candidates, list)
-    if len(candidates) > 0:
-        assert candidates[0]["stock_quantity"] > 0
-        assert candidates[0]["category"] == "CPU"
-        assert "product_id" in candidates[0]
+    assert len(candidates) > 0
+    assert candidates[0]["stock_quantity"] > 0
+    assert candidates[0]["category"] == "CPU"
+    assert "product_id" in candidates[0]
 
 
 def test_reserve_stock_tool():

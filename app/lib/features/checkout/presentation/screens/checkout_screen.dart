@@ -4,6 +4,7 @@ import '../../../../core/auth_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../cart/data/cart_service.dart';
 import '../../../orders/data/order_service.dart';
+import '../../data/user_contact_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -26,16 +27,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _selectedPaymentMethod = 'Cash on Delivery';
   bool _isProcessing = false;
 
-  bool get _isCodEligible => _cartService.totalAmount <= 100000;
+  bool get _isCodEligible => _cartService.calculateTotal(isPickup: false) <= 100000;
 
   @override
   void initState() {
     super.initState();
     final user = AuthSession.instance.currentUser;
-    _nameController.text = user?.displayName ?? 'Alex Doe';
-    _phoneController.text = '0771234567';
-    _addressController.text = 'No. 45, Flower Road';
-    _cityController.text = 'Colombo 07';
+    final userId = user?.userId ?? 0;
+
+    // Check if legitimate saved contact exists for THIS authenticated user
+    final saved = (userId > 0)
+        ? UserContactService.instance.getSavedContact(userId)
+        : null;
+
+    if (saved != null) {
+      _nameController.text = saved.recipientName;
+      _phoneController.text = saved.phoneNumber;
+      _addressController.text = saved.address;
+      _cityController.text = saved.city;
+    } else {
+      // Leave empty for new user without saved contact; prefill name ONLY if genuine profile name exists
+      final genuineName = (user != null &&
+              ((user.firstName?.trim().isNotEmpty ?? false) ||
+                  (user.lastName?.trim().isNotEmpty ?? false)))
+          ? '${user.firstName ?? ''} ${user.lastName ?? ''}'.trim()
+          : '';
+      _nameController.text = genuineName;
+      _phoneController.text = '';
+      _addressController.text = '';
+      _cityController.text = '';
+    }
 
     // If order total <= 100,000, default to COD.
     // If order total > 100,000, COD is not available, default to In-Store Pickup & Payment.
@@ -79,13 +100,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       final user = AuthSession.instance.currentUser;
+      final userId = user?.userId ?? 1;
+
+      final isPickup = _selectedPaymentMethod == 'In-Store Pickup & Payment';
+      final totalToCharge = _cartService.calculateTotal(isPickup: isPickup);
+
       final order = await _orderService.placeOrder(
-        userId: user?.userId ?? 1,
+        userId: userId,
         shippingAddress: shippingAddress,
         paymentMethod: _selectedPaymentMethod,
         cartItems: _cartService.items,
-        totalAmount: _cartService.totalAmount,
+        totalAmount: totalToCharge,
+        couponCode: _cartService.couponCode,
+        discountAmount: _cartService.discountAmount,
       );
+
+      // Save legitimate contact details for this authenticated user
+      if (userId > 0) {
+        UserContactService.instance.saveContact(
+          userId,
+          UserShippingContact(
+            recipientName: _nameController.text.trim(),
+            phoneNumber: _phoneController.text.trim(),
+            address: _addressController.text.trim(),
+            city: _cityController.text.trim(),
+          ),
+        );
+      }
 
       if (!mounted) return;
 
@@ -231,8 +272,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   : _currentStep == 1
                                       ? 'Review Order'
                                       : _selectedPaymentMethod == 'Cash on Delivery'
-                                          ? 'Place COD Order — LKR ${_cartService.totalAmount.toStringAsFixed(2)}'
-                                          : 'Reserve for Store Pickup — LKR ${_cartService.totalAmount.toStringAsFixed(2)}',
+                                          ? 'Place COD Order — LKR ${_cartService.calculateTotal(isPickup: false).toStringAsFixed(2)}'
+                                          : 'Reserve for Store Pickup — LKR ${_cartService.calculateTotal(isPickup: true).toStringAsFixed(2)}',
                               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                             ),
                     ),
@@ -367,7 +408,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             labelText: 'Recipient Name *',
             prefixIcon: Icon(Icons.person_outline),
           ),
-          validator: (v) => v == null || v.trim().isEmpty ? 'Enter recipient name' : null,
+          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter recipient name' : null,
         ),
         const SizedBox(height: 12),
 
@@ -379,7 +420,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             labelText: 'Phone Number (for verification) *',
             prefixIcon: Icon(Icons.phone_outlined),
           ),
-          validator: (v) => v == null || v.trim().isEmpty ? 'Enter phone number' : null,
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) {
+              return 'Please enter phone number';
+            }
+            final digits = v.replaceAll(RegExp(r'\D'), '');
+            if (digits.length < 9 || digits.length > 15) {
+              return 'Please enter a valid phone number (9-15 digits)';
+            }
+            return null;
+          },
         ),
         const SizedBox(height: 12),
 
@@ -390,7 +440,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             labelText: isCod ? 'Street Address *' : 'Contact / Billing Address *',
             prefixIcon: const Icon(Icons.home_outlined),
           ),
-          validator: (v) => v == null || v.trim().isEmpty ? 'Enter address' : null,
+          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter delivery address' : null,
         ),
         const SizedBox(height: 12),
 
@@ -401,14 +451,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             labelText: 'City / Postal Code *',
             prefixIcon: Icon(Icons.location_city_outlined),
           ),
-          validator: (v) => v == null || v.trim().isEmpty ? 'Enter city' : null,
+          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter city' : null,
         ),
       ],
     );
   }
 
   Widget _buildPaymentStep() {
-    final total = _cartService.totalAmount;
+    final total = _cartService.calculateTotal(isPickup: _selectedPaymentMethod == 'In-Store Pickup & Payment');
     final isCod = _isCodEligible;
 
     return Column(
@@ -801,6 +851,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Text('LKR ${_cartService.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w600)),
                 ],
               ),
+              if (_cartService.discountAmount > 0) ...[
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _cartService.couponCode != null && _cartService.couponCode!.isNotEmpty
+                          ? 'Discount (${_cartService.couponCode}):'
+                          : 'Discount:',
+                      style: const TextStyle(color: Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      '- LKR ${_cartService.discountAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF10B981)),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 6),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -825,7 +893,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 children: [
                   const Text('Order Total:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   Text(
-                    'LKR ${_cartService.totalAmount.toStringAsFixed(2)}',
+                    'LKR ${_cartService.calculateTotal(isPickup: _selectedPaymentMethod == "In-Store Pickup & Payment").toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,

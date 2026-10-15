@@ -119,7 +119,7 @@ CREATE TABLE Filters (
 );
 
 -- 4c. MASTER FILTER OPTIONS TABLE
-CREATE TABLE MasterFilterOptions (
+CREATE TABLE master_filter_options (
     OptionId SERIAL PRIMARY KEY,
     FilterId INT REFERENCES Filters(FilterId) ON DELETE CASCADE,
     OptionValue VARCHAR(100) NOT NULL,
@@ -127,6 +127,9 @@ CREATE TABLE MasterFilterOptions (
 
     CONSTRAINT UQ_MasterFilter_OptionValue UNIQUE(FilterId, OptionValue)
 );
+
+CREATE OR REPLACE VIEW MasterFilterOptions AS SELECT * FROM master_filter_options;
+
 
 -- 5. CATEGORY FILTERS TABLE
 -- Defines which filter types belong to which category (e.g. Motherboard -> Chipset, Socket)
@@ -353,3 +356,44 @@ CREATE TABLE CustomBuildItems (
 
 CREATE INDEX idx_custombuilditems_build ON CustomBuildItems(BuildId);
 CREATE INDEX idx_custombuilditems_product ON CustomBuildItems(ProductId);
+
+
+-- ============================================================================
+-- 14. STORE PROMOTIONAL COUPONS
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS coupons (
+    couponid SERIAL PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    discounttype VARCHAR(20) NOT NULL DEFAULT 'PERCENTAGE',
+    discountvalue DECIMAL(10, 2) NOT NULL,
+    minsubtotal DECIMAL(12, 2) DEFAULT 0,
+    maxdiscount DECIMAL(12, 2) NULL,
+    isactive BOOLEAN DEFAULT TRUE,
+    createdat TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code);
+
+
+-- ============================================================================
+-- 15. AI REQUIREMENT GATHERING SESSIONS
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS requirement_sessions (
+    sessionid VARCHAR(100) PRIMARY KEY,
+    userid INT REFERENCES users(userid) ON DELETE SET NULL,
+    purpose VARCHAR(100),
+    budgetamount DECIMAL(12, 2),
+    budgetraw VARCHAR(100),
+    currency VARCHAR(10) DEFAULT 'LKR',
+    targetresolution VARCHAR(50),
+    monitorneeded BOOLEAN,
+    preferencesjson TEXT,
+    iscomplete BOOLEAN DEFAULT FALSE,
+    status VARCHAR(50) DEFAULT 'Gathering',
+    rawanswersjson TEXT,
+    createdat TIMESTAMPTZ DEFAULT NOW(),
+    updatedat TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_requirement_sessions_user ON requirement_sessions(userid);

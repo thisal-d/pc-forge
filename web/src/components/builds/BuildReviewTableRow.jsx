@@ -67,13 +67,13 @@ export const BuildReviewTableRow = ({ build, onInspect }) => {
       </td>
       <td>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          {build.clearancePassed ? (
-            <span className="badge badge-success" style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-              <CheckIcon size={12} /> Cleared
-            </span>
-          ) : (
+          {(build.status === 'Changes Requested' || (build.status || '').toLowerCase().includes('change') || build.clearancePassed === false) ? (
             <span className="badge badge-error" style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
               <AlertTriangleIcon size={12} /> Issue Detected
+            </span>
+          ) : (
+            <span className="badge badge-success" style={{ fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+              <CheckIcon size={12} /> Cleared
             </span>
           )}
         </div>

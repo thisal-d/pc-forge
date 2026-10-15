@@ -302,6 +302,36 @@ def generate_compatible_build(request: BuildGenerationRequest) -> BuildGeneratio
     build_context_var.set({"catalog": request.catalog or []})
     target_budget = _normalize_budget(request.budget_amount, request.currency)
 
+    live_items = fetch_live_products()
+    if not live_items:
+        return BuildGenerationResponse(
+            success=False,
+            error="Hardware catalog is empty or database is unreachable.",
+            summary="No in-stock components found in database to assemble a build."
+        )
+
+    # Format available hardware options from live catalog into prompt for fast, single-turn LLM selection
+    catalog_by_cat: Dict[str, List[Dict[str, Any]]] = {}
+    for p in live_items:
+        c = (p.get("category") or "Component").strip()
+        catalog_by_cat.setdefault(c, []).append(p)
+
+    summary_lines = []
+    for cat, items in catalog_by_cat.items():
+        summary_lines.append(f"### {cat}:")
+        for item in items:
+            spec_parts = []
+            if item.get("socket"):
+                spec_parts.append(f"Socket: {item['socket']}")
+            if item.get("memory_type"):
+                spec_parts.append(f"RAM: {item['memory_type']}")
+            if item.get("power_wattage"):
+                spec_parts.append(f"{item['power_wattage']}W")
+            if item.get("form_factor"):
+                spec_parts.append(f"{item['form_factor']}")
+            specs_str = f" ({', '.join(spec_parts)})" if spec_parts else ""
+            summary_lines.append(f"- [ID: {item['product_id']}] {item['name']}{specs_str} - LKR {item['price']:,.0f}")
+
     raw_request_text = (
         f"- Purpose / Workload: {request.purpose}\n"
         f"- Target Resolution: {request.target_resolution}\n"
@@ -315,11 +345,12 @@ def generate_compatible_build(request: BuildGenerationRequest) -> BuildGeneratio
 Customer PC Build Request:
 {delimited_request}
 
-Please:
-1. Call `get_candidate_components` to retrieve available hardware from the catalog.
-2. Select all 8 components (cpu, motherboard, ram, gpu, psu, storage, pc_case, cooler).
-3. Call `check_socket_compatibility`, `check_memory_compatibility`, `check_psu_wattage`, and `check_case_fit` to prove they are physically and electrically compatible.
-4. Once verified, call `submit_validated_build` with the product IDs and your engineering summary.
+Available Hardware In Store:
+{chr(10).join(summary_lines)}
+
+Instructions:
+1. Select exactly one component for each of the 8 required slots (cpu, motherboard, ram, gpu, psu, storage, pc_case, cooler) that are physically compatible (matching socket, matching RAM standard, sufficient PSU wattage headroom) and stay within or near the customer's budget.
+2. Call `submit_validated_build` immediately with the chosen product IDs (cpu_product_id, motherboard_product_id, ram_product_id, gpu_product_id, psu_product_id, storage_product_id, case_product_id, cooler_product_id) and your engineering summary.
 """)
 
     initial_state: BuildAgentState = {

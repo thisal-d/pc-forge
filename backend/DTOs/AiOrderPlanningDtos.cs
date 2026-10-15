@@ -192,6 +192,12 @@ public class SubmitApprovedOrderRequestDto
 
     [JsonPropertyName("components")]
     public List<OrderPricingItemDto> Components { get; set; } = new();
+
+    [JsonPropertyName("promo_code")]
+    public string? PromoCode { get; set; }
+
+    [JsonPropertyName("discount_amount")]
+    public decimal? DiscountAmount { get; set; }
 }
 
 public class SubmitApprovedOrderResponseDto

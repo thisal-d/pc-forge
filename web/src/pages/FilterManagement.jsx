@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { filterService } from '../services/filterService.js';
-import { CloseIcon, AlertTriangleIcon, CheckCircleIcon } from '../components/icons/index.js';
+import { CloseIcon, AlertTriangleIcon, CheckCircleIcon, InfoIcon } from '../components/icons/index.js';
 
 // Slug generator
 export const slugify = (text) => {
@@ -1188,8 +1188,9 @@ export const FilterManagement = () => {
                   </div>
                 </div>
 
-                <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#eff6ff', borderRadius: '6px', fontSize: '0.8rem', color: '#1e40af' }}>
-                  ℹ️ Changes to Display Name, Unit, and Type will automatically sync across categories assigned this filter.
+                <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#eff6ff', borderRadius: '6px', fontSize: '0.8rem', color: '#1e40af', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <InfoIcon size={16} color="#1e40af" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <span>Changes to Display Name, Unit, and Type will automatically sync across categories assigned this filter.</span>
                 </div>
               </div>
 

@@ -421,7 +421,7 @@ class _AiBuildResultScreenState extends State<AiBuildResultScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Member 02 Inventory Agent is checking shelf stock in PostgreSQL and locking a 15-minute reservation hold.',
+                  'Inventory Agent is verifying live warehouse stock and securing a 15-minute reservation hold.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12.5,

@@ -5,6 +5,7 @@ public class ServiceRequest
     public int ServiceRequestId { get; set; }
     public string ServiceRequestNumber { get; set; } = string.Empty;
     public int UserId { get; set; }
+    public int? SlotId { get; set; }
     public string? Title { get; set; }
     public string? Description { get; set; }
     public DateTime? PreferredDate { get; set; }
@@ -14,4 +15,5 @@ public class ServiceRequest
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public User? User { get; set; }
+    public ServiceTimeSlot? Slot { get; set; }
 }

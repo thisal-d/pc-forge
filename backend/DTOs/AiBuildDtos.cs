@@ -93,6 +93,9 @@ public class ComponentItemDto
 
     [JsonPropertyName("form_factor")]
     public string? FormFactor { get; set; }
+
+    [JsonPropertyName("stock_quantity")]
+    public int StockQuantity { get; set; }
 }
 
 public class CompatibilityChecklistDto

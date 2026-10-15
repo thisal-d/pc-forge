@@ -211,37 +211,6 @@ body {
   gap: 1rem;
 }
 
-.top-nav-icon-btn {
-  position: relative;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.top-nav-icon-btn:hover {
-  background-color: var(--border-subtle);
-  color: var(--text-main);
-}
-
-.notification-badge-dot {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  width: 8px;
-  height: 8px;
-  background-color: var(--danger);
-  border-radius: 50%;
-  border: 2px solid #ffffff;
-}
-
 /* User Profile Pill */
 .user-profile-wrapper {
   position: relative;

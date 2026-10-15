@@ -245,6 +245,8 @@ public class AiBuildsController : ControllerBase
         var userId = GetCurrentUserId() ?? 1;
 
         // Create CustomBuild record so it appears on the Technician Review Workbench (/build-reviews)
+        var promoInfo = !string.IsNullOrWhiteSpace(request.PromoCode) ? $" Coupon: {request.PromoCode}." : "";
+        var discInfo = (request.DiscountAmount.HasValue && request.DiscountAmount.Value > 0) ? $" Discount: {request.DiscountAmount.Value}." : "";
         var customBuild = new CustomBuild
         {
             UserId = userId,
@@ -252,7 +254,7 @@ public class AiBuildsController : ControllerBase
             TotalPrice = request.TotalAmount,
             EstimatedWattage = 450,
             Status = "Pending Staff Review",
-            CustomerNotes = $"AI Order Proposal #{request.OrderNumber} approved by customer. Reservation ID: {request.ReservationId}. Destination: {request.ShippingAddress}",
+            CustomerNotes = $"AI Order Proposal #{request.OrderNumber} approved by customer.{promoInfo}{discInfo} Reservation ID: {request.ReservationId}. Destination: {request.ShippingAddress}",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

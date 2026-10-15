@@ -46,6 +46,68 @@ class _BuildStatusScreenState extends State<BuildStatusScreen> {
     }
   }
 
+  Future<void> _confirmDeleteBuild() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.delete_forever_rounded, color: AppColors.alertRed, size: 24),
+            SizedBox(width: 8),
+            Text('Delete Build?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete "${customBuild.buildName}" (Rig #${customBuild.buildId})? This will permanently remove it from your builds.',
+          style: const TextStyle(fontSize: 13.5, color: AppColors.secondaryText, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.secondaryText)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.alertRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final token = AuthSession.instance.token;
+        await BuildService.instance.deleteBuild(customBuild.buildId, token: token);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Custom Build #${customBuild.buildId} deleted successfully.'),
+              backgroundColor: AppColors.stockGreen,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete build: $e'),
+              backgroundColor: AppColors.alertRed,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Color _getSlotColor(BuildSlotType type) {
     switch (type) {
       case BuildSlotType.cpu:
@@ -88,6 +150,15 @@ class _BuildStatusScreenState extends State<BuildStatusScreen> {
             letterSpacing: -0.3,
           ),
         ),
+        actions: [
+          IconButton(
+            key: const Key('delete_build_action_btn'),
+            icon: const Icon(Icons.delete_outline_rounded,
+                color: AppColors.alertRed, size: 22),
+            tooltip: 'Delete Build',
+            onPressed: _confirmDeleteBuild,
+          ),
+        ],
       ),
       body: ListView(
         physics: const BouncingScrollPhysics(),
@@ -226,10 +297,20 @@ class _BuildStatusScreenState extends State<BuildStatusScreen> {
                 for (final component in _customBuild.selectedComponents.values) {
                   CartService.instance.addItem(component);
                 }
+
+                // Apply custom build's approved coupon / discount if present
+                final discount = _customBuild.discountAmount;
+                final code = _customBuild.couponCode;
+                if (discount > 0) {
+                  CartService.instance.applyDiscount(discount, code: code);
+                }
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      'Loaded ${_customBuild.selectedComponents.length} approved rig parts into Cart!',
+                      discount > 0
+                          ? 'Loaded ${_customBuild.selectedComponents.length} parts into Cart with ${code != null ? "$code " : ""}discount applied!'
+                          : 'Loaded ${_customBuild.selectedComponents.length} approved rig parts into Cart!',
                     ),
                     backgroundColor: AppColors.stockGreen,
                     duration: const Duration(seconds: 2),
@@ -255,6 +336,26 @@ class _BuildStatusScreenState extends State<BuildStatusScreen> {
             child: const Text(
               'Back to Catalog',
               style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          OutlinedButton.icon(
+            key: const Key('delete_build_bottom_btn'),
+            onPressed: _confirmDeleteBuild,
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: AppColors.alertRed.withValues(alpha: 0.5)),
+              foregroundColor: AppColors.alertRed,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: const Text(
+              'Delete Custom Build',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
             ),
           ),
 

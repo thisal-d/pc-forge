@@ -73,28 +73,7 @@ def fetch_live_products() -> List[Dict[str, Any]]:
     except Exception:
         pass
 
-    # 3. Default fallback catalog for offline execution and isolated tests
-    return list(DEFAULT_CATALOG)
-
-
-DEFAULT_CATALOG: List[Dict[str, Any]] = [
-    {"product_id": 1, "name": "AMD Ryzen 7 7800X3D", "category": "CPU", "brand": "AMD", "model": "7800X3D", "price": 145000.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 120, "form_factor": None},
-    {"product_id": 3, "name": "AMD Ryzen 5 7600X", "category": "CPU", "brand": "AMD", "model": "7600X", "price": 69000.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 105, "form_factor": None},
-    {"product_id": 4, "name": "Intel Core i7-14700K", "category": "CPU", "brand": "Intel", "model": "14700K", "price": 128000.0, "socket": "LGA1700", "memory_type": "DDR5", "power_wattage": 253, "form_factor": None},
-    {"product_id": 11, "name": "MSI MAG B650 Tomahawk WiFi", "category": "Motherboard", "brand": "MSI", "model": "B650", "price": 68000.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 50, "form_factor": "ATX"},
-    {"product_id": 13, "name": "ASUS TUF Gaming Z790-Plus WiFi", "category": "Motherboard", "brand": "ASUS", "model": "Z790", "price": 79000.0, "socket": "LGA1700", "memory_type": "DDR5", "power_wattage": 50, "form_factor": "ATX"},
-    {"product_id": 16, "name": "Corsair Vengeance RGB 32GB (2x16GB) DDR5 6000MHz", "category": "RAM", "brand": "Corsair", "model": "Vengeance", "price": 36000.0, "socket": None, "memory_type": "DDR5", "power_wattage": 15, "form_factor": "DIMM"},
-    {"product_id": 15, "name": "G.Skill Trident Z5 RGB 32GB (2x16GB) DDR5 6000MHz", "category": "RAM", "brand": "G.Skill", "model": "Trident Z5", "price": 38000.0, "socket": None, "memory_type": "DDR5", "power_wattage": 15, "form_factor": "DIMM"},
-    {"product_id": 8, "name": "Gigabyte GeForce RTX 4070 Ti Super 16GB", "category": "GPU", "brand": "Gigabyte", "model": "RTX 4070 Ti Super", "price": 265000.0, "socket": None, "memory_type": "GDDR6X", "power_wattage": 285, "form_factor": None},
-    {"product_id": 9, "name": "ASUS Dual GeForce RTX 4060 Ti 8GB", "category": "GPU", "brand": "ASUS", "model": "RTX 4060 Ti", "price": 129000.0, "socket": None, "memory_type": "GDDR6", "power_wattage": 160, "form_factor": None},
-    {"product_id": 18, "name": "Corsair RM850x 850W 80+ Gold Fully Modular", "category": "PSU", "brand": "Corsair", "model": "RM850x", "price": 45000.0, "socket": None, "memory_type": None, "power_wattage": 850, "form_factor": "ATX"},
-    {"product_id": 21, "name": "Samsung 990 PRO 2TB PCIe 4.0 NVMe SSD", "category": "Storage", "brand": "Samsung", "model": "990 Pro", "price": 55000.0, "socket": None, "memory_type": None, "power_wattage": 10, "form_factor": "M.2 2280"},
-    {"product_id": 24, "name": "Fractal Design North Mid Tower Case", "category": "Case", "brand": "Fractal Design", "model": "North", "price": 46000.0, "socket": None, "memory_type": None, "power_wattage": 0, "form_factor": "ATX"},
-    {"product_id": 26, "name": "Thermalright Peerless Assassin 120 SE Air Cooler", "category": "Cooler", "brand": "Thermalright", "model": "PA120-SE", "price": 12000.0, "socket": "AM5 / LGA1700", "memory_type": None, "power_wattage": 5, "form_factor": None},
-    {"product_id": 2, "name": "AMD Ryzen 9 7950X", "category": "CPU", "brand": "AMD", "model": "7950X", "price": 175000.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 170, "form_factor": None},
-    {"product_id": 6, "name": "ASUS ROG Strix RTX 4090 24GB", "category": "GPU", "brand": "ASUS", "model": "RTX 4090", "price": 580000.0, "socket": None, "memory_type": "GDDR6X", "power_wattage": 450, "form_factor": None},
-    {"product_id": 19, "name": "Seasonic Focus GX-1000 1000W 80+ Gold", "category": "PSU", "brand": "Seasonic", "model": "GX-1000", "price": 58000.0, "socket": None, "memory_type": None, "power_wattage": 1000, "form_factor": "ATX"},
-]
+    return []
 
 
 _fetch_live_products = fetch_live_products

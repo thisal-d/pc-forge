@@ -16,8 +16,9 @@ namespace backend.Tests;
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     // Fixed key shared by token generation and JWT validation.
-    // Must be >= 256 bits (32 chars) for HMAC-SHA256.
-    internal const string TestJwtKey = "PCForgeSuperSecretKeyForJwtAuthentication2026!";
+    internal static string TestJwtKey =>
+        Environment.GetEnvironmentVariable("Jwt__Key")
+        ?? "PCForgeSuperSecretKeyForJwtAuthentication2026!";
 
     private readonly string _dbName = "PCForge_TestDb_" + Guid.NewGuid().ToString("N");
 
@@ -85,6 +86,17 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 Status = "Active", Notes = "Primary tech", JoinedDate = new DateOnly(2025, 1, 1),
                 CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
             });
+            db.SaveChanges();
+        }
+
+        if (!db.ServiceTimeSlots.Any())
+        {
+            db.ServiceTimeSlots.AddRange(
+                new ServiceTimeSlot { SlotId = 1, StartTime = "09:00", EndTime = "11:00", Label = "09:00 AM - 11:00 AM", DefaultCapacity = 5, IsActive = true, DisplayOrder = 1 },
+                new ServiceTimeSlot { SlotId = 2, StartTime = "11:00", EndTime = "13:00", Label = "11:00 AM - 01:00 PM", DefaultCapacity = 5, IsActive = true, DisplayOrder = 2 },
+                new ServiceTimeSlot { SlotId = 3, StartTime = "14:00", EndTime = "16:00", Label = "02:00 PM - 04:00 PM", DefaultCapacity = 5, IsActive = true, DisplayOrder = 3 },
+                new ServiceTimeSlot { SlotId = 4, StartTime = "16:00", EndTime = "18:00", Label = "04:00 PM - 06:00 PM", DefaultCapacity = 5, IsActive = true, DisplayOrder = 4 }
+            );
             db.SaveChanges();
         }
     }

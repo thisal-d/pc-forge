@@ -748,9 +748,9 @@ def get_order_history(user_id: int = 1, order_number: Optional[str] = None) -> s
 
 
 @tool
-def get_warranty_status(product_name_or_id: str, order_id_or_number: Optional[str] = "PCF-10492") -> str:
+def get_warranty_status(product_name_or_id: str, order_id_or_number: Optional[str] = None) -> str:
     """Check manufacturer warranty eligibility (legacy alias)."""
-    oid = 1
+    oid = 0
     if order_id_or_number:
         clean = re.sub(r"[^\d]", "", order_id_or_number)
         if clean:

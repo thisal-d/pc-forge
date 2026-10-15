@@ -93,6 +93,7 @@ public class CustomBuildsController : ControllerBase
                 ItemCount = cb.Items.Count,
                 CreatedAt = cb.CreatedAt,
                 UpdatedAt = cb.UpdatedAt,
+                ClearancePassed = cb.Status != "Changes Requested",
                 Components = cb.Items.Select(i => new CustomBuildComponentDto
                 {
                     ProductId = i.ProductId,
@@ -204,6 +205,7 @@ public class CustomBuildsController : ControllerBase
             PsuCapacityWatts = psuWatts,
             PsuHeadroomWatts = headroom,
             PsuHeadroomPercentage = headroomPercent,
+            ClearancePassed = build.Status != "Changes Requested" && socketMatch && memoryMatch && (headroom == null || headroom >= 0),
             Components = components
         };
 
@@ -435,6 +437,41 @@ public class CustomBuildsController : ControllerBase
         }
 
         return Ok(await GetBuildDetailInternal(id));
+    }
+
+    /// <summary>
+    /// Delete a custom build. Customers can delete their own builds, and Staff/Admin can delete any build.
+    /// </summary>
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteBuild(int id)
+    {
+        var build = await _context.CustomBuilds
+            .Include(cb => cb.Items)
+            .FirstOrDefaultAsync(cb => cb.BuildId == id);
+
+        if (build == null)
+        {
+            return NotFound(new { message = $"Custom Build #{id} not found." });
+        }
+
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue)
+        {
+            return Unauthorized(new { message = "Authentication required to delete a custom build." });
+        }
+
+        var isStaffOrAdmin = IsStaffOrAdmin();
+        if (!isStaffOrAdmin && build.UserId != currentUserId.Value)
+        {
+            return Forbid();
+        }
+
+        _context.CustomBuildItems.RemoveRange(build.Items);
+        _context.CustomBuilds.Remove(build);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Custom build #{BuildId} successfully deleted by user #{UserId}", id, currentUserId.Value);
+        return Ok(new { success = true, message = $"Custom Build #{id} deleted successfully." });
     }
 
     private async Task<CustomBuildDetailDto?> GetBuildDetailInternal(int id)

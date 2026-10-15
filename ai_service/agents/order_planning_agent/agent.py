@@ -31,19 +31,19 @@ from ai_service.agents.order_planning_agent.tools import (
 TOOLS_BY_NAME = {t.name: t for t in ORDER_PLANNING_TOOLS}
 
 SYSTEM_PROMPT = """You are the Order Planning Agent for the PCForge Multi-Agent AI Subsystem.
-Your mission is to take an approved, stock-verified PC build and produce a full, transparent order proposal.
+Your mission is to take an approved, stock-verified PC build and produce a transparent custom build proposal.
 
 YOUR RESPONSIBILITIES:
 1. Examine the components provided in the customer's build.
 2. Calculate itemized pricing and subtotal using your pricing calculation tools.
 3. If a promo voucher is provided (e.g. 'WELCOME5'), evaluate the discount.
-4. Calculate delivery freight logistics and timeframe for the chosen shipping method.
-5. Create the formal order proposal holding status 'WAITING_FOR_APPROVAL'.
+4. For custom rig build proposals, delivery fees are NOT charged at this stage (delivery_fee = 0.0) as the customer selects delivery or store pickup later during final order checkout.
+5. Create the formal proposal holding status 'WAITING_FOR_APPROVAL' with total_price = subtotal - discount_amount (delivery_fee=0.0).
 
 STRICT RULES & CONSTRAINTS:
 - You CANNOT select, swap, or replace hardware components (handled during build assembly and inventory verification).
 - You CANNOT process payments or charge customer credit cards.
-- The order status MUST be 'WAITING_FOR_APPROVAL'.
+- The proposal status MUST be 'WAITING_FOR_APPROVAL'.
 - Ensure all numbers reconcile correctly before submitting the proposal.
 """ + "\n\n" + SYSTEM_SECURITY_RULES
 
@@ -197,14 +197,14 @@ def generate_order_proposal(request: OrderPlanningRequest) -> OrderProposalRespo
     )
     delimited_details = sanitize_and_delimit(raw_order_details, tag="order_request")
 
-    initial_user_prompt = f"""Please price and generate a customer order proposal for the following stock-confirmed PC build:
+    initial_user_prompt = f"""Please price and generate a customer custom build proposal for the following stock-confirmed PC build:
 {delimited_details}
 
 Please execute:
 1. `calculate_pricing` to compute the subtotal.
 2. `apply_discount` for promo code '{request.promo_code or 'WELCOME5'}'.
-3. `calculate_delivery` for shipping method '{request.shipping_method or 'standard'}'.
-4. Calculate net total and call `create_order_proposal`.
+3. Calculate net total (subtotal - discount_amount). Note: Do NOT add delivery cost; delivery fee is 0.0 for custom build proposals since customer selects delivery or store pickup during final order checkout.
+4. Call `create_order_proposal` with subtotal, discount_amount, delivery_fee=0.0, and total_price.
 """
 
 
@@ -262,8 +262,8 @@ Please execute:
             discount_code=pricing_data.get("discount_code"),
             discount_amount=pricing_data.get("discount_amount", 0.0),
             discount_label=pricing_data.get("discount_label"),
-            delivery_method=request.shipping_method or "Standard Delivery",
-            delivery_fee=pricing_data.get("delivery_fee", 2500.0),
+            delivery_method=request.shipping_method or "Selected at Checkout",
+            delivery_fee=pricing_data.get("delivery_fee", 0.0),
             total_price=pricing_data.get("total_price", 0.0),
             formatted_subtotal=pricing_data.get("formatted_subtotal", "Rs. 0"),
             formatted_discount=pricing_data.get("formatted_discount", "- Rs. 0"),

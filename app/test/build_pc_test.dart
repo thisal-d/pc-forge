@@ -136,6 +136,11 @@ class MockBuildApiService extends ApiService {
       },
     ];
   }
+
+  @override
+  Future<void> deleteCustomBuild(int buildId, {String? token}) async {
+    // Mock delete success
+  }
 }
 
 class MockPickerApiService extends ApiService {
@@ -699,6 +704,125 @@ void main() {
 
       // Check Modify & Resubmit Button
       expect(find.text('Modify & Resubmit Build (In Review)'), findsOneWidget);
+    });
+
+    testWidgets('Deleting a custom build from customer side removes it from list', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: MyCustomBuildsScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify both initial builds exist
+      expect(find.text('Pro Creator AM5 Workstation'), findsOneWidget);
+      expect(find.text('Compact ITX Gaming Beast'), findsOneWidget);
+
+      // Tap delete button for build #901
+      final deleteBtn = find.byKey(const Key('delete_build_btn_901'));
+      expect(deleteBtn, findsOneWidget);
+      await tester.tap(deleteBtn);
+      await tester.pumpAndSettle();
+
+      // Confirmation dialog must appear
+      expect(find.text('Delete Build?'), findsOneWidget);
+      expect(find.text('Delete'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+
+      // Confirm deletion
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      // Build #901 should now be removed from the customer's view
+      expect(find.text('Pro Creator AM5 Workstation'), findsNothing);
+      expect(find.text('Compact ITX Gaming Beast'), findsOneWidget);
+      expect(find.text('Custom Build #901 deleted successfully.'), findsOneWidget);
+    });
+
+    testWidgets('Deleting build from BuildStatusScreen deletes build and pops screen', (tester) async {
+      final buildModel = CustomBuildModel(
+        buildId: 901,
+        buildName: 'Pro Creator AM5 Workstation',
+        totalCost: 1850.00,
+        estimatedWattage: 650,
+        status: 'Approved by Staff',
+        submittedAt: DateTime.now(),
+        isCompatible: true,
+        selectedComponents: {},
+      );
+
+      bool popped = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => BuildStatusScreen(customBuild: buildModel)),
+                );
+                popped = true;
+              },
+              child: const Text('Open Status'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open Status'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Build Review Status'), findsOneWidget);
+
+      // Tap AppBar delete action
+      await tester.tap(find.byKey(const Key('delete_build_action_btn')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete Build?'), findsOneWidget);
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      // Screen should pop back
+      expect(popped, true);
+    });
+
+    test('Case form factor mismatch detection: ATX mobo in Mini-ITX case', () {
+      final service = BuildService.instance;
+      service.clearDraft();
+
+      const atxMobo = ProductModel(
+        productId: 50,
+        name: 'ASUS ROG Strix B650-E Gaming WiFi',
+        price: 280.0,
+        socket: 'AM5',
+        memoryType: 'DDR5',
+        formFactor: 'ATX',
+      );
+
+      const itxCase = ProductModel(
+        productId: 60,
+        name: 'Lian Li A4-H2O Mini-ITX Case',
+        price: 155.0,
+        formFactor: 'Mini-ITX',
+      );
+
+      service.selectComponent(BuildSlotType.motherboard, atxMobo);
+      service.selectComponent(BuildSlotType.pcCase, itxCase);
+
+      expect(service.compatibilityWarnings.any((w) => w.contains('Form Factor Mismatch')), true);
+      expect(service.isCompatible, false);
+
+      // Swap to ATX Mid Tower case -> Warning resolves
+      const atxCase = ProductModel(
+        productId: 61,
+        name: 'Corsair 4000D Airflow ATX Mid Tower',
+        price: 104.0,
+        formFactor: 'ATX Mid Tower',
+      );
+
+      service.selectComponent(BuildSlotType.pcCase, atxCase);
+      expect(service.compatibilityWarnings.any((w) => w.contains('Form Factor Mismatch')), false);
     });
   });
 }

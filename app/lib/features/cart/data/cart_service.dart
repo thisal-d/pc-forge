@@ -20,9 +20,33 @@ class CartService extends ChangeNotifier {
         (sum, item) => sum + ((item.product?.price ?? 0.0) * item.quantity),
       );
 
+  double _discountAmount = 0.0;
+  String? _couponCode;
+
+  double get discountAmount => _discountAmount;
+  String? get couponCode => _couponCode;
+
+  void applyDiscount(double amount, {String? code}) {
+    _discountAmount = amount > 0 ? amount : 0.0;
+    _couponCode = code;
+    notifyListeners();
+  }
+
+  void clearDiscount() {
+    _discountAmount = 0.0;
+    _couponCode = null;
+    notifyListeners();
+  }
+
   double get shippingAmount => subtotal > 0 ? 15.0 : 0.0;
 
-  double get totalAmount => subtotal + shippingAmount;
+  double calculateTotal({bool isPickup = false}) {
+    final shipping = isPickup ? 0.0 : shippingAmount;
+    final total = (subtotal - _discountAmount) + shipping;
+    return total > 0 ? total : 0.0;
+  }
+
+  double get totalAmount => calculateTotal(isPickup: false);
 
   bool get isEmpty => _items.isEmpty;
 
@@ -113,6 +137,8 @@ class CartService extends ChangeNotifier {
   /// Clears all cart items
   void clear() {
     _items.clear();
+    _discountAmount = 0.0;
+    _couponCode = null;
     notifyListeners();
   }
 }

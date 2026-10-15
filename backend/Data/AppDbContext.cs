@@ -20,6 +20,8 @@ public class AppDbContext : DbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<ServiceRequest> ServiceRequests => Set<ServiceRequest>();
+    public DbSet<ServiceTimeSlot> ServiceTimeSlots => Set<ServiceTimeSlot>();
+    public DbSet<ServiceTimeSlotOverride> ServiceTimeSlotOverrides => Set<ServiceTimeSlotOverride>();
     public DbSet<Staff> Staff => Set<Staff>();
     public DbSet<CustomBuild> CustomBuilds => Set<CustomBuild>();
     public DbSet<CustomBuildItem> CustomBuildItems => Set<CustomBuildItem>();
@@ -231,6 +233,7 @@ public class AppDbContext : DbContext
             entity.Property(sr => sr.ServiceRequestNumber).HasColumnName("servicerequestnumber").HasMaxLength(30).IsRequired();
             entity.HasIndex(sr => sr.ServiceRequestNumber).IsUnique();
             entity.Property(sr => sr.UserId).HasColumnName("userid");
+            entity.Property(sr => sr.SlotId).HasColumnName("slotid");
             entity.Property(sr => sr.Title).HasColumnName("title").HasMaxLength(200);
             entity.Property(sr => sr.Description).HasColumnName("description");
             entity.Property(sr => sr.PreferredDate).HasColumnName("preferreddate");
@@ -242,6 +245,49 @@ public class AppDbContext : DbContext
             entity.HasOne(sr => sr.User)
                   .WithMany()
                   .HasForeignKey(sr => sr.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(sr => sr.Slot)
+                  .WithMany(s => s.ServiceRequests)
+                  .HasForeignKey(sr => sr.SlotId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // 9b. Map ServiceTimeSlots
+        modelBuilder.Entity<ServiceTimeSlot>(entity =>
+        {
+            entity.ToTable("servicetimeslots");
+            entity.HasKey(s => s.SlotId);
+            entity.Property(s => s.SlotId).HasColumnName("slotid");
+            entity.Property(s => s.StartTime).HasColumnName("starttime").HasMaxLength(10).IsRequired();
+            entity.Property(s => s.EndTime).HasColumnName("endtime").HasMaxLength(10).IsRequired();
+            entity.Property(s => s.Label).HasColumnName("label").HasMaxLength(50);
+            entity.Property(s => s.DefaultCapacity).HasColumnName("defaultcapacity").HasDefaultValue(5);
+            entity.Property(s => s.IsActive).HasColumnName("isactive").HasDefaultValue(true);
+            entity.Property(s => s.DisplayOrder).HasColumnName("displayorder").HasDefaultValue(0);
+            entity.Property(s => s.CreatedAt).HasColumnName("createdat").HasDefaultValueSql("NOW()");
+            entity.Property(s => s.UpdatedAt).HasColumnName("updatedat").HasDefaultValueSql("NOW()");
+        });
+
+        // 9c. Map ServiceTimeSlotOverrides
+        modelBuilder.Entity<ServiceTimeSlotOverride>(entity =>
+        {
+            entity.ToTable("servicetimeslotoverrides");
+            entity.HasKey(o => o.OverrideId);
+            entity.Property(o => o.OverrideId).HasColumnName("overrideid");
+            entity.Property(o => o.SlotId).HasColumnName("slotid");
+            entity.Property(o => o.Date).HasColumnName("date").IsRequired();
+            entity.Property(o => o.CustomCapacity).HasColumnName("customcapacity");
+            entity.Property(o => o.IsClosed).HasColumnName("isclosed").HasDefaultValue(false);
+            entity.Property(o => o.Reason).HasColumnName("reason").HasMaxLength(255);
+            entity.Property(o => o.CreatedAt).HasColumnName("createdat").HasDefaultValueSql("NOW()");
+            entity.Property(o => o.UpdatedAt).HasColumnName("updatedat").HasDefaultValueSql("NOW()");
+
+            entity.HasIndex(o => new { o.SlotId, o.Date }).IsUnique();
+
+            entity.HasOne(o => o.Slot)
+                  .WithMany(s => s.Overrides)
+                  .HasForeignKey(o => o.SlotId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 

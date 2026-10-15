@@ -106,8 +106,9 @@ class CartScreen extends StatelessWidget {
             );
           }
 
-          final estimatedTax = cart.subtotal * 0.05; // 5% Estimated Tax
-          final grandTotal = cart.subtotal + cart.shippingAmount + estimatedTax;
+          final netSubtotal = (cart.subtotal - cart.discountAmount).clamp(0.0, double.infinity);
+          final estimatedTax = netSubtotal * 0.05; // 5% Estimated Tax
+          final grandTotal = netSubtotal + cart.shippingAmount + estimatedTax;
 
           return Column(
             children: [
@@ -317,6 +318,24 @@ class CartScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (cart.discountAmount > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              cart.couponCode != null && cart.couponCode!.isNotEmpty
+                                  ? 'Discount (${cart.couponCode})'
+                                  : 'Discount',
+                              style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                            Text(
+                              '- LKR ${cart.discountAmount.toStringAsFixed(2)}',
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF10B981)),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 6),
 
                       // Shipping

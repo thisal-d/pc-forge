@@ -17,31 +17,39 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
 inventory_context_var: ContextVar[Dict[str, Any]] = ContextVar("inventory_context_var", default={})
 
 
-DEFAULT_INVENTORY_CATALOG: List[Dict[str, Any]] = [
-    {"product_id": 1, "name": "AMD Ryzen 5 7600X", "category": "CPU", "brand": "AMD", "model": "7600X", "price": 229.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 105, "form_factor": None, "stock_quantity": 12},
-    {"product_id": 2, "name": "Intel Core i5-13600K", "category": "CPU", "brand": "Intel", "model": "13600K", "price": 299.0, "socket": "LGA1700", "memory_type": "DDR5", "power_wattage": 125, "form_factor": None, "stock_quantity": 8},
-    {"product_id": 3, "name": "MSI B650 Gaming Plus WiFi", "category": "Motherboard", "brand": "MSI", "model": "B650", "price": 179.0, "socket": "AM5", "memory_type": "DDR5", "power_wattage": 50, "form_factor": "ATX", "stock_quantity": 10},
-    {"product_id": 4, "name": "ASUS TUF Gaming B760-PLUS", "category": "Motherboard", "brand": "ASUS", "model": "B760", "price": 189.0, "socket": "LGA1700", "memory_type": "DDR5", "power_wattage": 50, "form_factor": "ATX", "stock_quantity": 6},
-    {"product_id": 5, "name": "Corsair Vengeance 32GB (2x16GB) DDR5 6000MHz", "category": "RAM", "brand": "Corsair", "model": "Vengeance", "price": 115.0, "socket": None, "memory_type": "DDR5", "power_wattage": 15, "form_factor": "DIMM", "stock_quantity": 15},
-    {"product_id": 6, "name": "Kingston Fury Beast 16GB (2x8GB) DDR5 5200MHz", "category": "RAM", "brand": "Kingston", "model": "Fury", "price": 65.0, "socket": None, "memory_type": "DDR5", "power_wattage": 15, "form_factor": "DIMM", "stock_quantity": 9},
-    {"product_id": 8, "name": "NVIDIA GeForce RTX 4070 Ti 12GB", "category": "GPU", "brand": "NVIDIA", "model": "RTX 4070 Ti", "price": 799.0, "socket": None, "memory_type": "GDDR6X", "power_wattage": 285, "form_factor": None, "stock_quantity": 5},
-    {"product_id": 9, "name": "AMD Radeon RX 7800 XT 16GB", "category": "GPU", "brand": "AMD", "model": "RX 7800 XT", "price": 499.0, "socket": None, "memory_type": "GDDR6", "power_wattage": 263, "form_factor": None, "stock_quantity": 7},
-    {"product_id": 10, "name": "Corsair RM750e 750W 80+ Gold Fully Modular", "category": "PSU", "brand": "Corsair", "model": "RM750e", "price": 99.0, "socket": None, "memory_type": None, "power_wattage": 750, "form_factor": "ATX", "stock_quantity": 14},
-    {"product_id": 11, "name": "Samsung 980 Pro 1TB NVMe PCIe 4.0 SSD", "category": "Storage", "brand": "Samsung", "model": "980 Pro", "price": 89.0, "socket": None, "memory_type": None, "power_wattage": 10, "form_factor": "M.2 2280", "stock_quantity": 20},
-    {"product_id": 12, "name": "NZXT H5 Flow ATX Mid-Tower Case", "category": "Case", "brand": "NZXT", "model": "H5 Flow", "price": 89.0, "socket": None, "memory_type": None, "power_wattage": 0, "form_factor": "ATX", "stock_quantity": 11},
-    {"product_id": 13, "name": "DeepCool AK620 High-Performance CPU Air Cooler", "category": "Cooler", "brand": "DeepCool", "model": "AK620", "price": 65.0, "socket": "AM5 / LGA1700", "memory_type": None, "power_wattage": 5, "form_factor": None, "stock_quantity": 10},
-]
-
-
 def _find_product_in_catalog(pid: int) -> Optional[Dict[str, Any]]:
-    """Helper to locate a product in the request-scoped catalog context or fallback."""
+    """Helper to locate a product in the request-scoped catalog context from PostgreSQL database, or via live backend API."""
     ctx = inventory_context_var.get()
     catalog = ctx.get("catalog") if isinstance(ctx, dict) else None
-    search_list = catalog if (catalog and isinstance(catalog, list)) else DEFAULT_INVENTORY_CATALOG
-    for p in search_list:
-        item_id = p.get("product_id") or p.get("productId")
-        if item_id is not None and int(item_id) == pid:
-            return p
+    if catalog and isinstance(catalog, list):
+        for p in catalog:
+            item_id = p.get("product_id") or p.get("productId")
+            if item_id is not None and int(item_id) == pid:
+                return p
+
+    # Query live backend API connected to PostgreSQL
+    try:
+        url = f"{BACKEND_URL.rstrip('/')}/api/products/{pid}"
+        req = urllib.request.Request(url, headers={"User-Agent": "PCForgeAi/1.0"})
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if isinstance(data, dict):
+                return {
+                    "product_id": data.get("productId", pid),
+                    "name": data.get("name", f"Product #{pid}"),
+                    "category": data.get("categoryName", "Component"),
+                    "brand": data.get("brand", ""),
+                    "model": data.get("model", ""),
+                    "price": float(data.get("price", 0.0)),
+                    "socket": data.get("socket"),
+                    "memory_type": data.get("memoryType"),
+                    "power_wattage": data.get("powerWattage"),
+                    "form_factor": data.get("formFactor"),
+                    "stock_quantity": int(data.get("stockQuantity", 0))
+                }
+    except Exception:
+        pass
+
     return None
 
 
@@ -58,7 +66,10 @@ def get_stock_level(product_id: int) -> str:
     # 1. First priority: Check in-memory catalog context passed from ASP.NET Core
     p_ctx = _find_product_in_catalog(pid)
     if p_ctx:
-        qty = int(p_ctx.get("stock_quantity") or p_ctx.get("stockQuantity") or 10)
+        raw_qty = p_ctx.get("stock_quantity")
+        if raw_qty is None:
+            raw_qty = p_ctx.get("stockQuantity", 0)
+        qty = int(raw_qty)
         name = p_ctx.get("name", f"Product #{pid}")
         cat = p_ctx.get("category") or p_ctx.get("categoryName", "Component")
         price = float(p_ctx.get("price", 0.0))
@@ -169,7 +180,7 @@ def find_compatible_substitute(
             catalog_items = []
 
     if not catalog_items:
-        catalog_items = DEFAULT_INVENTORY_CATALOG
+        return json.dumps([])
 
     results = []
     for item in catalog_items:

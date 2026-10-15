@@ -64,7 +64,7 @@ class _SupportScreenState extends State<SupportScreen> {
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
     setState(() {
-      _displayedCount = (_displayedCount + 8).clamp(0, filtered.length);
+      _displayedCount = (_displayedCount + 8).clamp(0, filtered.length).toInt();
       _isLoadingMore = false;
     });
   }
@@ -171,6 +171,20 @@ class _SupportScreenState extends State<SupportScreen> {
         }
       }
     }
+  }
+
+  String _formatDisplayDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return '';
+    try {
+      final parsed = DateTime.tryParse(raw);
+      if (parsed != null) {
+        return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
+      }
+    } catch (_) {}
+    if (raw.contains('T')) {
+      return raw.split('T')[0];
+    }
+    return raw;
   }
 
   List<ServiceRequestModel> _getFilteredRequests(List<ServiceRequestModel> requests) {
@@ -432,14 +446,20 @@ class _SupportScreenState extends State<SupportScreen> {
 
               const SizedBox(height: 16),
 
-              if (sr.preferredDate != null) ...[
+              if (sr.preferredDate != null && sr.preferredDate!.isNotEmpty) ...[
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.secondaryText),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Service Appointment: ${sr.preferredDate} (${sr.preferredTime ?? "10:00 AM"})',
-                      style: const TextStyle(color: AppColors.primaryDark, fontSize: 13, fontWeight: FontWeight.w500),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.secondaryText),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Service Appointment: ${_formatDisplayDate(sr.preferredDate)} (${sr.preferredTime ?? "10:00 AM"})',
+                        style: const TextStyle(color: AppColors.primaryDark, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
                     ),
                   ],
                 ),
@@ -997,19 +1017,23 @@ class _SupportScreenState extends State<SupportScreen> {
                                                     style: const TextStyle(fontSize: 10, color: AppColors.secondaryText),
                                                   ),
                                                 ),
-                                                const SizedBox(width: 8),
-                                                if (sr.preferredDate != null) ...[
+                                                if (sr.preferredDate != null && sr.preferredDate!.isNotEmpty) ...[
+                                                  const SizedBox(width: 8),
                                                   const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.secondaryText),
                                                   const SizedBox(width: 4),
-                                                  Text(
-                                                    sr.preferredTime != null && sr.preferredTime!.isNotEmpty
-                                                        ? '${sr.preferredDate} at ${sr.preferredTime}'
-                                                        : '${sr.preferredDate}',
-                                                    style: const TextStyle(fontSize: 11, color: AppColors.secondaryText, fontWeight: FontWeight.w500),
+                                                  Expanded(
+                                                    child: Text(
+                                                      sr.preferredTime != null && sr.preferredTime!.isNotEmpty
+                                                          ? '${_formatDisplayDate(sr.preferredDate)} at ${sr.preferredTime}'
+                                                          : _formatDisplayDate(sr.preferredDate),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: const TextStyle(fontSize: 11, color: AppColors.secondaryText, fontWeight: FontWeight.w500),
+                                                    ),
                                                   ),
-                                                  const SizedBox(width: 8),
-                                                ],
-                                                const Spacer(),
+                                                ] else
+                                                  const Spacer(),
+                                                const SizedBox(width: 8),
                                                 Text(
                                                   '${sr.createdAt.day}/${sr.createdAt.month}/${sr.createdAt.year}',
                                                   style: const TextStyle(fontSize: 11, color: AppColors.secondaryText),
