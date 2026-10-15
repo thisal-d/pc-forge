@@ -44,7 +44,10 @@ export const Login = () => {
       await login(emailTrim, password);
       navigate(from, { replace: true });
     } catch (err) {
-      const msg = err.response?.data?.message || 'Login failed. Please verify your credentials.';
+      const msg =
+        err.message ||
+        err.response?.data?.message ||
+        'Login failed. Please verify your credentials.';
       setError(msg);
     } finally {
       setSubmitting(false);
