@@ -21,6 +21,7 @@ class MockRegisterApiService extends ApiService {
     String path,
     Map<String, dynamic> body, {
     String? token,
+    Duration timeout = const Duration(seconds: 90),
   }) async {
     if (simulateNetworkFailure) {
       throw SocketException('Connection refused');

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../../core/utils/image_utils.dart';
 
 class ProductModel {
   final int productId;
@@ -152,15 +153,19 @@ class ProductModel {
       } catch (_) {}
     }
 
-    final imgUrl = json['imageUrl'] as String?;
+    final rawImgUrl = json['imageUrl'] as String?;
+    final imgUrl = ImageUtils.resolveImageUrl(rawImgUrl);
     final gallery = <String>[];
     if (imgUrl != null && imgUrl.trim().isNotEmpty) {
       gallery.add(imgUrl.trim());
     }
     if (json['images'] is List) {
       for (final item in json['images'] as List) {
-        if (item is String && item.trim().isNotEmpty && !gallery.contains(item.trim())) {
-          gallery.add(item.trim());
+        if (item is String) {
+          final resolved = ImageUtils.resolveImageUrl(item);
+          if (resolved != null && resolved.isNotEmpty && !gallery.contains(resolved)) {
+            gallery.add(resolved);
+          }
         }
       }
     }

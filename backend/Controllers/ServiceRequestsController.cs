@@ -19,6 +19,7 @@ public class ServiceRequestsController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IAiAgentService _aiAgentService;
+    private readonly IEmailService _emailService;
     private readonly ILogger<ServiceRequestsController> _logger;
 
     // Concurrency lock dictionary to synchronize bookings per slot and date
@@ -27,10 +28,12 @@ public class ServiceRequestsController : ControllerBase
     public ServiceRequestsController(
         AppDbContext context,
         IAiAgentService aiAgentService,
+        IEmailService emailService,
         ILogger<ServiceRequestsController> logger)
     {
         _context = context;
         _aiAgentService = aiAgentService;
+        _emailService = emailService;
         _logger = logger;
     }
 
@@ -41,7 +44,7 @@ public class ServiceRequestsController : ControllerBase
     [HttpPost("ai-chat")]
     public async Task<ActionResult<AfterSalesChatResponseDto>> AfterSalesChat([FromBody] AfterSalesChatRequestDto request)
     {
-        var currentUserId = GetCurrentUserId() ?? 1;
+        var currentUserId = GetCurrentUserId() ?? (request.UserId > 0 ? request.UserId : 1);
         request.UserId = currentUserId;
 
         var result = await _aiAgentService.SendAfterSalesChatMessageAsync(request);
@@ -788,7 +791,7 @@ public class ServiceRequestsController : ControllerBase
                         Description = resolvedDescription,
                         PreferredDate = dto.PreferredDate,
                         PreferredTime = preferredTime,
-                        Status = "Pending",
+                        Status = "Booked",
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -803,6 +806,31 @@ public class ServiceRequestsController : ControllerBase
 
                     _logger.LogInformation("Service Request {SrNumber} created for User {UserId} in Slot #{SlotId} on {Date}",
                         request.ServiceRequestNumber, userId, slot.SlotId, prefDateUtc.ToString("yyyy-MM-dd"));
+
+                    // Dispatch confirmation email
+                    try
+                    {
+                        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == userId);
+                        if (!string.IsNullOrWhiteSpace(user?.Email))
+                        {
+                            var customerName = string.Join(" ", new[] { user.FirstName, user.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+                            if (string.IsNullOrWhiteSpace(customerName)) customerName = "Valued Customer";
+
+                            _ = _emailService.SendServiceRequestNotificationAsync(
+                                user.Email,
+                                customerName,
+                                request.ServiceRequestNumber,
+                                request.Status,
+                                request.Title,
+                                request.PreferredDate,
+                                slot.Label ?? $"{slot.StartTime} - {slot.EndTime}",
+                                request.Description);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to dispatch service request received email for {SrNumber}", request.ServiceRequestNumber);
+                    }
 
                     return CreatedAtAction(nameof(GetServiceRequestById), new { id = request.ServiceRequestId }, new ServiceRequestDetailDto
                     {
@@ -881,9 +909,9 @@ public class ServiceRequestsController : ControllerBase
         }
 
         var normalizedStatus = NormalizeStatus(request.Status);
-        if (!isStaffOrAdmin && normalizedStatus != "Pending")
+        if (!isStaffOrAdmin && normalizedStatus != "Booked" && normalizedStatus != "Pending")
         {
-            return BadRequest(new { message = "Customers can only cancel a Service Request while it is in Pending status." });
+            return BadRequest(new { message = "Customers can only cancel a Service Request while it is in Booked status." });
         }
 
         if (normalizedStatus == "Completed" || normalizedStatus == "Cancelled" || normalizedStatus == "No Show" || normalizedStatus == "Rejected")
@@ -896,6 +924,31 @@ public class ServiceRequestsController : ControllerBase
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Service Request {SrNumber} was cancelled by User {UserId}", request.ServiceRequestNumber, currentUserId);
+
+        // Dispatch cancellation email
+        var customerEmail = request.User?.Email;
+        var customerName = request.User != null ? $"{request.User.FirstName} {request.User.LastName}".Trim() : "";
+        if (string.IsNullOrWhiteSpace(customerName)) customerName = request.User?.Email ?? "Valued Customer";
+
+        if (!string.IsNullOrWhiteSpace(customerEmail))
+        {
+            try
+            {
+                _ = _emailService.SendServiceRequestNotificationAsync(
+                    customerEmail,
+                    customerName,
+                    request.ServiceRequestNumber,
+                    "Cancelled",
+                    request.Title,
+                    request.PreferredDate,
+                    request.PreferredTime,
+                    "Service appointment cancelled and time slot released.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to dispatch service request cancellation email for {SrNumber}", request.ServiceRequestNumber);
+            }
+        }
 
         return Ok(new ServiceRequestDetailDto
         {
@@ -986,6 +1039,32 @@ public class ServiceRequestsController : ControllerBase
 
         _logger.LogInformation("Service Request {SrNumber} updated: Status={Status}",
             request.ServiceRequestNumber, request.Status);
+
+        // Dispatch status update email
+        var updateEmail = request.User?.Email;
+        var updateCustomerName = request.User != null ? $"{request.User.FirstName} {request.User.LastName}".Trim() : "";
+        if (string.IsNullOrWhiteSpace(updateCustomerName)) updateCustomerName = request.User?.Email ?? "Valued Customer";
+
+        if (!string.IsNullOrWhiteSpace(updateEmail))
+        {
+            try
+            {
+                _ = _emailService.SendServiceRequestNotificationAsync(
+                    updateEmail,
+                    updateCustomerName,
+                    request.ServiceRequestNumber,
+                    request.Status,
+                    request.Title,
+                    request.PreferredDate,
+                    request.PreferredTime,
+                    request.Description);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to dispatch service request update email for {SrNumber} ({Status})",
+                    request.ServiceRequestNumber, request.Status);
+            }
+        }
 
         return Ok(new ServiceRequestDetailDto
         {
@@ -1152,12 +1231,13 @@ public class ServiceRequestsController : ControllerBase
     private static string NormalizeStatus(string? status)
     {
         if (string.IsNullOrWhiteSpace(status))
-            return "Pending";
+            return "Booked";
 
         var s = status.Trim();
         var lower = s.ToLower().Replace("_", " ");
 
-        if (lower == "pending") return "Pending";
+        if (lower == "booked") return "Booked";
+        if (lower == "pending") return "Booked";
         if (lower == "in progress" || lower == "in_progress" || lower == "in service" || lower == "in_service" || lower == "scheduled" || lower == "under review" || lower == "under_review")
             return "In Progress";
         if (lower == "completed" || lower == "resolved") return "Completed";

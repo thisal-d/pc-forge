@@ -205,7 +205,7 @@ export const ServiceRequests = () => {
   const STATUS_OPTIONS = useMemo(
     () => [
       { label: 'All Requests', value: 'all', count: requests.length },
-      { label: 'Pending', value: 'pending', count: stats.pending || 0 },
+      { label: 'Booked', value: 'booked', count: (stats.booked ?? stats.pending) || 0 },
       { label: 'In Progress', value: 'in progress', count: stats.inProgress || 0 },
       { label: 'Completed', value: 'completed', count: stats.completed || 0 },
       {
@@ -255,6 +255,8 @@ export const ServiceRequests = () => {
           if (current !== 'no show') return false;
         } else if (target === 'cancelled') {
           if (current !== 'cancelled' && current !== 'canceled') return false;
+        } else if (target === 'booked' || target === 'pending') {
+          if (current !== 'booked' && current !== 'pending') return false;
         } else if (current !== target) {
           return false;
         }
@@ -572,8 +574,9 @@ export const ServiceRequests = () => {
   const getStatusBadge = (status) => {
     const s = (status || '').toUpperCase().replace(/_/g, ' ');
     switch (s) {
+      case 'BOOKED':
       case 'PENDING':
-        return <span className="badge badge-warning">Pending</span>;
+        return <span className="badge badge-warning">Booked</span>;
       case 'IN PROGRESS':
       case 'IN SERVICE':
       case 'UNDER REVIEW':
@@ -700,22 +703,22 @@ export const ServiceRequests = () => {
               <span className="stat-subtext">All recorded requests</span>
             </div>
             <div className="stat-card stat-card-inactive">
-              <span className="stat-label">Pending</span>
-              <span className="stat-value" style={{ color: '#fbbf24' }}>
-                {stats.pending}
+              <span className="stat-label">Booked</span>
+              <span className="stat-value" style={{ color: 'var(--warning-text)' }}>
+                {stats.booked ?? stats.pending}
               </span>
               <span className="stat-subtext">Awaiting intake / drop-off</span>
             </div>
             <div className="stat-card stat-card-tech">
               <span className="stat-label">In Progress</span>
-              <span className="stat-value" style={{ color: '#6366f1' }}>
+              <span className="stat-value" style={{ color: 'var(--accent-purple)' }}>
                 {stats.inProgress}
               </span>
               <span className="stat-subtext">Under diagnostic or repair</span>
             </div>
             <div className="stat-card stat-card-active">
               <span className="stat-label">Completed</span>
-              <span className="stat-value" style={{ color: '#10b981' }}>
+              <span className="stat-value" style={{ color: 'var(--success-text)' }}>
                 {stats.completed}
               </span>
               <span className="stat-subtext">Repaired and collected</span>
@@ -1013,7 +1016,8 @@ export const ServiceRequests = () => {
                                   className="sr-status-select"
                                   title="Quick status change"
                                 >
-                                  <option value="Pending">Pending</option>
+                                  <option value="Booked">Booked</option>
+                                  {req.status === 'Pending' && <option value="Pending">Pending</option>}
                                   <option value="In Progress">In Progress</option>
                                   <option value="Completed">Completed</option>
                                   <option value="No Show">No Show</option>
@@ -1834,7 +1838,8 @@ export const ServiceRequests = () => {
                         className="sr-status-select"
                         title="Update status"
                       >
-                        <option value="Pending">Pending</option>
+                        <option value="Booked">Booked</option>
+                        {selectedRequest.status === 'Pending' && <option value="Pending">Pending</option>}
                         <option value="In Progress">In Progress</option>
                         <option value="Completed">Completed</option>
                         <option value="No Show">No Show</option>

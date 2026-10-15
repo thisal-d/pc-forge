@@ -47,7 +47,7 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
         var detail = await response.Content.ReadFromJsonAsync<ServiceRequestDetailDto>();
         Assert.NotNull(detail);
         Assert.Equal("PC won't boot into BIOS", detail.Title);
-        Assert.Equal("Pending", detail.Status);
+        Assert.Equal("Booked", detail.Status);
         Assert.Equal(1, detail.SlotId);
         Assert.Equal("09:00 AM - 11:00 AM", detail.TimeSlotLabel);
     }
@@ -474,13 +474,13 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.ServiceRequests.Add(new ServiceRequest
             {
-                ServiceRequestNumber = $"SR-FILTER-PENDING-{Guid.NewGuid().ToString("N")[..4]}",
+                ServiceRequestNumber = $"SR-FILTER-BOOKED-{Guid.NewGuid().ToString("N")[..4]}",
                 UserId = 1,
                 SlotId = 1,
-                Title = "Filter Test Pending",
+                Title = "Filter Test Booked",
                 Description = "Filter test",
                 PreferredDate = baseDate,
-                Status = "Pending"
+                Status = "Booked"
             });
             db.ServiceRequests.Add(new ServiceRequest
             {
@@ -495,11 +495,11 @@ public class ServiceRequestsTests : IClassFixture<CustomWebApplicationFactory>
             await db.SaveChangesAsync();
         }
 
-        // Filter by status = "Pending" and date range
-        var filterUrl = $"/api/ServiceRequests?status=Pending&startDate={baseDate.AddDays(-1):yyyy-MM-dd}&endDate={baseDate.AddDays(1):yyyy-MM-dd}";
+        // Filter by status = "Booked" and date range
+        var filterUrl = $"/api/ServiceRequests?status=Booked&startDate={baseDate.AddDays(-1):yyyy-MM-dd}&endDate={baseDate.AddDays(1):yyyy-MM-dd}";
         var listRes = await adminClient.GetFromJsonAsync<List<ServiceRequestSummaryDto>>(filterUrl);
         Assert.NotNull(listRes);
-        Assert.Contains(listRes, r => r.Title == "Filter Test Pending");
+        Assert.Contains(listRes, r => r.Title == "Filter Test Booked");
         Assert.DoesNotContain(listRes, r => r.Title == "Filter Test Completed");
     }
 }

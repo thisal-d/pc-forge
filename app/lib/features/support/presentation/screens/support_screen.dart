@@ -27,7 +27,7 @@ class _SupportScreenState extends State<SupportScreen> {
 
   final List<Map<String, String>> _statusFilters = [
     {'key': 'ALL', 'label': 'All Requests'},
-    {'key': 'PENDING', 'label': 'Pending'},
+    {'key': 'BOOKED', 'label': 'Booked'},
     {'key': 'IN PROGRESS', 'label': 'In Progress'},
     {'key': 'COMPLETED', 'label': 'Completed'},
     {'key': 'NO SHOW', 'label': 'No Show'},
@@ -122,7 +122,7 @@ class _SupportScreenState extends State<SupportScreen> {
 
   bool _isCancellable(String status) {
     final s = status.toUpperCase().replaceAll('_', ' ');
-    return s == 'PENDING';
+    return s == 'BOOKED' || s == 'PENDING';
   }
 
   Future<void> _confirmCancelRequest(ServiceRequestModel sr) async {
@@ -204,6 +204,8 @@ class _SupportScreenState extends State<SupportScreen> {
           if (rStatus != 'CANCELLED' && rStatus != 'CANCELED') return false;
         } else if (fStatus == 'NO SHOW') {
           if (rStatus != 'NO SHOW') return false;
+        } else if (fStatus == 'BOOKED' || fStatus == 'PENDING') {
+          if (rStatus != 'BOOKED' && rStatus != 'PENDING') return false;
         } else if (rStatus != fStatus) {
           return false;
         }
@@ -245,6 +247,7 @@ class _SupportScreenState extends State<SupportScreen> {
   Color _getStatusColor(String status) {
     final s = status.toUpperCase().replaceAll('_', ' ');
     switch (s) {
+      case 'BOOKED':
       case 'PENDING':
         return AppColors.warningAmber;
       case 'IN PROGRESS':
@@ -268,6 +271,7 @@ class _SupportScreenState extends State<SupportScreen> {
   int _getStatusStepIndex(String status) {
     final s = status.toUpperCase().replaceAll('_', ' ');
     switch (s) {
+      case 'BOOKED':
       case 'PENDING':
         return 0;
       case 'IN PROGRESS':
@@ -285,7 +289,7 @@ class _SupportScreenState extends State<SupportScreen> {
 
   void _showRequestDetails(ServiceRequestModel sr) {
     final currentStep = _getStatusStepIndex(sr.status);
-    final timelineSteps = ['Pending', 'Under Review', 'In Service', 'Resolved'];
+    final timelineSteps = ['Booked', 'Under Review', 'In Service', 'Resolved'];
 
     showModalBottomSheet(
       context: context,
@@ -371,6 +375,7 @@ class _SupportScreenState extends State<SupportScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.background,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -931,23 +936,37 @@ class _SupportScreenState extends State<SupportScreen> {
                                           ),
                                         ),
                                       ),
-                                    );
+                                  );
                                   }
 
                                   final sr = displayedRequests[index - 1];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                    elevation: 0,
-                                    color: AppColors.surface,
-                                    child: InkWell(
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 14),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface,
                                       borderRadius: BorderRadius.circular(16),
-                                      onTap: () => _showRequestDetails(sr),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
+                                      border: Border.all(
+                                        color: const Color(0xFFCBD5E1),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x0A0F172A),
+                                          blurRadius: 8,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(16),
+                                        onTap: () => _showRequestDetails(sr),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
                                             Row(
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
@@ -1063,6 +1082,7 @@ class _SupportScreenState extends State<SupportScreen> {
                                           ],
                                         ),
                                       ),
+                                    ),
                                     ),
                                   );
                                 },

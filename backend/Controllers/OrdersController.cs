@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PCForge.Api.Data;
 using PCForge.Api.DTOs;
 using PCForge.Api.Models;
+using PCForge.Api.Services;
 
 namespace PCForge.Api.Controllers;
 
@@ -14,11 +15,16 @@ namespace PCForge.Api.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IEmailService _emailService;
     private readonly ILogger<OrdersController> _logger;
 
-    public OrdersController(AppDbContext context, ILogger<OrdersController> logger)
+    public OrdersController(
+        AppDbContext context,
+        IEmailService emailService,
+        ILogger<OrdersController> logger)
     {
         _context = context;
+        _emailService = emailService;
         _logger = logger;
     }
 
@@ -181,11 +187,32 @@ public class OrdersController : ControllerBase
         _logger.LogInformation("Order #{OrderId} placed successfully for User {UserId}, Method: {PaymentMethod}, Total: {TotalAmount:C}",
             order.OrderId, userId, normalizedPaymentMethod, totalAmount);
 
-        // 5. Load User info for response
+        // 5. Load User info for response and email
         var user = await _context.Users.FindAsync(userId);
         var customerName = user != null ? $"{user.FirstName} {user.LastName}".Trim() : "";
         if (string.IsNullOrEmpty(customerName)) customerName = user?.Email ?? "";
         var customerEmail = user?.Email ?? "";
+
+        // Dispatch Order Confirmed email notification
+        if (!string.IsNullOrWhiteSpace(customerEmail))
+        {
+            try
+            {
+                _ = _emailService.SendOrderNotificationAsync(
+                    customerEmail,
+                    string.IsNullOrWhiteSpace(customerName) ? "Valued Customer" : customerName,
+                    order.OrderId,
+                    order.Status,
+                    order.PaymentMethod,
+                    order.ShippingAddress,
+                    order.TotalAmount,
+                    order.Items.Sum(i => i.Quantity));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to dispatch order placed email for Order #{OrderId}", order.OrderId);
+            }
+        }
 
         var response = new OrderDetailDto
         {
@@ -406,6 +433,31 @@ public class OrdersController : ControllerBase
             _logger.LogInformation("Order #{OrderId} status changed from '{PreviousStatus}' to '{NewStatus}' by {User}",
                 order.OrderId, previousStatus, targetCanonical, User.Identity?.Name ?? "Staff");
 
+            // Dispatch order status change notification email
+            var customerEmail = order.User?.Email;
+            var customerName = order.User != null ? $"{order.User.FirstName} {order.User.LastName}".Trim() : "";
+            if (string.IsNullOrWhiteSpace(customerName)) customerName = order.User?.Email ?? "Valued Customer";
+
+            if (!string.IsNullOrWhiteSpace(customerEmail))
+            {
+                try
+                {
+                    _ = _emailService.SendOrderNotificationAsync(
+                        customerEmail,
+                        customerName,
+                        order.OrderId,
+                        order.Status,
+                        order.PaymentMethod,
+                        order.ShippingAddress,
+                        order.TotalAmount,
+                        order.Items.Sum(i => i.Quantity));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to dispatch order status email for Order #{OrderId} ({Status})", order.OrderId, order.Status);
+                }
+            }
+
             return Ok(MapToDetailDto(order));
         });
     }
@@ -516,6 +568,32 @@ public class OrdersController : ControllerBase
 
             _logger.LogInformation("Order #{OrderId} cancelled successfully by user #{UserId}. Restocked {ItemCount} items.",
                 order.OrderId, currentUserId.Value, order.Items.Count);
+
+            // Dispatch cancellation email
+            var customerEmail = order.User?.Email;
+            var customerName = order.User != null ? $"{order.User.FirstName} {order.User.LastName}".Trim() : "";
+            if (string.IsNullOrWhiteSpace(customerName)) customerName = order.User?.Email ?? "Valued Customer";
+
+            if (!string.IsNullOrWhiteSpace(customerEmail))
+            {
+                try
+                {
+                    _ = _emailService.SendOrderNotificationAsync(
+                        customerEmail,
+                        customerName,
+                        order.OrderId,
+                        OrderStatusConstants.Cancelled,
+                        order.PaymentMethod,
+                        order.ShippingAddress,
+                        order.TotalAmount,
+                        order.Items.Sum(i => i.Quantity),
+                        "Order was cancelled per customer or staff request.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to dispatch order cancellation email for Order #{OrderId}", order.OrderId);
+                }
+            }
 
             return Ok(MapToDetailDto(order));
         });

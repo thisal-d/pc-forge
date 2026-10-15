@@ -21,6 +21,9 @@
 @import './styles/pages/build-reviews.css';
 @import './styles/pages/auth.css';
 @import './styles/pages/service-requests.css';
+@import './styles/pages/orders.css';
+@import './styles/pages/coupons.css';
+@import './styles/pages/filters.css';
 
 /* 5. Universal Responsiveness & Mobile Adaptations */
 @import './styles/responsive.css';

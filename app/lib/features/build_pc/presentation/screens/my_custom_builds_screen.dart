@@ -92,7 +92,7 @@ class _MyCustomBuildsScreenState extends State<MyCustomBuildsScreen> {
           ],
         ),
         content: Text(
-          'Are you sure you want to delete "${build.buildName}" (Rig #${build.buildId})? This will permanently remove it from your builds.',
+          'Are you sure you want to delete "${build.buildName}"? This will permanently remove it from your builds.',
           style: const TextStyle(fontSize: 13.5, color: AppColors.secondaryText, height: 1.4),
         ),
         actions: [
@@ -121,7 +121,7 @@ class _MyCustomBuildsScreenState extends State<MyCustomBuildsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Custom Build #${build.buildId} deleted successfully.'),
+              content: Text('Custom Build "${build.buildName}" deleted successfully.'),
               backgroundColor: AppColors.stockGreen,
               duration: const Duration(seconds: 2),
             ),
@@ -520,7 +520,7 @@ class _MyCustomBuildsScreenState extends State<MyCustomBuildsScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Submitted: ${_formatDate(build.submittedAt)} \u2022 ID #${build.buildId}',
+                          'Submitted: ${_formatDate(build.submittedAt)}',
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,

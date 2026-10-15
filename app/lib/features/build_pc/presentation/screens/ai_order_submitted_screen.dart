@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../data/models/ai_order_proposal_model.dart';
 import 'build_pc_hub_screen.dart';
+import 'my_custom_builds_screen.dart';
 
-/// Screen displayed immediately after customer taps "Approve Order"
+/// Screen displayed immediately after customer taps "Submit Build Review"
 /// Matches UI 5 (ui5.png) in PCForge Agentic AI Workflow specifications:
-/// "Flutter · shown immediately after approval - saved to backend, awaiting a technician"
+/// "Flutter · shown immediately after review submission - saved to backend, awaiting a technician"
 class AiOrderSubmittedScreen extends StatelessWidget {
   final AiSubmittedOrderModel submittedOrder;
   final String buildName;
@@ -25,7 +26,7 @@ class AiOrderSubmittedScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         title: const Text(
-          'Order submitted',
+          'Build review submitted',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
@@ -40,17 +41,17 @@ class AiOrderSubmittedScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Order Confirmation Card matching ui5.png
+              // 1. Build Review Confirmation Card
               _buildOrderCard(context),
 
               const SizedBox(height: 28),
 
-              // 2. Linear Stepper matching ui5.png: Submitted -> Reviewing -> Payment -> Confirmed
+              // 2. Linear Stepper: Submitted -> Reviewing -> Approved -> Ready to Order
               _buildProgressStepper(),
 
               const SizedBox(height: 28),
 
-              // 3. Informational Callout Card matching ui5.png
+              // 3. Informational Callout Card
               _buildTechnicianCalloutCard(),
 
               const SizedBox(height: 36),
@@ -82,12 +83,12 @@ class AiOrderSubmittedScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Order Number Header
+          // Build Number Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Order #${submittedOrder.orderNumber}',
+                'Build #${submittedOrder.orderNumber}',
                 style: const TextStyle(
                   fontSize: 19,
                   fontWeight: FontWeight.w800,
@@ -119,7 +120,7 @@ class AiOrderSubmittedScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7), // Warm amber background matching ui5.png
+                  color: const Color(0xFFFEF3C7), // Warm amber background
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
@@ -143,7 +144,7 @@ class AiOrderSubmittedScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Total (not charged yet)',
+                'Build Total (not charged yet)',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -167,31 +168,30 @@ class AiOrderSubmittedScreen extends StatelessWidget {
 
   Widget _buildProgressStepper() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _buildStepItem(
           title: 'Submitted',
-          color: const Color(0xFF10B981), // Green matching ui5.png
+          color: const Color(0xFF10B981), // Green completed
           isCompleted: true,
           isActive: false,
         ),
         _buildStepSeparator(color: const Color(0xFF10B981)),
         _buildStepItem(
           title: 'Reviewing',
-          color: const Color(0xFF5B4DFF), // Purple active matching ui5.png
+          color: const Color(0xFF5B4DFF), // Purple active
           isCompleted: false,
           isActive: true,
         ),
         _buildStepSeparator(color: const Color(0xFFCBD5E1)),
         _buildStepItem(
-          title: 'Store Pickup',
+          title: 'Approved',
           color: const Color(0xFF94A3B8), // Gray pending
           isCompleted: false,
           isActive: false,
         ),
         _buildStepSeparator(color: const Color(0xFFCBD5E1)),
         _buildStepItem(
-          title: 'Handover',
+          title: 'Ready to Order',
           color: const Color(0xFF94A3B8), // Gray pending
           isCompleted: false,
           isActive: false,
@@ -206,25 +206,23 @@ class AiOrderSubmittedScreen extends StatelessWidget {
     required bool isCompleted,
     required bool isActive,
   }) {
-    return Column(
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: (isCompleted || isActive) ? FontWeight.w800 : FontWeight.w600,
-            color: color,
-          ),
-        ),
-      ],
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 12.5,
+        fontWeight: (isCompleted || isActive) ? FontWeight.w800 : FontWeight.w600,
+        color: color,
+      ),
     );
   }
 
   Widget _buildStepSeparator({required Color color}) {
-    return Container(
-      width: 20,
-      height: 2,
-      color: color,
+    return Expanded(
+      child: Container(
+        height: 2,
+        margin: const EdgeInsets.symmetric(horizontal: 5),
+        color: color,
+      ),
     );
   }
 
@@ -246,7 +244,7 @@ class AiOrderSubmittedScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left solid purple accent bar matching ui5.png
+          // Left solid purple accent bar
           Container(
             width: 4.5,
             height: 54,
@@ -297,6 +295,33 @@ class AiOrderSubmittedScreen extends StatelessWidget {
               'Return to PC Builder Hub',
               style: TextStyle(
                 fontSize: 15.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: OutlinedButton(
+            onPressed: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const MyCustomBuildsScreen()),
+                (route) => route.isFirst,
+              );
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF5B4DFF),
+              side: const BorderSide(color: Color(0xFF5B4DFF), width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const Text(
+              'View My Custom Builds',
+              style: TextStyle(
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),
             ),

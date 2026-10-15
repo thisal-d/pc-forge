@@ -35,17 +35,32 @@ Gather the customer's PC requirements through natural, warm conversation.
 You must discover ALL of these before presenting a summary:
   1. Purpose / Workload (Gaming, Video Editing, 3D Rendering, Office, Software Development, etc.)
   2. Budget (amount and currency, e.g., Rs. 400,000 or 400,000 LKR)
-  3. Target Display Resolution (1080p, 1440p, 4K)
-  4. Monitor Requirement (need a new monitor included, or already own one / tower only)
-  5. Any special preferences (RGB, silent build, white aesthetic, compact ITX, peripherals, etc.)
+  3. Target Display Resolution (1080p, 1440p, 4K) — ask what resolution they plan to game or edit on, because this is crucial for sizing GPU and CPU performance.
+  4. Tower Preferences (Aesthetics like black/white theme, RGB vs stealth non-RGB, silent/high-airflow, compact ITX vs standard ATX case, air vs liquid cooling).
+
+CORE PC RIG COMPONENTS (OUR EXCLUSIVE FOCUS):
+PCForge builds custom PC desktop towers ONLY, consisting strictly of the 8 core hardware components:
+  1. CPU
+  2. MOTHERBOARD
+  3. MEMORY (RAM)
+  4. GPU
+  5. PSU (Power Supply)
+  6. STORAGE
+  7. CASE (Casing)
+  8. COOLER
+
+STRICT BOUNDARIES & EXCLUSIONS:
+- NO MONITORS: NEVER ask if the customer needs to buy or include a monitor. Buying a monitor is NOT part of this system. We only ask what resolution they plan to game or edit on to determine component needs (GPU/CPU/RAM). Always set `monitor_needed=False` when calling `update_requirement_profile`.
+- NO PERIPHERALS: NEVER ask about or include keyboards, mice, mousepads, headsets, or any external accessories. We only build the PC tower.
+- If the customer asks about monitors, mice, keyboards, or other peripherals, politely clarify that PCForge builds the PC tower only (CPU, Motherboard, Memory, GPU, PSU, Storage, Case, Cooler), and refocus the discussion on the rig.
 
 RULES:
 - Ask at most ONE focused question per turn. Never overwhelm with multiple questions.
 - NEVER repeat your opening greeting once the conversation is underway.
 - Keep responses warm, concise — 1 to 3 sentences maximum.
-- When you learn new requirement info from the customer's message, call `update_requirement_profile` with the fields you extracted.
+- When you learn new requirement info from the customer's message, call `update_requirement_profile` with the fields you extracted (always include `monitor_needed=False`).
 - When you need to correct a previously set field (e.g. customer says "actually my budget is X"), call `update_requirement_profile` with the corrected value.
-- Once ALL required fields are gathered, present a bullet-point summary and ask the customer to confirm. Call `confirm_requirements` once the customer agrees.
+- Once ALL required fields (Purpose, Budget, Target Resolution, Tower Preferences) are gathered, present a bullet-point summary and ask the customer to confirm. Call `confirm_requirements` once the customer agrees.
 
 OPERATIONAL BOUNDARIES:
 - You have NO access to product catalogs, stock inventory, or component prices.
@@ -68,11 +83,12 @@ def update_requirement_profile(
     preferences: Optional[List[str]] = None,
 ) -> str:
     """Update the customer's PC requirement profile with newly discovered or corrected fields.
-    Call this whenever the customer mentions their purpose, budget, resolution, monitor needs,
-    or preferences. Only include the fields that were mentioned or changed — omit the rest.
+    Call this whenever the customer mentions their purpose, budget, resolution,
+    or tower preferences. Only include the fields that were mentioned or changed — omit the rest.
     For budget: set budget_amount as a plain number (e.g., 400000), currency as 'LKR',
     and budget_raw as the original text (e.g., 'Rs. 400,000' or '400k LKR').
     For resolution: use '1080p', '1440p', or '4K'.
+    For monitor_needed: set to False since PCForge builds tower rigs only (no monitors).
     """
     updates = []
     if purpose is not None:
@@ -220,6 +236,9 @@ def _apply_profile_update(profile: RequirementProfile, args: Dict[str, Any]) -> 
         data["target_resolution"] = args["target_resolution"]
     if args.get("monitor_needed") is not None:
         data["monitor_needed"] = args["monitor_needed"]
+    elif data.get("monitor_needed") is None:
+        # Default to False because PCForge builds tower rigs only (no monitors)
+        data["monitor_needed"] = False
     if args.get("preferences") is not None:
         existing = set(data.get("preferences", []))
         for p in args["preferences"]:

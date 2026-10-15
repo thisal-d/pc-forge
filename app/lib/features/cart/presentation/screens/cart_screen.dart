@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_network_image.dart';
 import '../../data/cart_service.dart';
 
 class CartScreen extends StatelessWidget {
@@ -146,19 +147,16 @@ class CartScreen extends StatelessWidget {
                                 border: Border.all(color: AppColors.border),
                               ),
                               clipBehavior: Clip.antiAlias,
-                              child: (product?.imageUrl != null && product!.imageUrl!.trim().isNotEmpty)
-                                  ? Image.network(
-                                      product.imageUrl!.trim(),
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (ctx, err, st) => const Icon(
-                                        Icons.memory_rounded,
-                                        color: AppColors.secondaryText,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.memory_rounded,
-                                      color: AppColors.secondaryText,
-                                    ),
+                              child: AppNetworkImage(
+                                imageUrl: product?.imageUrl,
+                                categoryName: product?.categoryName,
+                                productName: product?.name,
+                                width: 72,
+                                height: 72,
+                                fit: BoxFit.cover,
+                                fallbackIconSize: 28,
+                                showCategoryTag: false,
+                              ),
                             ),
 
                             const SizedBox(width: 12),

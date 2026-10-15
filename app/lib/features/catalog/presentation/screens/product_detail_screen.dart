@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_network_image.dart';
 import '../../../cart/data/cart_service.dart';
 import '../../../wishlist/data/wishlist_service.dart';
 import '../../data/models/product_model.dart';
@@ -167,25 +168,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             itemBuilder: (context, index) {
                               return Padding(
                                 padding: const EdgeInsets.all(16.0),
-                                child: Image.network(
-                                  galleryImages[index],
+                                child: AppNetworkImage(
+                                  imageUrl: galleryImages[index],
+                                  categoryName: product.categoryName,
+                                  productName: product.name,
                                   fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) => Center(
-                                    child: Icon(Icons.devices_rounded, size: 70, color: Colors.grey.shade400),
-                                  ),
-                                  loadingBuilder: (context, child, progress) {
-                                    if (progress == null) return child;
-                                    return const Center(
-                                      child: CircularProgressIndicator(color: AppColors.primaryBlue),
-                                    );
-                                  },
+                                  fallbackIconSize: 70,
+                                  showCategoryTag: true,
                                 ),
                               );
                             },
                           )
                         else
-                          Center(
-                            child: Icon(Icons.devices_rounded, size: 80, color: Colors.grey.shade400),
+                          AppNetworkImage(
+                            imageUrl: null,
+                            categoryName: product.categoryName,
+                            productName: product.name,
+                            fit: BoxFit.contain,
+                            fallbackIconSize: 70,
+                            showCategoryTag: true,
                           ),
 
                         // Badge at top-left
@@ -505,8 +506,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     builder: (context, _) {
                       final isLiked = WishlistService.instance.isWishlisted(product.productId);
                       return Container(
-                        width: 48,
-                        height: 48,
+                        width: 44,
+                        height: 52,
                         decoration: BoxDecoration(
                           color: isLiked ? AppColors.alertRed.withValues(alpha: 0.1) : AppColors.surface,
                           borderRadius: BorderRadius.circular(12),
@@ -518,7 +519,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           icon: Icon(
                             isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                             color: isLiked ? AppColors.alertRed : AppColors.primaryDark,
-                            size: 22,
+                            size: 20,
                           ),
                           tooltip: 'Add to Wishlist',
                           onPressed: () => WishlistService.instance.toggleWishlist(product),
@@ -527,11 +528,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     },
                   ),
 
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
 
                   // Quantity Stepper
                   Container(
-                    height: 48,
+                    height: 52,
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(12),
@@ -544,38 +545,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           icon: const Icon(Icons.remove, size: 16),
                           onPressed: _quantity > 1 ? () => setState(() => _quantity--) : null,
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 36),
+                          constraints: const BoxConstraints(minWidth: 32),
                         ),
-                        Text(
-                          '$_quantity',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Text(
+                            '$_quantity',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.add, size: 16),
                           onPressed: _quantity < maxStock ? () => setState(() => _quantity++) : null,
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 36),
+                          constraints: const BoxConstraints(minWidth: 32),
                         ),
                       ],
                     ),
                   ),
 
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
 
                   // Add to Cart Primary CTA Button
                   Expanded(
                     child: SizedBox(
-                      height: 48,
-                      child: ElevatedButton.icon(
+                      height: 52,
+                      child: ElevatedButton(
                         key: const Key('detail_add_to_cart_btn'),
                         onPressed: product.isInStock ? () => _handleAddToCart(product) : null,
-                        icon: const Icon(Icons.shopping_cart_outlined, size: 18),
-                        label: Text(
-                          product.isInStock
-                              ? 'Add to Cart — LKR ${(product.price * _quantity).toStringAsFixed(2)}'
-                              : 'Out of Stock',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryBlue,
                           foregroundColor: Colors.white,
@@ -584,6 +581,48 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                product.isInStock
+                                    ? Icons.shopping_cart_outlined
+                                    : Icons.remove_shopping_cart_outlined,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                product.isInStock ? 'Add to Cart' : 'Out of Stock',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                              if (product.isInStock) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.22),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'LKR ${(product.price * _quantity).toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ),
                     ),

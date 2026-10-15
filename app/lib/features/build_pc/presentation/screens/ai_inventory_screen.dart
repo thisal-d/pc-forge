@@ -457,7 +457,7 @@ class _AiInventoryScreenState extends State<AiInventoryScreen> {
         SnackBar(
           backgroundColor: const Color(0xFFEF4444),
           content: Text(
-            proposalResult.error ?? 'Failed to generate order proposal. Please ensure backend is running.',
+            proposalResult.error ?? 'Failed to generate build review summary. Please ensure backend is running.',
           ),
         ),
       );

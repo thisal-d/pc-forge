@@ -47,4 +47,6 @@ export const ClockIcon = (props) => React.createElement(Icon, { name: 'clock', .
 export const InfoIcon = (props) => React.createElement(Icon, { name: 'info', ...props });
 export const ChevronUpIcon = (props) => React.createElement(Icon, { name: 'chevronUp', ...props });
 export const ChevronDownIcon = (props) => React.createElement(Icon, { name: 'chevronDown', ...props });
+export const QrCodeIcon = (props) => React.createElement(Icon, { name: 'qrCode', ...props });
+
 

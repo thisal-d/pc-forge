@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'app_network_image.dart';
 
 class PromoBanner extends StatelessWidget {
   final VoidCallback? onTap;
@@ -109,10 +110,11 @@ class PromoBanner extends StatelessWidget {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            Image.network(
-                              'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=400&auto=format&fit=crop&q=80',
+                            AppNetworkImage(
+                              imageUrl:
+                                  'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=400&auto=format&fit=crop&q=80',
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
+                              customFallback: Container(
                                 color: Colors.blue.shade900.withValues(alpha: 0.4),
                                 child: const Center(
                                   child: Icon(
@@ -122,19 +124,6 @@ class PromoBanner extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              loadingBuilder: (context, child, progress) {
-                                if (progress == null) return child;
-                                return const Center(
-                                  child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                );
-                              },
                             ),
                             // RGB Neon Gradient Overlay
                             Container(

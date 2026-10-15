@@ -130,66 +130,6 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
     }
   }
 
-  void _handleAttachPhoto(String srNumber) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Attach Photo to $srNumber',
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Take a photo of the faulty component or screen artifact for technician inspection.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: const Icon(Icons.camera_alt_outlined, color: Color(0xFF5B4DFF)),
-                title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.w600)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: const Color(0xFF10B981),
-                      content: Text('Photo attached to $srNumber!'),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined, color: Color(0xFF5B4DFF)),
-                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: const Color(0xFF10B981),
-                      content: Text('Image uploaded and linked to $srNumber!'),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -549,7 +489,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
 
           _buildServiceRequestRow(
             label: 'Initial Status',
-            value: 'Pending',
+            value: 'Booked',
             isBold: true,
             valueColor: const Color(0xFFB45309),
           ),
@@ -600,7 +540,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
     Color statusBg;
     Color statusFg;
     final st = sr.status.toUpperCase();
-    if (st == 'PENDING') {
+    if (st == 'BOOKED' || st == 'PENDING') {
       statusBg = const Color(0xFFFEF3C7);
       statusFg = const Color(0xFFB45309);
     } else if (st == 'IN PROGRESS' || st == 'IN_PROGRESS') {
@@ -620,7 +560,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
       statusFg = const Color(0xFFB45309);
     }
 
-    final isPending = st == 'PENDING';
+    final isPending = st == 'BOOKED' || st == 'PENDING';
 
     return Container(
       width: double.infinity,
@@ -696,20 +636,14 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
             const SizedBox(height: 12),
           ],
 
-          _buildServiceRequestRow(
-            label: 'Product',
-            value: sr.productName ?? 'PC Hardware Component',
-            isBold: true,
-          ),
-          const SizedBox(height: 8),
-
-          _buildServiceRequestRow(
-            label: 'Warranty',
-            value: sr.warrantyStatus,
-            valueColor: sr.warrantyStatus == 'Active' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-            isBold: true,
-          ),
-          const SizedBox(height: 8),
+          if (sr.problemCategory.isNotEmpty && sr.problemCategory.toLowerCase() != 'general') ...[
+            _buildServiceRequestRow(
+              label: 'Category',
+              value: sr.problemCategory,
+              isBold: true,
+            ),
+            const SizedBox(height: 8),
+          ],
 
           if (sr.preferredDate != null) ...[
             _buildServiceRequestRow(
@@ -727,41 +661,20 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
 
           const SizedBox(height: 16),
 
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 44,
-                  child: OutlinedButton(
-                    onPressed: () => _handleAttachPhoto(sr.serviceRequestNumber),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF5B4DFF),
-                      side: const BorderSide(color: Color(0xFF5B4DFF), width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                    ),
-                    child: const Text('Attach Photo', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                  ),
-                ),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF5B4DFF),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 44,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF5B4DFF),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                    ),
-                    child: const Text('View Requests', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                  ),
-                ),
-              ),
-            ],
+              child: const Text('View Requests', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            ),
           ),
 
           if (isPending) ...[
@@ -887,7 +800,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
       if (idx != -1) {
         setState(() {
           _messages[idx] = AiAfterSalesChatMessage(
-            text: 'Your Service Request has been confirmed and submitted successfully! Status is Pending.',
+            text: 'Your Service Request has been confirmed and submitted successfully! Status is Booked.',
             isUser: false,
             serviceRequest: created,
             attemptCount: msg.attemptCount,
@@ -900,7 +813,7 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFF10B981),
-            content: Text('Service Request #${created.serviceRequestNumber} created with status Pending.'),
+            content: Text('Service Request #${created.serviceRequestNumber} created with status Booked.'),
           ),
         );
       }
@@ -1012,14 +925,15 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
           SizedBox(
             width: double.infinity,
             height: 44,
-            child: OutlinedButton(
-              onPressed: () => _handleAttachPhoto(rmaSr.rmaNumber),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF5B4DFF),
-                side: const BorderSide(color: Color(0xFF5B4DFF), width: 1.5),
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF5B4DFF),
+                foregroundColor: Colors.white,
+                elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('Attach Photo', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: const Text('View Requests', style: TextStyle(fontWeight: FontWeight.w700)),
             ),
           ),
         ],

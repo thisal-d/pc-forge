@@ -10,7 +10,7 @@ public class ServiceRequest
     public string? Description { get; set; }
     public DateTime? PreferredDate { get; set; }
     public string? PreferredTime { get; set; }
-    public string Status { get; set; } = "Pending";
+    public string Status { get; set; } = "Booked";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

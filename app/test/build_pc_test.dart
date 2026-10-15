@@ -565,7 +565,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Check header and status
-      expect(find.text('RIG #${flaggedBuild.buildId}'), findsOneWidget);
+      expect(find.text('CUSTOM RIG'), findsOneWidget);
       expect(find.text('Changes Requested'), findsOneWidget);
 
       // Check technician feedback banner
@@ -609,7 +609,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('RIG #${approvedBuild.buildId}'), findsOneWidget);
+      expect(find.text('CUSTOM RIG'), findsOneWidget);
       expect(find.text('Approved by Staff'), findsOneWidget);
       expect(find.text('Certified Technician Approval Message'), findsOneWidget);
       expect(find.text('Clearance verified. Motherboard VRM thermals well within spec. Ready for build.'), findsOneWidget);
@@ -736,7 +736,7 @@ void main() {
       // Build #901 should now be removed from the customer's view
       expect(find.text('Pro Creator AM5 Workstation'), findsNothing);
       expect(find.text('Compact ITX Gaming Beast'), findsOneWidget);
-      expect(find.text('Custom Build #901 deleted successfully.'), findsOneWidget);
+      expect(find.text('Custom Build "Pro Creator AM5 Workstation" deleted successfully.'), findsOneWidget);
     });
 
     testWidgets('Deleting build from BuildStatusScreen deletes build and pops screen', (tester) async {

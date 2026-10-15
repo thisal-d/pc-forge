@@ -163,7 +163,7 @@ class _CreateServiceRequestScreenState extends State<CreateServiceRequestScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Service Request submitted successfully! Status: Pending'),
+            content: Text('Service Request submitted successfully! Status: Booked'),
             backgroundColor: AppColors.stockGreen,
           ),
         );

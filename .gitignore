@@ -64,3 +64,4 @@ pubspec.lock
 readme-test.md
 .env.deploy
 test-member/
+.dotnet

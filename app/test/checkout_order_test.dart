@@ -18,6 +18,8 @@ class MockOrderApiService extends ApiService {
     required String shippingAddress,
     required String paymentMethod,
     required List<Map<String, dynamic>> items,
+    String? couponCode,
+    double? discountAmount,
     String? token,
   }) async {
     return {

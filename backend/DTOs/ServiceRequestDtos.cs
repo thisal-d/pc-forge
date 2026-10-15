@@ -128,7 +128,7 @@ public class ServiceRequestDetailDto
     public string? Description { get; set; }
     public DateTime? PreferredDate { get; set; }
     public string? PreferredTime { get; set; }
-    public string Status { get; set; } = "Pending";
+    public string Status { get; set; } = "Booked";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
@@ -146,7 +146,7 @@ public class ServiceRequestSummaryDto
     public string? Description { get; set; }
     public DateTime? PreferredDate { get; set; }
     public string? PreferredTime { get; set; }
-    public string Status { get; set; } = "Pending";
+    public string Status { get; set; } = "Booked";
     public DateTime CreatedAt { get; set; }
 }
 

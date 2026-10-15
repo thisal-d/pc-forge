@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_network_image.dart';
 import '../../features/catalog/data/models/product_model.dart';
 import '../../features/wishlist/data/wishlist_service.dart';
 import '../theme/app_colors.dart';
@@ -15,28 +16,6 @@ class ProductCard extends StatelessWidget {
     this.onAddToCart,
   });
 
-  IconData _getCategoryFallbackIcon(String? category) {
-    switch ((category ?? '').toLowerCase()) {
-      case 'gpu':
-        return Icons.videogame_asset_outlined;
-      case 'cpu':
-        return Icons.memory_rounded;
-      case 'motherboard':
-        return Icons.developer_board_rounded;
-      case 'ram':
-        return Icons.straighten_rounded;
-      case 'psu':
-        return Icons.power_rounded;
-      case 'storage':
-        return Icons.storage_rounded;
-      case 'cooling':
-        return Icons.ac_unit_rounded;
-      case 'case':
-        return Icons.computer_rounded;
-      default:
-        return Icons.devices_rounded;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,29 +49,16 @@ class ProductCard extends StatelessWidget {
                         border: Border.all(color: AppColors.border.withValues(alpha: 0.6), width: 1),
                       ),
                       clipBehavior: Clip.antiAlias,
-                      child: (product.imageUrl != null && product.imageUrl!.trim().isNotEmpty)
-                          ? Image.network(
-                              product.imageUrl!.trim(),
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => _buildFallbackThumbnail(),
-                              loadingBuilder: (context, child, progress) {
-                                if (progress == null) return child;
-                                return Container(
-                                  color: const Color(0xFFF1F5F9),
-                                  child: const Center(
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.primaryBlue,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            )
-                          : _buildFallbackThumbnail(),
+                      child: AppNetworkImage(
+                        imageUrl: product.imageUrl,
+                        categoryName: product.categoryName,
+                        productName: product.name,
+                        width: 104,
+                        height: 108,
+                        fit: BoxFit.cover,
+                        fallbackIconSize: 38,
+                        showCategoryTag: true,
+                      ),
                     ),
 
                     // Badge Pill at top-left (e.g. "🔥 Popular" / "🔥 Best Seller")
@@ -302,9 +268,12 @@ class ProductCard extends StatelessWidget {
                             key: Key('add_to_cart_btn_${product.productId}'),
                             onPressed: product.isInStock ? onAddToCart : null,
                             icon: const Icon(Icons.shopping_cart_outlined, size: 14),
-                            label: const Text(
-                              'Add to Cart',
-                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                            label: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Add to Cart',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                              ),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryBlue,
@@ -313,7 +282,7 @@ class ProductCard extends StatelessWidget {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
                               visualDensity: VisualDensity.compact,
                               elevation: 0,
                             ),
@@ -331,13 +300,4 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  Widget _buildFallbackThumbnail() {
-    return Center(
-      child: Icon(
-        _getCategoryFallbackIcon(product.categoryName),
-        size: 40,
-        color: AppColors.secondaryText.withValues(alpha: 0.6),
-      ),
-    );
-  }
 }

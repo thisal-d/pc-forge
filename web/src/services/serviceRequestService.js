@@ -173,12 +173,16 @@ export const serviceRequestService = {
   // Compute live KPI analytics
   getStats(requestsList = []) {
     if (!Array.isArray(requestsList)) {
-      return { total: 0, pending: 0, inProgress: 0, completed: 0, noShow: 0, cancelled: 0 };
+      return { total: 0, booked: 0, pending: 0, inProgress: 0, completed: 0, noShow: 0, cancelled: 0 };
     }
 
     const norm = (s) => (s || '').toUpperCase().replace(/_/g, ' ');
     const total = requestsList.length;
-    const pending = requestsList.filter((r) => norm(r.status) === 'PENDING').length;
+    const booked = requestsList.filter((r) => {
+      const s = norm(r.status);
+      return s === 'BOOKED' || s === 'PENDING';
+    }).length;
+    const pending = booked;
     const inProgress = requestsList.filter((r) => {
       const s = norm(r.status);
       return s === 'IN PROGRESS' || s === 'IN SERVICE' || s === 'UNDER REVIEW' || s === 'SCHEDULED';
@@ -190,7 +194,7 @@ export const serviceRequestService = {
     const noShow = requestsList.filter((r) => norm(r.status) === 'NO SHOW').length;
     const cancelled = requestsList.filter((r) => norm(r.status) === 'CANCELLED' || norm(r.status) === 'CANCELED' || norm(r.status) === 'REJECTED').length;
 
-    return { total, pending, inProgress, completed, noShow, cancelled };
+    return { total, booked, pending, inProgress, completed, noShow, cancelled };
   },
 
   // Update service request status and optional appointment date/time/slot (PUT /api/ServiceRequests/{id})

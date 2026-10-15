@@ -238,7 +238,7 @@ public class AppDbContext : DbContext
             entity.Property(sr => sr.Description).HasColumnName("description");
             entity.Property(sr => sr.PreferredDate).HasColumnName("preferreddate");
             entity.Property(sr => sr.PreferredTime).HasColumnName("preferredtime").HasMaxLength(50);
-            entity.Property(sr => sr.Status).HasColumnName("status").HasMaxLength(50).HasDefaultValue("Pending");
+            entity.Property(sr => sr.Status).HasColumnName("status").HasMaxLength(50).HasDefaultValue("Booked");
             entity.Property(sr => sr.CreatedAt).HasColumnName("createdat").HasDefaultValueSql("NOW()");
             entity.Property(sr => sr.UpdatedAt).HasColumnName("updatedat").HasDefaultValueSql("NOW()");
 

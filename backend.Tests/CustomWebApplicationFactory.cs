@@ -230,7 +230,7 @@ public class MockAiAgentService : PCForge.Api.Services.IAiAgentService
                         Description = msg,
                         PreferredDate = extractedDate,
                         PreferredTime = extractedTime,
-                        Status = "Pending",
+                        Status = "Booked",
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -240,7 +240,7 @@ public class MockAiAgentService : PCForge.Api.Services.IAiAgentService
                     return new AfterSalesChatResponseDto
                     {
                         Success = true,
-                        Reply = $"Your Service Request has been created successfully.\n\nService Request ID: {srNumber}\nTitle: {newSr.Title}\nStatus: Pending",
+                        Reply = $"Your Service Request has been created successfully.\n\nService Request ID: {srNumber}\nTitle: {newSr.Title}\nStatus: Booked",
                         ServiceRequestMode = true,
                         ServiceRequestRequired = true,
                         ServiceRequest = new ServiceRequestInfoDto
@@ -281,12 +281,40 @@ public class MockAiAgentService : PCForge.Api.Services.IAiAgentService
 public class MockEmailService : IEmailService
 {
     public List<(string Email, string Name, int BuildId, string Status)> SentEmails { get; } = new();
+    public List<(string Email, string Name, int OrderId, string Status, decimal Amount)> SentOrderEmails { get; } = new();
+    public List<(string Email, string Name, string ServiceNumber, string Status)> SentServiceEmails { get; } = new();
 
     public Task<bool> SendBuildReviewNotificationAsync(
         string customerEmail, string customerName, int buildId,
         string buildName, string newStatus, string? technicianNotes, decimal totalPrice)
     {
         SentEmails.Add((customerEmail, customerName, buildId, newStatus));
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> SendBuildNotificationAsync(
+        string customerEmail, string customerName, int buildId,
+        string buildName, string eventType, string? technicianNotes = null, decimal totalPrice = 0)
+    {
+        SentEmails.Add((customerEmail, customerName, buildId, eventType));
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> SendOrderNotificationAsync(
+        string customerEmail, string customerName, int orderId,
+        string eventType, string paymentMethod, string shippingAddress,
+        decimal totalAmount, int itemCount = 0, string? notes = null)
+    {
+        SentOrderEmails.Add((customerEmail, customerName, orderId, eventType, totalAmount));
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> SendServiceRequestNotificationAsync(
+        string customerEmail, string customerName, string serviceRequestNumber,
+        string eventType, string? title = null, DateTime? appointmentDate = null,
+        string? appointmentTime = null, string? notes = null)
+    {
+        SentServiceEmails.Add((customerEmail, customerName, serviceRequestNumber, eventType));
         return Task.FromResult(true);
     }
 }
