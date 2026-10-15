@@ -220,10 +220,10 @@ export const Navbar = () => {
             </>
           ) : (
             <div className="auth-buttons-group">
-              <Link to="/login" className="btn btn-outline-sm">
+              <Link to="/login" className="btn btn-outline-sm" id="nav-login-btn">
                 Login
               </Link>
-              <Link to="/register" className="btn btn-primary-sm">
+              <Link to="/register" className="btn btn-primary-sm" id="nav-register-btn">
                 Register
               </Link>
             </div>

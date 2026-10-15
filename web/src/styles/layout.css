@@ -211,6 +211,12 @@ body {
   gap: 1rem;
 }
 
+.auth-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 /* User Profile Pill */
 .user-profile-wrapper {
   position: relative;
