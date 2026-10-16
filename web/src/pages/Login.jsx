@@ -1,6 +1,8 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.1.0';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
@@ -122,7 +124,7 @@ export const Login = () => {
         </div>
 
         <p className="auth-footer">
-          PCForge Operations Portal &bull; Authorized Staff Only
+          PCForge Operations Portal &bull; Authorized Staff Only &bull; v{APP_VERSION}
         </p>
       </div>
     </div>
