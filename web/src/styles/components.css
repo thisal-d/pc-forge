@@ -478,15 +478,6 @@
   box-shadow: 0 0 0 3px var(--primary-focus);
 }
 
-.select-chevron-icon {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--text-muted);
-}
-
 .toolbar-count-badge {
   display: flex;
   align-items: center;

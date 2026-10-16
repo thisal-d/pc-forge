@@ -1,5 +1,4 @@
 import React from 'react';
-import { ADJUSTMENT_REASONS } from '../../constants/inventoryConstants.js';
 import { CloseIcon, PackageIcon, TargetIcon } from '../icons/index.js';
 
 export const StockAdjustmentModal = ({
@@ -11,10 +10,6 @@ export const StockAdjustmentModal = ({
   amountInput,
   onAmountInputChange,
   previewNewStock,
-  reasonInput,
-  onReasonInputChange,
-  notesInput,
-  onNotesInputChange,
   modalError,
   isSubmitting,
   onSubmit,
@@ -95,55 +90,23 @@ export const StockAdjustmentModal = ({
                 <strong style={{ color: '#2563eb' }}>{previewNewStock} units</strong>
               </span>
             </div>
-
-            {/* Reason */}
-            <div className="form-group-saas">
-              <label className="form-label-saas" htmlFor="modal-reason-select">
-                Reason for Adjustment
-              </label>
-              <select
-                id="modal-reason-select"
-                className="form-select-saas"
-                value={reasonInput}
-                onChange={(e) => onReasonInputChange(e.target.value)}
-              >
-                {ADJUSTMENT_REASONS.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Notes */}
-            <div className="form-group-saas">
-              <label className="form-label-saas" htmlFor="modal-notes-input">
-                Internal Notes (Optional)
-              </label>
-              <textarea
-                id="modal-notes-input"
-                className="form-textarea-saas"
-                rows="2"
-                placeholder="e.g., PO #108492 received from distributor..."
-                value={notesInput}
-                onChange={(e) => onNotesInputChange(e.target.value)}
-              />
-            </div>
           </div>
 
           <div className="saas-modal-footer">
             <button
               type="button"
-              className="btn-outline-saas"
+              className="btn btn-secondary"
               onClick={onClose}
               disabled={isSubmitting}
+              id="btn-cancel-adjust-stock"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary-saas"
+              className="btn btn-primary"
               disabled={isSubmitting}
+              id="btn-confirm-adjust-stock"
             >
               {isSubmitting ? 'Updating...' : 'Confirm Stock Adjustment'}
             </button>
