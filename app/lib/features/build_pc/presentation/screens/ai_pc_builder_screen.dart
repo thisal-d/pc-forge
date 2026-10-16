@@ -377,13 +377,15 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
                 child: const Icon(Icons.check_rounded, color: Color(0xFF10B981), size: 16),
               ),
               const SizedBox(width: 10),
-              const Text(
-                'Requirement Profile — Ready',
-                style: TextStyle(
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                  letterSpacing: -0.3,
+              const Expanded(
+                child: Text(
+                  'Requirement Profile — Ready',
+                  style: TextStyle(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                  ),
                 ),
               ),
             ],
@@ -447,7 +449,7 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
 
   Widget _buildProfileRow(String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
@@ -457,12 +459,17 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
             color: Color(0xFF64748B),
           ),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0F172A),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            softWrap: true,
+            style: const TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+            ),
           ),
         ),
       ],
