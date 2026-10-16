@@ -154,6 +154,10 @@ public class EmailService : IEmailService
             ["to_email"] = customerEmail,
             ["customer_name"] = customerName,
             ["customer_email"] = customerEmail,
+            ["email"] = customerEmail,
+            ["user_email"] = customerEmail,
+            ["recipient_email"] = customerEmail,
+            ["reply_to"] = customerEmail,
             ["subject"] = subject,
             ["headline"] = headline,
             ["status_badge"] = statusBadge,
@@ -308,6 +312,10 @@ public class EmailService : IEmailService
             ["to_email"] = customerEmail,
             ["customer_name"] = customerName,
             ["customer_email"] = customerEmail,
+            ["email"] = customerEmail,
+            ["user_email"] = customerEmail,
+            ["recipient_email"] = customerEmail,
+            ["reply_to"] = customerEmail,
             ["subject"] = subject,
             ["headline"] = headline,
             ["status_badge"] = statusBadge,
@@ -443,6 +451,10 @@ public class EmailService : IEmailService
             ["to_email"] = customerEmail,
             ["customer_name"] = customerName,
             ["customer_email"] = customerEmail,
+            ["email"] = customerEmail,
+            ["user_email"] = customerEmail,
+            ["recipient_email"] = customerEmail,
+            ["reply_to"] = customerEmail,
             ["subject"] = subject,
             ["headline"] = headline,
             ["status_badge"] = statusBadge,
@@ -532,6 +544,9 @@ public class EmailService : IEmailService
             {
                 payload["accessToken"] = privateKey;
             }
+
+            _logger.LogInformation("[EmailService] Dispatching email to {CustomerEmail} using Template: '{TemplateId}' (Subject: '{Subject}')",
+                customerEmail, templateId ?? "Default", subject);
 
             var response = await _httpClient.PostAsJsonAsync("https://api.emailjs.com/api/v1.0/email/send", payload);
             if (response.IsSuccessStatusCode)
