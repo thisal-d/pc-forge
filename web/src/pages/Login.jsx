@@ -56,11 +56,6 @@ export const Login = () => {
     }
   };
 
-  const fillCredentials = (quickEmail, quickPassword) => {
-    setEmail(quickEmail);
-    setPassword(quickPassword);
-    setError('');
-  };
 
   return (
     <div className="auth-container">
@@ -103,25 +98,6 @@ export const Login = () => {
           </button>
         </form>
 
-        <div className="demo-credentials-box">
-          <span className="demo-title">Quick Test Credentials:</span>
-          <div className="demo-chips">
-            <button
-              type="button"
-              className="chip chip-admin"
-              onClick={() => fillCredentials('admin@pcforge.com', 'Admin123!')}
-            >
-              Admin
-            </button>
-            <button
-              type="button"
-              className="chip chip-staff"
-              onClick={() => fillCredentials('staff@pcforge.com', 'Staff123!')}
-            >
-              Staff
-            </button>
-          </div>
-        </div>
 
         <p className="auth-footer">
           PCForge Operations Portal &bull; Authorized Staff Only &bull; v{APP_VERSION}

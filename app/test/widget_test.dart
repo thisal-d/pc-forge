@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pc_forge_mobile/main.dart';
 
@@ -12,7 +12,6 @@ void main() {
     expect(find.byKey(const Key('login_email_field')), findsOneWidget);
     expect(find.byKey(const Key('login_password_field')), findsOneWidget);
     expect(find.byKey(const Key('login_submit_btn')), findsOneWidget);
-    expect(find.byKey(const Key('login_quick_fill_btn')), findsOneWidget);
     expect(find.byKey(const Key('login_to_register_btn')), findsOneWidget);
   });
 
@@ -27,14 +26,6 @@ void main() {
     expect(find.text('Please enter your password'), findsOneWidget);
   });
 
-  testWidgets('Quick Fill button populates customer credentials on Login screen', (WidgetTester tester) async {
-    await tester.pumpWidget(const PCForgeApp());
-
-    await tester.tap(find.byKey(const Key('login_quick_fill_btn')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('customer@pcforge.com'), findsOneWidget);
-  });
 
   testWidgets('Entering customer credentials populates text fields on Login screen', (WidgetTester tester) async {
     await tester.pumpWidget(const PCForgeApp());
