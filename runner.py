@@ -502,10 +502,10 @@ class RunnerOrchestrator:
                 except Exception as e:
                     log("MOBILE", RED, f"Failed to scaffold Flutter platform: {e}")
 
-            api_base_url, app_env_mode = self.read_mobile_env()
-            log("MOBILE", BLUE, f"Mobile API Target: {api_base_url} (Env: {app_env_mode})")
+            api_base_url, app_env_mode, app_version = self.read_mobile_env()
+            log("MOBILE", BLUE, f"Mobile API Target: {api_base_url} (Env: {app_env_mode}, Ver: {app_version})")
 
-            mobile_cmd = self.build_mobile_cmd(api_base_url, app_env_mode, device)
+            mobile_cmd = self.build_mobile_cmd(api_base_url, app_env_mode, app_version, device)
 
             self.services["mobile"] = Service(
                 name=f"Mobile Client (Flutter {f'[{device}]' if device else ''})",
@@ -517,11 +517,12 @@ class RunnerOrchestrator:
             )
 
     def read_mobile_env(self):
-        """Reads API_BASE_URL and APP_ENV from app/.env if present."""
+        """Reads API_BASE_URL, APP_ENV, and APP_VERSION from app/.env if present."""
         app_dir = self.root_dir / "app"
         app_env_file = app_dir / ".env"
         api_base_url = "http://localhost:5000/api"
         app_env_mode = "development"
+        app_version = "1.1.0"
         if app_env_file.exists():
             try:
                 for raw_line in app_env_file.read_text(encoding="utf-8").splitlines():
@@ -534,17 +535,22 @@ class RunnerOrchestrator:
                         val = line.split("=", 1)[1].strip().strip('"').strip("'")
                         if val:
                             app_env_mode = val
+                    elif line.startswith("APP_VERSION="):
+                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if val:
+                            app_version = val
             except Exception:
                 pass
-        return api_base_url, app_env_mode
+        return api_base_url, app_env_mode, app_version
 
-    def build_mobile_cmd(self, api_base_url: str, app_env_mode: str, device: Optional[str]) -> List[str]:
+    def build_mobile_cmd(self, api_base_url: str, app_env_mode: str, app_version: str, device: Optional[str]) -> List[str]:
         """Constructs flutter run command with current compile-time environment flags."""
         flutter_bin = find_flutter_binary()
         cmd = [
             flutter_bin, "run",
             f"--dart-define=API_BASE_URL={api_base_url}",
-            f"--dart-define=APP_ENV={app_env_mode}"
+            f"--dart-define=APP_ENV={app_env_mode}",
+            f"--dart-define=APP_VERSION={app_version}"
         ]
         if device:
             cmd.extend(["-d", device])
@@ -556,16 +562,16 @@ class RunnerOrchestrator:
             log("RUNNER", YELLOW, "Mobile service is not running.")
             return
 
-        api_base_url, app_env_mode = self.read_mobile_env()
+        api_base_url, app_env_mode, app_version = self.read_mobile_env()
         device = self.flutter_device or detect_flutter_device()
         self.flutter_device = device
 
         if self.run_backend:
             setup_adb_reverse([5000, 5050], self.flutter_device)
 
-        new_cmd = self.build_mobile_cmd(api_base_url, app_env_mode, device)
+        new_cmd = self.build_mobile_cmd(api_base_url, app_env_mode, app_version, device)
         self.services["mobile"].cmd = new_cmd
-        log("MOBILE", BLUE, f"Restarting Mobile with Target: {api_base_url} (Env: {app_env_mode})")
+        log("MOBILE", BLUE, f"Restarting Mobile with Target: {api_base_url} (Env: {app_env_mode}, Ver: {app_version})")
         self.services["mobile"].restart()
 
     def _setup_watcher(self):

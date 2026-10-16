@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.1.0';
+
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,6 +56,12 @@ export const Login = () => {
     }
   };
 
+  const fillCredentials = (quickEmail, quickPassword) => {
+    setEmail(quickEmail);
+    setPassword(quickPassword);
+    setError('');
+  };
+
   return (
     <div className="auth-container">
       <div className="auth-card">
@@ -71,7 +79,7 @@ export const Login = () => {
             <input
               id="email"
               type="email"
-              placeholder="staff@pcforge.com"
+              placeholder="user@pcforge.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -95,8 +103,28 @@ export const Login = () => {
           </button>
         </form>
 
+        <div className="demo-credentials-box">
+          <span className="demo-title">Quick Test Credentials:</span>
+          <div className="demo-chips">
+            <button
+              type="button"
+              className="chip chip-admin"
+              onClick={() => fillCredentials('admin@pcforge.com', 'Admin123!')}
+            >
+              Admin
+            </button>
+            <button
+              type="button"
+              className="chip chip-staff"
+              onClick={() => fillCredentials('staff@pcforge.com', 'Staff123!')}
+            >
+              Staff
+            </button>
+          </div>
+        </div>
+
         <p className="auth-footer">
-          Don't have an account? <Link to="/register">Create one here</Link>
+          PCForge Operations Portal &bull; Authorized Staff Only &bull; v{APP_VERSION}
         </p>
       </div>
     </div>

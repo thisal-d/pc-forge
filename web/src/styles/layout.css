@@ -164,6 +164,19 @@ body {
   letter-spacing: -0.4px;
 }
 
+.brand-version-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--primary-light, #eff6ff);
+  border: 1px solid var(--primary-border, #bfdbfe);
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+  line-height: 1;
+  letter-spacing: 0.3px;
+  margin-left: 0.2rem;
+}
+
 /* Top Horizontal Navigation Tabs */
 .top-navbar-tabs {
   display: flex;
@@ -420,6 +433,16 @@ body {
   font-size: 0.75rem;
   color: #3b82f6;
   line-height: 1.4;
+}
+
+.sidebar-version-footer {
+  margin-top: 1.25rem;
+  padding: 0.5rem 0.25rem 0.25rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted, #94a3b8);
+  letter-spacing: 0.2px;
 }
 
 /* Base Keyframes */

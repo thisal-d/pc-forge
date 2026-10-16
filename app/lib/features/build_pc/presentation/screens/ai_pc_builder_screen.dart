@@ -52,6 +52,7 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
   }
 
   void _sendMessage([String? presetText]) {
+    if (_aiService.isLoading) return;
     final text = presetText ?? _textController.text;
     if (text.trim().isEmpty) return;
     if (presetText == null) {
@@ -241,16 +242,17 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
   }
 
   Widget _buildQuickChip({required String label, required VoidCallback onTap}) {
+    final disabled = _aiService.isLoading;
     return ActionChip(
-      onPressed: onTap,
-      backgroundColor: const Color(0xFFEEF2FF),
-      side: const BorderSide(color: Color(0xFFC7D2FE)),
+      onPressed: disabled ? null : onTap,
+      backgroundColor: disabled ? const Color(0xFFF1F5F9) : const Color(0xFFEEF2FF),
+      side: BorderSide(color: disabled ? const Color(0xFFE2E8F0) : const Color(0xFFC7D2FE)),
       label: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF4F46E5),
+          color: disabled ? const Color(0xFF94A3B8) : const Color(0xFF4F46E5),
         ),
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -375,13 +377,15 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
                 child: const Icon(Icons.check_rounded, color: Color(0xFF10B981), size: 16),
               ),
               const SizedBox(width: 10),
-              const Text(
-                'Requirement Profile — Ready',
-                style: TextStyle(
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                  letterSpacing: -0.3,
+              const Expanded(
+                child: Text(
+                  'Requirement Profile — Ready',
+                  style: TextStyle(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                  ),
                 ),
               ),
             ],
@@ -445,7 +449,7 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
 
   Widget _buildProfileRow(String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
@@ -455,12 +459,17 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
             color: Color(0xFF64748B),
           ),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14.5,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0F172A),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            softWrap: true,
+            style: const TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+            ),
           ),
         ),
       ],
@@ -497,6 +506,8 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
   }
 
   Widget _buildInputBar(bool isComplete) {
+    final isLoading = _aiService.isLoading;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
       decoration: const BoxDecoration(
@@ -515,12 +526,15 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
               child: TextField(
                 controller: _textController,
                 textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _sendMessage(),
+                enabled: !isLoading,
+                onSubmitted: isLoading ? null : (_) => _sendMessage(),
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: isComplete
-                      ? 'Say anything to adjust requirements...'
-                      : 'Tell me what you need (e.g. 1440p, have monitor)...',
+                  hintText: isLoading
+                      ? 'Waiting for AI response...'
+                      : (isComplete
+                          ? 'Say anything to adjust requirements...'
+                          : 'Tell me what you need (e.g. 1440p, have monitor)...'),
                   hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                   border: InputBorder.none,
                 ),
@@ -529,17 +543,29 @@ class _AiPcBuilderScreenState extends State<AiPcBuilderScreen> {
           ),
           const SizedBox(width: 10),
           Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF5B4DFF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+            decoration: BoxDecoration(
+              gradient: isLoading
+                  ? null
+                  : const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF5B4DFF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+              color: isLoading ? const Color(0xFFCBD5E1) : null,
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-              onPressed: () => _sendMessage(),
+              icon: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+              onPressed: isLoading ? null : () => _sendMessage(),
             ),
           ),
         ],

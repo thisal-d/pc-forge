@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../../core/app_routes.dart';
 import '../../data/auth_repository.dart';
 
@@ -24,6 +24,14 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _quickFillCustomer() {
+    setState(() {
+      _emailController.text = 'customer@pcforge.com';
+      _passwordController.text = 'Cust123!';
+      _errorMessage = null;
+    });
   }
 
   Future<void> _handleLogin() async {
@@ -202,7 +210,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+
+                  // Demo Quick-Fill Helper
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      key: const Key('login_quick_fill_btn'),
+                      onPressed: _isLoading ? null : _quickFillCustomer,
+                      icon: const Icon(Icons.flash_on, size: 16),
+                      label: const Text('Quick Fill Demo (Customer)', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
 
                   // Login Button
                   ElevatedButton(
@@ -246,3 +269,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

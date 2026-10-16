@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.1.0';
+
 export const Navbar = () => {
   const { user, isAuthenticated, role, logout } = useAuth();
   const navigate = useNavigate();
@@ -140,6 +142,7 @@ export const Navbar = () => {
             <img src="/logo.png" alt="PCForge Logo" className="brand-logo-img" />
           </div>
           <span className="brand-title">PCForge</span>
+          <span className="brand-version-badge">v{APP_VERSION}</span>
         </Link>
 
         {/* Center: Top Horizontal Navigation Tabs */}
@@ -220,11 +223,8 @@ export const Navbar = () => {
             </>
           ) : (
             <div className="auth-buttons-group">
-              <Link to="/login" className="btn btn-outline-sm" id="nav-login-btn">
+              <Link to="/login" className="btn btn-primary-sm" id="nav-login-btn">
                 Login
-              </Link>
-              <Link to="/register" className="btn btn-primary-sm" id="nav-register-btn">
-                Register
               </Link>
             </div>
           )}
@@ -235,3 +235,4 @@ export const Navbar = () => {
 };
 
 export default Navbar;
+

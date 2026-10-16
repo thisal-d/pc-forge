@@ -89,7 +89,7 @@ class AiBuildService extends ChangeNotifier {
   /// Send message to Requirement Discovery Agent
   Future<void> sendMessage(String text) async {
     final clean = text.trim();
-    if (clean.isEmpty) return;
+    if (clean.isEmpty || _isLoading) return;
 
     // Optimistically append user message
     _messages.add(AiRequirementMessage(text: clean, isUser: true));
