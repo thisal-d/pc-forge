@@ -47,8 +47,6 @@ export const Inventory = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [adjustMode, setAdjustMode] = useState('add'); // 'add' (Restock) or 'set' (Exact)
   const [amountInput, setAmountInput] = useState('10');
-  const [reasonInput, setReasonInput] = useState('Shipment Received');
-  const [notesInput, setNotesInput] = useState('');
   const [modalError, setModalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -194,8 +192,6 @@ export const Inventory = () => {
     setSelectedProduct(product);
     setAdjustMode('add');
     setAmountInput('10');
-    setReasonInput('Shipment Received');
-    setNotesInput('');
     setModalError('');
     setIsModalOpen(true);
   };
@@ -243,14 +239,10 @@ export const Inventory = () => {
     setModalError('');
 
     try {
-      const fullReason = notesInput.trim()
-        ? `${reasonInput}: ${notesInput.trim()}`
-        : reasonInput;
-
       await productService.updateProductStock(
         selectedProduct.productId || selectedProduct.id,
         finalStock,
-        fullReason
+        'Manual stock adjustment'
       );
 
       setProducts((prev) =>
@@ -372,10 +364,6 @@ export const Inventory = () => {
         amountInput={amountInput}
         onAmountInputChange={setAmountInput}
         previewNewStock={previewNewStock}
-        reasonInput={reasonInput}
-        onReasonInputChange={setReasonInput}
-        notesInput={notesInput}
-        onNotesInputChange={setNotesInput}
         modalError={modalError}
         isSubmitting={isSubmitting}
         onSubmit={handleModalSubmit}
