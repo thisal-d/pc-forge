@@ -574,44 +574,33 @@ class ProfileScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
-                          Icons.dns_outlined,
+                          Icons.smartphone_rounded,
                           size: 18,
-                          color: AppColors.secondaryText,
+                          color: AppColors.primaryBlue,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'PCForge Mobile v2.4.0',
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Text(
+                              'PCForge Mobile',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.primaryDark,
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 7,
-                                  height: 7,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.stockGreen,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'API Connected • Localhost 5000',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.secondaryText,
-                                  ),
-                                ),
-                              ],
+                            SizedBox(height: 2),
+                            Text(
+                              'v${String.fromEnvironment('APP_VERSION', defaultValue: '1.1.0')}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.secondaryText,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),

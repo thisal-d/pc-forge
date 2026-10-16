@@ -98,7 +98,6 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
       final isSrModeNow = result.serviceRequestMode || _isServiceRequestMode || result.serviceRequest != null;
 
       setState(() {
-        _isLoading = false;
         _isServiceRequestMode = isSrModeNow;
         _messages.add(
           AiAfterSalesChatMessage(
@@ -117,7 +116,6 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _isLoading = false;
         _messages.add(
           AiAfterSalesChatMessage(
             text: "Sorry, I encountered an issue connecting to the service. Please try again.",
@@ -127,6 +125,12 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
         );
       });
       _scrollToBottom();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -1044,11 +1048,27 @@ class _AiSupportChatScreenState extends State<AiSupportChatScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          IconButton(
-            onPressed: _isLoading ? null : () => _handleSendMessage(_textController.text),
-            icon: Icon(
-              Icons.send_rounded,
-              color: _isLoading ? Colors.grey.shade400 : const Color(0xFF5B4DFF),
+          Container(
+            decoration: BoxDecoration(
+              color: _isLoading ? const Color(0xFFCBD5E1) : const Color(0xFF5B4DFF),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              onPressed: _isLoading ? null : () => _handleSendMessage(_textController.text),
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
             ),
           ),
         ],

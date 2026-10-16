@@ -141,8 +141,8 @@ void main() {
       expect(error, isNull);
       expect(CartService.instance.totalCount, 2);
       expect(CartService.instance.subtotal, 749.00 * 2);
-      expect(CartService.instance.shippingAmount, 15.0);
-      expect(CartService.instance.totalAmount, (749.00 * 2) + 15.0);
+      expect(CartService.instance.shippingAmount, 0.0);
+      expect(CartService.instance.totalAmount, 749.00 * 2);
     });
 
     test('prevents adding quantity beyond available stock', () {

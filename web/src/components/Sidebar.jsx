@@ -2,6 +2,8 @@ import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.1.0';
+
 export const Sidebar = () => {
   const { role } = useAuth();
   const location = useLocation();
@@ -160,6 +162,11 @@ export const Sidebar = () => {
         <p className="sidebar-promo-desc">
           Manage your inventory and grow your business with PCForge.
         </p>
+      </div>
+
+      {/* Sidebar Version Footer */}
+      <div className="sidebar-version-footer">
+        <span>PCForge Portal v{APP_VERSION}</span>
       </div>
     </aside>
   );

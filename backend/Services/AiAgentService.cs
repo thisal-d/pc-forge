@@ -41,6 +41,45 @@ public class AiAgentService : IAiAgentService
         return (scope.ServiceProvider.GetRequiredService<AppDbContext>(), scope);
     }
 
+    private async Task<(bool Success, T? Data, int StatusCode, string ErrorBody)> PostWithRetryAsync<T>(string uri, object payload, int maxRetries = 3)
+    {
+        int lastStatusCode = 0;
+        string lastErrorBody = string.Empty;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync(uri, payload);
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<T>();
+                    return (true, result, (int)response.StatusCode, string.Empty);
+                }
+
+                lastStatusCode = (int)response.StatusCode;
+                lastErrorBody = await response.Content.ReadAsStringAsync();
+
+                // Retry on rate limit (429) or transient gateway/service issues (502, 503, 504)
+                if ((lastStatusCode == 429 || lastStatusCode == 502 || lastStatusCode == 503 || lastStatusCode == 504) && attempt < maxRetries)
+                {
+                    _logger.LogWarning("AI microservice {Uri} returned HTTP {StatusCode}. Retrying attempt {Attempt}/{MaxRetries} after delay...", uri, lastStatusCode, attempt, maxRetries);
+                    await Task.Delay(TimeSpan.FromSeconds(attempt * 2));
+                    continue;
+                }
+
+                break;
+            }
+            catch (HttpRequestException ex) when (attempt < maxRetries)
+            {
+                _logger.LogWarning(ex, "Network error calling AI microservice {Uri}. Retrying attempt {Attempt}/{MaxRetries}...", uri, attempt, maxRetries);
+                await Task.Delay(TimeSpan.FromSeconds(attempt * 2));
+            }
+        }
+
+        return (false, default, lastStatusCode, lastErrorBody);
+    }
+
     public async Task<RequirementChatResponseDto> SendRequirementChatMessageAsync(string sessionId, string message)
     {
         try
@@ -51,22 +90,26 @@ public class AiAgentService : IAiAgentService
                 message = message
             };
 
-            var response = await _httpClient.PostAsJsonAsync("/agent/requirements/chat", payload);
-            if (response.IsSuccessStatusCode)
+            var (success, result, statusCode, errBody) = await PostWithRetryAsync<RequirementChatResponseDto>("/agent/requirements/chat", payload);
+            if (success && result != null)
             {
-                var result = await response.Content.ReadFromJsonAsync<RequirementChatResponseDto>();
-                if (result != null)
-                {
-                    return result;
-                }
+                return result;
             }
 
-            var errBody = await response.Content.ReadAsStringAsync();
-            _logger.LogError("AI microservice returned HTTP {StatusCode}: {ErrorBody}", response.StatusCode, errBody);
+            _logger.LogError("AI microservice returned HTTP {StatusCode}: {ErrorBody}", statusCode, errBody);
+
+            string userFriendlyReply = statusCode == 429
+                ? "Our AI assistant is currently experiencing high demand. Please wait a moment and send your message again."
+                : (statusCode == 503 || statusCode == 504)
+                    ? "Our AI assistant is currently waking up or under maintenance. Please try again in a few moments."
+                    : !string.IsNullOrWhiteSpace(errBody) && errBody.Length < 120 && !errBody.Contains("<html")
+                        ? $"AI service notice: {errBody}"
+                        : "I apologize, but our AI service is currently unavailable. Please try again shortly.";
+
             return new RequirementChatResponseDto
             {
                 SessionId = sessionId,
-                Reply = $"AI microservice error (HTTP {(int)response.StatusCode}): {errBody}",
+                Reply = userFriendlyReply,
                 Profile = new RequirementProfileDto(),
                 IsComplete = false,
                 Status = "error"
@@ -78,7 +121,7 @@ public class AiAgentService : IAiAgentService
             return new RequirementChatResponseDto
             {
                 SessionId = sessionId,
-                Reply = $"Failed to communicate with AI Requirement Agent at {_aiServiceBaseUrl}: {ex.Message}",
+                Reply = "I apologize, but the AI assistant is currently unreachable. Please try again shortly.",
                 Profile = new RequirementProfileDto(),
                 IsComplete = false,
                 Status = "error"

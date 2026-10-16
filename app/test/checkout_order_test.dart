@@ -25,7 +25,7 @@ class MockOrderApiService extends ApiService {
     return {
       'orderId': 1001,
       'userId': 42,
-      'totalAmount': 764.00,
+      'totalAmount': 749.00,
       'status': 'Order placed',
       'shippingAddress': shippingAddress,
       'paymentMethod': paymentMethod,
@@ -50,7 +50,7 @@ class MockOrderApiService extends ApiService {
       {
         'orderId': 1001,
         'userId': 42,
-        'totalAmount': 764.00,
+        'totalAmount': 749.00,
         'status': 'Order placed',
         'shippingAddress': '45 Flower Road, Colombo',
         'paymentMethod': 'Credit / Debit Card',
@@ -76,7 +76,7 @@ class MockOrderApiService extends ApiService {
     return {
       'orderId': orderId,
       'userId': 42,
-      'totalAmount': 764.00,
+      'totalAmount': 749.00,
       'status': 'Cancelled',
       'shippingAddress': '45 Flower Road, Colombo',
       'paymentMethod': 'Cash on Delivery',
@@ -128,7 +128,7 @@ void main() {
       expect(order.status, 'Order placed');
       expect(order.items.length, 1);
       expect(order.items.first.productName, 'GeForce RTX 4070 Ti 12GB');
-      expect(order.totalAmount, 764.00);
+      expect(order.totalAmount, 749.00);
 
       // Cart is cleared after order is confirmed
       expect(CartService.instance.isEmpty, true);

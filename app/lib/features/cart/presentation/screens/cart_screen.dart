@@ -107,9 +107,7 @@ class CartScreen extends StatelessWidget {
             );
           }
 
-          final netSubtotal = (cart.subtotal - cart.discountAmount).clamp(0.0, double.infinity);
-          final estimatedTax = netSubtotal * 0.05; // 5% Estimated Tax
-          final grandTotal = netSubtotal + cart.shippingAmount + estimatedTax;
+          final grandTotal = (cart.subtotal - cart.discountAmount).clamp(0.0, double.infinity);
 
           return Column(
             children: [
@@ -334,32 +332,6 @@ class CartScreen extends StatelessWidget {
                           ],
                         ),
                       ],
-                      const SizedBox(height: 6),
-
-                      // Shipping
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Shipping / Delivery', style: TextStyle(color: AppColors.secondaryText, fontSize: 13)),
-                          Text(
-                            'LKR ${cart.shippingAmount.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-
-                      // Estimated Tax
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Estimated Tax (5%)', style: TextStyle(color: AppColors.secondaryText, fontSize: 13)),
-                          Text(
-                            'LKR ${estimatedTax.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                          ),
-                        ],
-                      ),
                       const Divider(height: 18),
 
                       // Total
