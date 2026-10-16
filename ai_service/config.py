@@ -1,4 +1,4 @@
-import os
+﻿import os
 import re
 import logging
 import threading
@@ -73,7 +73,7 @@ def get_api_keys() -> list[str]:
 
 GOOGLE_API_KEYS = get_api_keys()
 GOOGLE_API_KEY = GOOGLE_API_KEYS[0] if GOOGLE_API_KEYS else os.getenv("GOOGLE_API_KEY", "")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-3.8-flash")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-3.5-flash-lite")
 AI_SERVICE_PORT = int(os.getenv("AI_SERVICE_PORT", "5050"))
 AI_SERVICE_HOST = os.getenv("AI_SERVICE_HOST", "0.0.0.0")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
@@ -414,4 +414,5 @@ def get_llm():
     except Exception as e:
         logger.error(f"[config] Failed to initialize ChatGoogleGenerativeAI: {e}")
         return None
+
 

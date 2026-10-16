@@ -38,11 +38,10 @@ class CartService extends ChangeNotifier {
     notifyListeners();
   }
 
-  double get shippingAmount => subtotal > 0 ? 15.0 : 0.0;
+  double get shippingAmount => 0.0;
 
   double calculateTotal({bool isPickup = false}) {
-    final shipping = isPickup ? 0.0 : shippingAmount;
-    final total = (subtotal - _discountAmount) + shipping;
+    final total = subtotal - _discountAmount;
     return total > 0 ? total : 0.0;
   }
 

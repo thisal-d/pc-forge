@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -6,7 +6,6 @@ import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 
 import { Login } from './pages/Login';
-import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
 import { Inventory } from './pages/Inventory';
 import { Unauthorized } from './pages/Unauthorized';
@@ -31,7 +30,7 @@ const AppLayout = () => {
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/register" element={<Navigate to="/login" replace />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 
             {/* Protected Routes (Staff & Admin Only) */}
@@ -147,3 +146,4 @@ export const App = () => {
 };
 
 export default App;
+

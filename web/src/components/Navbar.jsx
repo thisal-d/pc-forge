@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -220,11 +220,8 @@ export const Navbar = () => {
             </>
           ) : (
             <div className="auth-buttons-group">
-              <Link to="/login" className="btn btn-outline-sm" id="nav-login-btn">
+              <Link to="/login" className="btn btn-primary-sm" id="nav-login-btn">
                 Login
-              </Link>
-              <Link to="/register" className="btn btn-primary-sm" id="nav-register-btn">
-                Register
               </Link>
             </div>
           )}
@@ -235,3 +232,4 @@ export const Navbar = () => {
 };
 
 export default Navbar;
+

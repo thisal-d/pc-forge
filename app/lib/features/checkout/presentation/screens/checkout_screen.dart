@@ -869,24 +869,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ],
                 ),
               ],
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _selectedPaymentMethod == 'In-Store Pickup & Payment'
-                        ? 'Store Pickup Fee:'
-                        : 'Courier Delivery Fee:',
-                    style: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
-                  ),
-                  Text(
-                    _selectedPaymentMethod == 'In-Store Pickup & Payment'
-                        ? 'FREE (LKR 0.00)'
-                        : 'LKR ${_cartService.shippingAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
               const Divider(height: 18),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
