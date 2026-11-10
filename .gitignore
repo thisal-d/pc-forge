@@ -1,0 +1,71 @@
+# .NET / C#
+**/bin/
+**/obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+**/wwwroot/uploads/
+
+# Node / Web
+**/node_modules/
+**/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Flutter / Dart
+**/.dart_tool/
+**/build/
+contributions.md
+**/.flutter-plugins
+your-part
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+app/android/.gradle/
+app/android/.kotlin/
+app/android/local.properties
+app/android/**/build/
+app/android/.cxx/
+app/ios/
+app/linux/
+app/macos/
+app/windows/
+app/web/
+app/.metadata
+app/pubspec.lock
+*.iml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+ci-log
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+config.bat
+contributed-history.md
+pubspec.lock
+
+# Local Environment Secrets (never commit!)
+**/.env
+**/.env.local
+**/.env.*.local
+**/deploy.env
+**/*.deploy.env
+!**/.env.example
+/data/
+/Data/knowledge/
+!backend/Data/
+readme-test.md
+.env.deploy
+test-member/
+.dotnet

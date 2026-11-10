@@ -1,0 +1,137 @@
+/* ==========================================================================
+   PCForge Page Module - Master Filter Specification Management
+   Modern SaaS Light Theme
+   ========================================================================== */
+
+/* Type Badges */
+.filter-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.filter-type-multiselect {
+  background-color: var(--primary-light);
+  color: var(--primary-hover);
+  border: 1px solid var(--primary-border);
+}
+
+.filter-type-singleselect {
+  background-color: var(--accent-purple-light);
+  color: var(--accent-purple);
+  border: 1px solid var(--accent-purple-border);
+}
+
+.filter-type-range {
+  background-color: var(--warning-light);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+}
+
+.filter-type-boolean {
+  background-color: var(--success-light);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
+}
+
+/* System Filter Key Code Pill */
+.filter-key-code {
+  display: inline-block;
+  background-color: var(--border-subtle);
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-xs);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  font-family: monospace;
+}
+
+/* Unit Badge */
+.filter-unit-pill {
+  display: inline-block;
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+/* Option Chips Container */
+.filter-options-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-width: 320px;
+}
+
+.filter-option-chip {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--border-subtle);
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  color: var(--text-body);
+  font-weight: 500;
+}
+
+.filter-option-chip-remove {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  margin-left: 0.25rem;
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
+.filter-option-chip-remove:hover {
+  color: var(--danger-text);
+}
+
+.filter-option-more {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--border);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Category Assignment Pills */
+.filter-cat-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.filter-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  color: var(--primary-hover);
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.filter-cat-empty {
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+  background-color: var(--bg);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+}

@@ -1,0 +1,72 @@
+/* ==========================================================================
+   PCForge Page Module - Promotions & Coupons Management
+   Modern SaaS Light Theme
+   ========================================================================== */
+
+/* Code Badge */
+.coupon-code-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--primary-light);
+  color: var(--primary-hover);
+  font-weight: 800;
+  font-size: 0.825rem;
+  font-family: monospace;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--primary-border);
+}
+
+/* Discount Type & Rate Badge */
+.discount-rate-badge {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+}
+
+.discount-rate-badge.percentage {
+  background-color: var(--success-light);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
+}
+
+.discount-rate-badge.flat {
+  background-color: var(--info-light);
+  color: var(--info-text);
+  border: 1px solid var(--info-border);
+}
+
+/* Receipt Preview Card inside Coupon Modals */
+.receipt-preview-card {
+  background-color: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.85rem 1rem;
+  margin-top: 0.5rem;
+}
+
+.receipt-preview-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+}
+
+.receipt-preview-details {
+  font-size: 0.825rem;
+  color: var(--text-body);
+  line-height: 1.5;
+}
+
+/* Coupon Action Buttons Group in Table */
+.coupon-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}

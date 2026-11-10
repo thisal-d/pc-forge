@@ -1,0 +1,55 @@
+# ==============================================================================
+# GitHub Dependabot Configuration — PCForge (SE3090 Lecture 08 §7)
+# Automated daily/weekly dependency vulnerability scanning & pull requests
+# ==============================================================================
+version: 2
+updates:
+  # 1. React Web Admin Dependencies (npm)
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "web"
+
+  # 2. ASP.NET Core Backend Dependencies (NuGet)
+  - package-ecosystem: "nuget"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "backend"
+
+  # 3. Python AI Microservice Dependencies (pip)
+  - package-ecosystem: "pip"
+    directory: "/ai_service"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ai-service"
+
+  # 4. Flutter Mobile App Dependencies (pub)
+  - package-ecosystem: "pub"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "mobile"
+
+  # 5. GitHub Actions Workflow Tooling
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci/cd"
